@@ -163,6 +163,111 @@ mod tests {
         assert!(total_compared > 0, "비교 대상 문단이 0개");
     }
 
+    // ─── 문자별 폭 진단 (Task 400) ───
+
+    /// 줄별 텍스트를 추출하고 rhwp 측정 폭 vs available_width를 비교
+    #[test]
+    fn test_lineseg_width_diagnosis_basic() {
+        use crate::renderer::layout::{estimate_text_width, resolved_to_text_style};
+        use crate::renderer::style_resolver::detect_lang_category;
+        use crate::renderer::composer::find_active_char_shape;
+
+        let Some((document, styles)) = load_raw("samples/lseg-01-basic.hwp") else { return };
+        let dpi = 96.0;
+        let section = &document.sections[0];
+        let page_def = &section.section_def.page_def;
+        let column_def = find_column_def_for_paragraph(&section.paragraphs, 0);
+        let layout = PageLayoutInfo::from_page_def(page_def, &column_def, dpi);
+        let col_area = &layout.column_areas[0];
+
+        for (pi, para) in section.paragraphs.iter().enumerate() {
+            if para.line_segs.is_empty() || para.text.is_empty() { continue; }
+            if para.line_segs[0].line_height == 0 { continue; }
+
+            let para_style = styles.para_styles.get(para.para_shape_id as usize);
+            let margin_left = para_style.map(|s| s.margin_left).unwrap_or(0.0);
+            let margin_right = para_style.map(|s| s.margin_right).unwrap_or(0.0);
+            let available_width = col_area.width - margin_left - margin_right;
+            let available_hwp = crate::renderer::px_to_hwpunit(available_width, dpi);
+
+            let text_chars: Vec<char> = para.text.chars().collect();
+
+            eprintln!("\n=== 문단 {} (줄 {}개, 가용폭 {:.1}px = {} HU) ===",
+                pi, para.line_segs.len(), available_width, available_hwp);
+
+            for (li, ls) in para.line_segs.iter().enumerate() {
+                let utf16_start = ls.text_start as usize;
+                let utf16_end = if li + 1 < para.line_segs.len() {
+                    para.line_segs[li + 1].text_start as usize
+                } else {
+                    para.char_offsets.last().map(|&o| o as usize + 1).unwrap_or(text_chars.len())
+                };
+
+                // UTF-16 offset → char index 변환
+                let char_start = para.char_offsets.iter()
+                    .position(|&o| o as usize >= utf16_start).unwrap_or(0);
+                let char_end = para.char_offsets.iter()
+                    .position(|&o| o as usize >= utf16_end).unwrap_or(text_chars.len());
+                let line_text: String = text_chars[char_start..char_end.min(text_chars.len())].iter().collect();
+
+                // TextStyle 생성
+                let active_cs_id = find_active_char_shape(&para.char_shapes, char_start as u32);
+                let first_ch = line_text.chars().next().unwrap_or('가');
+                let lang = detect_lang_category(first_ch);
+                let ts = resolved_to_text_style(&styles, active_cs_id as u32, lang);
+
+                // 줄 전체 폭 측정
+                let measured_width = estimate_text_width(&line_text, &ts);
+                let measured_hwp = crate::renderer::px_to_hwpunit(measured_width, dpi);
+                let orig_seg_width = ls.segment_width;
+
+                // 문자별 개별 폭 합산
+                let mut hangul_count = 0usize;
+                let mut latin_count = 0usize;
+                let mut space_count = 0usize;
+                let mut punct_count = 0usize;
+                let mut hangul_total = 0.0f64;
+                let mut latin_total = 0.0f64;
+                let mut space_total = 0.0f64;
+                let mut punct_total = 0.0f64;
+
+                for ch in line_text.chars() {
+                    let cw = estimate_text_width(&ch.to_string(), &ts);
+                    if ch >= '\u{AC00}' && ch <= '\u{D7AF}' {
+                        hangul_count += 1; hangul_total += cw;
+                    } else if ch.is_ascii_alphabetic() {
+                        latin_count += 1; latin_total += cw;
+                    } else if ch == ' ' {
+                        space_count += 1; space_total += cw;
+                    } else {
+                        punct_count += 1; punct_total += cw;
+                    }
+                }
+
+                eprintln!(
+                    "  L{}: chars=[{}..{}) len={} | measured={:.1}px({}HU) seg_width={}HU delta={}",
+                    li, char_start, char_end, line_text.chars().count(),
+                    measured_width, measured_hwp, orig_seg_width,
+                    measured_hwp - orig_seg_width
+                );
+                eprintln!(
+                    "    한글:{}자({:.1}px) 영문:{}자({:.1}px) 공백:{}자({:.1}px) 기타:{}자({:.1}px)",
+                    hangul_count, hangul_total, latin_count, latin_total,
+                    space_count, space_total, punct_count, punct_total
+                );
+
+                // 첫 5글자의 개별 폭 출력
+                let detail_chars: Vec<(char, f64)> = line_text.chars().take(10)
+                    .map(|ch| (ch, estimate_text_width(&ch.to_string(), &ts)))
+                    .collect();
+                let detail_str: Vec<String> = detail_chars.iter()
+                    .map(|(c, w)| format!("'{}'{:.2}", c, w))
+                    .collect();
+                eprintln!("    처음10자: {}", detail_str.join(" "));
+            }
+        }
+    }
+
     // ─── 통제된 샘플 (lseg-*) 개별 비교 ───
 
     #[test]
