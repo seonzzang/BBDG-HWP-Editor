@@ -916,6 +916,7 @@ impl DocumentCore {
         // Table 구조체
         let row_sizes: Vec<i16> = (0..row_count).map(|_| col_count as i16).collect();
         // raw_ctrl_data: treat_as_char + vert=Page(0) + horz=Para(3) + wrap=TopAndBottom(1)
+        #[allow(clippy::identity_op)]
         let flags: u32 = (1 << 0) /* treat_as_char */
             | (0 << 3) /* vert=Page */
             | (3 << 8) /* horz=Para */

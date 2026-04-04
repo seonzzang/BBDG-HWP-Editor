@@ -152,10 +152,8 @@ impl Paginator {
                 if has_tac {
                     // 표 실측 높이 합산 (outer_top 포함, outer_bottom 제외)
                     // 캡션은 paginate_table_control에서 별도 처리하므로 여기서는 제외
-                    // 마지막 TAC의 trailing line_spacing 제외 (텍스트 trailing_ls와 동일 원칙)
-                    let tac_total_count = para.controls.iter()
-                        .filter(|c| matches!(c, Control::Table(t) if t.common.treat_as_char))
-                        .count();
+                    // 표 실측 높이 합산 (outer_top + line_spacing 포함, outer_bottom 제외)
+                    // 캡션은 paginate_table_control에서 별도 처리하므로 여기서는 제외
                     let mut tac_ci = 0usize;
                     let tac_h: f64 = para.controls.iter().enumerate()
                         .filter_map(|(ci, c)| {
@@ -173,15 +171,10 @@ impl Paginator {
                                     }).unwrap_or(0.0);
                                     let outer_top = crate::renderer::hwpunit_to_px(
                                         t.outer_margin_top as i32, self.dpi);
-                                    let is_last = tac_ci + 1 == tac_total_count;
-                                    let ls = if !is_last {
-                                        para.line_segs.get(tac_ci)
-                                            .filter(|seg| seg.line_spacing > 0)
-                                            .map(|seg| crate::renderer::hwpunit_to_px(seg.line_spacing, self.dpi))
-                                            .unwrap_or(0.0)
-                                    } else {
-                                        0.0 // trailing line_spacing 제외
-                                    };
+                                    let ls = para.line_segs.get(tac_ci)
+                                        .filter(|seg| seg.line_spacing > 0)
+                                        .map(|seg| crate::renderer::hwpunit_to_px(seg.line_spacing, self.dpi))
+                                        .unwrap_or(0.0);
                                     tac_ci += 1;
                                     Some(mt_h + outer_top + ls)
                                 } else { None }
@@ -212,7 +205,18 @@ impl Paginator {
             let tac_table_count_for_flush = para.controls.iter()
                 .filter(|c| matches!(c, Control::Table(t) if t.common.treat_as_char))
                 .count();
-            if st.current_height + para_height_for_fit > available_height + 0.5
+            // trailing ls 경계 조건: trailing ls 제거 시 들어가면 flush 안 함
+            let has_tac_for_flush = para.controls.iter().any(|c|
+                matches!(c, Control::Table(t) if t.common.treat_as_char));
+            let trailing_tac_ls = if has_tac_for_flush {
+                para.line_segs.last()
+                    .filter(|seg| seg.line_spacing > 0)
+                    .map(|seg| crate::renderer::hwpunit_to_px(seg.line_spacing, self.dpi))
+                    .unwrap_or(0.0)
+            } else { 0.0 };
+            let fit_without_trail = st.current_height + para_height_for_fit - trailing_tac_ls <= available_height + 0.5;
+            let fit_with_trail = st.current_height + para_height_for_fit <= available_height + 0.5;
+            if !fit_with_trail && !fit_without_trail
                 && !st.current_items.is_empty()
                 && has_table
                 && tac_table_count_for_flush <= 1
@@ -1016,9 +1020,18 @@ impl Paginator {
             .filter(|c| matches!(c, Control::Table(t) if t.common.treat_as_char))
             .count();
         let table_total_height = if is_tac_table && para_height > 0.0 && tac_table_count <= 1 {
-            // TAC 표: 실측 높이 + 호스트 간격 (trailing line_spacing 제외)
-            // trailing ls는 다음 문단과의 간격이므로 fit 체크에서 제외
-            effective_height + host_spacing - host_line_spacing
+            // TAC 표: 실측 높이 + 호스트 간격
+            // trailing ls: 이 표가 페이지 마지막 항목이 될 수 있으면 제외
+            // (다음 문단이 없거나, trailing ls 제거 시에만 들어가는 경우)
+            let full_h = effective_height + host_spacing;
+            let without_trail = full_h - host_line_spacing;
+            let remaining = (st.available_height() - st.current_height).max(0.0);
+            if without_trail <= remaining + 0.5 && full_h > remaining + 0.5 {
+                // trailing ls 제거해야만 들어가는 경계 → 제거 (페이지 마지막)
+                without_trail
+            } else {
+                full_h
+            }
         } else if is_tac_table && tac_table_count > 1 {
             // 다중 TAC 표: LINE_SEG 데이터로 개별 표 높이 계산
             // LINE_SEG[k] = k번째 TAC 표의 줄 높이(표 높이 포함) + 줄간격

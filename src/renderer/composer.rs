@@ -319,8 +319,7 @@ fn compose_lines(para: &Paragraph) -> Vec<ComposedLine> {
 
         // 강제 줄넘김(\n) + TAC 표 문단 처리 (Task #19/Task #20)
         let newline_pos = line_text.find('\n');
-        if has_tac && newline_pos.is_some() {
-            let nl_pos = newline_pos.unwrap();
+        if let (true, Some(nl_pos)) = (has_tac, newline_pos) {
             let pre_text: String = line_text.chars().take(nl_pos).collect();
             let pre_end = text_start + nl_pos;
 

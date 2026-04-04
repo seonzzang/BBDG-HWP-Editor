@@ -1123,7 +1123,23 @@ fn dump_controls(args: &[String]) {
                         dump_shape(shape, "  ", &dump_common, &dump_shape_attr);
                     }
                     Control::Picture(pic) => {
-                        println!("{}그림: bin_data_id={}", prefix, pic.image_attr.bin_data_id);
+                        let sa = &pic.shape_attr;
+                        println!("{}그림: bin_id={}, common={}×{} ({:.1}×{:.1}mm), orig={}×{} ({:.1}×{:.1}mm), cur={}×{} ({:.1}×{:.1}mm), tac={}",
+                            prefix, pic.image_attr.bin_data_id, pic.common.width, pic.common.height,
+                            pic.common.width as f64 / 7200.0 * 25.4, pic.common.height as f64 / 7200.0 * 25.4,
+                            sa.original_width, sa.original_height,
+                            sa.original_width as f64 / 7200.0 * 25.4, sa.original_height as f64 / 7200.0 * 25.4,
+                            sa.current_width, sa.current_height,
+                            sa.current_width as f64 / 7200.0 * 25.4, sa.current_height as f64 / 7200.0 * 25.4,
+                            pic.common.treat_as_char);
+                        println!("{}  border_x={:?} border_y={:?} border_color=#{:06X} border_width={} ({:.2}mm) border_attr={:?}",
+                            prefix, pic.border_x, pic.border_y,
+                            pic.border_color, pic.border_width, pic.border_width as f64 / 7200.0 * 25.4,
+                            pic.border_attr);
+                        println!("{}  crop=({},{},{},{}) crop_mm=({:.2},{:.2},{:.2},{:.2})",
+                            prefix, pic.crop.left, pic.crop.top, pic.crop.right, pic.crop.bottom,
+                            pic.crop.left as f64 / 7200.0 * 25.4, pic.crop.top as f64 / 7200.0 * 25.4,
+                            pic.crop.right as f64 / 7200.0 * 25.4, pic.crop.bottom as f64 / 7200.0 * 25.4);
                         dump_common(&pic.common, "  ");
                     }
                     Control::Header(h) => {
@@ -1182,6 +1198,20 @@ fn dump_controls(args: &[String]) {
                                             }
                                             desc
                                         }
+                                        Control::Picture(pic) => {
+                                            let sa = &pic.shape_attr;
+                                            format!("그림: bin_id={}, common={}×{} ({:.1}×{:.1}mm), orig={}×{} ({:.1}×{:.1}mm), cur={}×{} ({:.1}×{:.1}mm), tac={}, crop=({},{},{},{}) crop_mm=({:.2},{:.2},{:.2},{:.2})",
+                                            pic.image_attr.bin_data_id, pic.common.width, pic.common.height,
+                                            pic.common.width as f64 / 7200.0 * 25.4, pic.common.height as f64 / 7200.0 * 25.4,
+                                            sa.original_width, sa.original_height,
+                                            sa.original_width as f64 / 7200.0 * 25.4, sa.original_height as f64 / 7200.0 * 25.4,
+                                            sa.current_width, sa.current_height,
+                                            sa.current_width as f64 / 7200.0 * 25.4, sa.current_height as f64 / 7200.0 * 25.4,
+                                            pic.common.treat_as_char,
+                                            pic.crop.left, pic.crop.top, pic.crop.right, pic.crop.bottom,
+                                            pic.crop.left as f64 / 7200.0 * 25.4, pic.crop.top as f64 / 7200.0 * 25.4,
+                                            pic.crop.right as f64 / 7200.0 * 25.4, pic.crop.bottom as f64 / 7200.0 * 25.4)
+                                        },
                                         _ => format!("{:?}", std::mem::discriminant(hc)),
                                     };
                                     println!("{}  hp[{}] ctrl[{}]: {}", prefix, hpi, hci, cn);
@@ -1196,6 +1226,30 @@ fn dump_controls(args: &[String]) {
                             .collect::<Vec<_>>()
                             .join(" ");
                         println!("{}꼬리말({:?}): paras={} \"{}\"", prefix, f.apply_to, f.paragraphs.len(), text);
+                        for (fpi, fp) in f.paragraphs.iter().enumerate() {
+                            if !fp.controls.is_empty() {
+                                for (fci, fc) in fp.controls.iter().enumerate() {
+                                    let cn = match fc {
+                                        Control::Picture(pic) => {
+                                            let sa = &pic.shape_attr;
+                                            format!("그림: bin_id={}, common={}×{} ({:.1}×{:.1}mm), orig={}×{} ({:.1}×{:.1}mm), cur={}×{} ({:.1}×{:.1}mm), tac={}, crop=({},{},{},{}) crop_mm=({:.2},{:.2},{:.2},{:.2})",
+                                            pic.image_attr.bin_data_id, pic.common.width, pic.common.height,
+                                            pic.common.width as f64 / 7200.0 * 25.4, pic.common.height as f64 / 7200.0 * 25.4,
+                                            sa.original_width, sa.original_height,
+                                            sa.original_width as f64 / 7200.0 * 25.4, sa.original_height as f64 / 7200.0 * 25.4,
+                                            sa.current_width, sa.current_height,
+                                            sa.current_width as f64 / 7200.0 * 25.4, sa.current_height as f64 / 7200.0 * 25.4,
+                                            pic.common.treat_as_char,
+                                            pic.crop.left, pic.crop.top, pic.crop.right, pic.crop.bottom,
+                                            pic.crop.left as f64 / 7200.0 * 25.4, pic.crop.top as f64 / 7200.0 * 25.4,
+                                            pic.crop.right as f64 / 7200.0 * 25.4, pic.crop.bottom as f64 / 7200.0 * 25.4)
+                                        },
+                                        _ => format!("{:?}", std::mem::discriminant(fc)),
+                                    };
+                                    println!("{}  fp[{}] ctrl[{}]: {}", prefix, fpi, fci, cn);
+                                }
+                            }
+                        }
                     }
                     Control::Footnote(fn_) => {
                         println!("{}각주: paragraphs={}", prefix, fn_.paragraphs.len());
@@ -1643,7 +1697,7 @@ fn gen_table(args: &[String]) {
 }
 
 fn test_field_roundtrip(args: &[String]) {
-    let input = args.get(0).map(|s| s.as_str()).unwrap_or("hwp_webctl/bsbc01_10_000.hwp");
+    let input = args.first().map(|s| s.as_str()).unwrap_or("hwp_webctl/bsbc01_10_000.hwp");
     let output = args.get(1).map(|s| s.as_str()).unwrap_or("output/field_test.hwp");
     
     let data = std::fs::read(input).expect("파일 읽기 실패");

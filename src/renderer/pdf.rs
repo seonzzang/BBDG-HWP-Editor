@@ -25,9 +25,8 @@ fn create_fontdb() -> usvg::fontdb::Database {
 /// SVG에서 없는 한글 폰트명에 fallback 추가
 #[cfg(not(target_arch = "wasm32"))]
 fn add_font_fallbacks(svg: &str) -> String {
-    let svg = svg.replace("font-family=\"휴먼명조\"", "font-family=\"휴먼명조, 바탕, serif\"");
-    let svg = svg.replace("font-family=\"HCI Poppy\"", "font-family=\"HCI Poppy, 맑은 고딕, sans-serif\"");
-    svg
+    svg.replace("font-family=\"휴먼명조\"", "font-family=\"휴먼명조, 바탕, serif\"")
+       .replace("font-family=\"HCI Poppy\"", "font-family=\"HCI Poppy, 맑은 고딕, sans-serif\"")
 }
 
 /// 단일 SVG를 PDF로 변환

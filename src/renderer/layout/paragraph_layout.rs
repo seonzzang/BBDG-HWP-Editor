@@ -1513,13 +1513,13 @@ impl LayoutEngine {
                                         color: eq.color,
                                         font_size: font_size_px,
                                         section_index: Some(section_index),
-                                        para_index: if cell_ctx.is_some() {
-                                            Some(cell_ctx.as_ref().unwrap().parent_para_index)
+                                        para_index: if let Some(ref ctx) = cell_ctx {
+                                            Some(ctx.parent_para_index)
                                         } else {
                                             Some(para_index)
                                         },
-                                        control_index: if cell_ctx.is_some() {
-                                            Some(cell_ctx.as_ref().unwrap().path[0].control_index)
+                                        control_index: if let Some(ref ctx) = cell_ctx {
+                                            Some(ctx.path[0].control_index)
                                         } else {
                                             Some(tac_ci)
                                         },
