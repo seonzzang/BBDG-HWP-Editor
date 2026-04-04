@@ -335,6 +335,10 @@ graph TB
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+## Notice
+
+본 제품은 한글과컴퓨터의 한글 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다.
+
 ## License
 
 [MIT License](LICENSE) — Copyright (c) 2025-2026 Edward Kim
