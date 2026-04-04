@@ -12,7 +12,7 @@ echo "📦 npm 패키지 준비 (v${VERSION})"
 # package.json 보완
 cat > "${PKG_DIR}/package.json" << EOF
 {
-  "name": "rhwp",
+  "name": "@rhwp/core",
   "version": "${VERSION}",
   "description": "HWP/HWPX file parser and renderer — Rust + WebAssembly",
   "type": "module",
@@ -59,19 +59,19 @@ cat > "${PKG_DIR}/README.md" << 'EOF'
 
 **알(R), 모두의 한글** — HWP/HWPX 파일 파서 & 렌더러 (Rust + WebAssembly)
 
-[![npm](https://img.shields.io/npm/v/rhwp)](https://www.npmjs.com/package/rhwp)
+[![npm](https://img.shields.io/npm/v/@rhwp/core)](https://www.npmjs.com/package/@rhwp/core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 설치
 
 ```bash
-npm install rhwp
+npm install @rhwp/core
 ```
 
 ## 사용법
 
 ```javascript
-import init, { HwpDocument } from 'rhwp';
+import init, { HwpDocument } from '@rhwp/core';
 
 // WASM 초기화
 await init();
@@ -92,7 +92,7 @@ document.getElementById('viewer').innerHTML = svg;
 ## Canvas 렌더링
 
 ```javascript
-import init, { HwpDocument } from 'rhwp';
+import init, { HwpDocument } from '@rhwp/core';
 
 await init();
 const doc = HwpDocument.load(buffer, 'document.hwp');
