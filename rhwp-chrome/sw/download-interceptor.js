@@ -23,12 +23,21 @@ export function setupDownloadInterceptor() {
 }
 
 async function handleHwpDownload(item) {
-  const settings = await chrome.storage.sync.get({ autoOpen: true });
+  try {
+    const settings = await chrome.storage.sync.get({ autoOpen: true });
 
-  if (settings.autoOpen) {
-    openViewer({
-      url: item.url,
-      filename: item.filename
-    });
+    if (settings.autoOpen) {
+      // 대용량 파일 경고 (50MB 초과)
+      if (item.fileSize > 50 * 1024 * 1024) {
+        console.warn(`[rhwp] 대용량 파일: ${item.filename} (${(item.fileSize / 1024 / 1024).toFixed(1)}MB)`);
+      }
+
+      openViewer({
+        url: item.url,
+        filename: item.filename
+      });
+    }
+  } catch (err) {
+    console.error('[rhwp] 다운로드 인터셉터 오류:', err);
   }
 }
