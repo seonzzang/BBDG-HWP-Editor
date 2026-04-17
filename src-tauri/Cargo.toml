@@ -1,0 +1,19 @@
+[package]
+name = "rhwp-studio"
+version = "0.7.2"
+description = "RHWP Studio Desktop"
+authors = ["Edward Kim"]
+license = "MIT"
+repository = "https://github.com/pureink-studio/rhwp"
+edition = "2021"
+rust-version = "1.75"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "2", features = [] }
+tauri-plugin-fs = "2.0"
+tauri-plugin-dialog = "2.0"

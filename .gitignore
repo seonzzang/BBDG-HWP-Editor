@@ -1,0 +1,36 @@
+# Node.js
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+.eslintcache
+
+# Rust / Cargo
+/target/
+Cargo.lock
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/bin/
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Temporary files
+*.log
+tmp/
+temp/
+
+# Build artifacts (Optional - usually excluded for source repos)
+*.exe
+*.msi
+BBDG_Final_Builds/
