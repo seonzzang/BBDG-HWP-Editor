@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/logo/logo-256.png" alt="rhwp logo" width="128" />
+  <img src="assets/logo/logo-256.png" alt="BBDG HWP Editor logo" width="128" />
 </p>
 
-<h1 align="center">rhwp</h1>
+<h1 align="center">BBDG HWP Editor</h1>
 
 <p align="center">
-  <strong>알(R), 모두의 한글</strong> — 알에서 시작하다<br/>
-  <em>All HWP, Open for Everyone</em>
+  <strong>비비디글로벌(주) 전용 폐쇄망 최적화 HWPX 에디터</strong><br/>
+  <em>Optimized for Enterprise Security & High-Performance Layout</em>
 </p>
 
 <p align="center">
@@ -25,68 +25,30 @@
 
 ---
 
-HWP 파일을 **어디서든** 열어보세요. 무료, 설치 없이.
+본 소프트웨어는 오픈소스 `rhwp` 엔진을 리패키징한 **BBDG-HWP-Editor**입니다. 비비디글로벌(주) 사내 보안 정책에 따라 외부 통신 없이 로컬에서만 작동하도록 최적화되었으며, 대형 문서 처리 성능이 대폭 강화되었습니다.
 
-rhwp는 Rust + WebAssembly 기반의 오픈소스 HWP/HWPX 뷰어/에디터입니다. 닫힌 포맷의 벽을 깨고, 모든 사람, 모든 AI, 모든 플랫폼에서 한글 문서를 자유롭게 읽고 쓸 수 있게 합니다.
+### 🚀 BBDG 리패키징 주요 특이사항
+- **3종 배포 버전 최적화**: 윈도우즈 EXE 포터블(무설치), EXE 설치형(NSIS), MSI 설치형(기업 배포용) 지원.
+- **네이티브 드래그&드랍**: 윈도우 단독 실행 시 외부 문서를 에디터로 직접 끌어다 놓아 즉시 편집 가능.
+- **대형 문서(300+ page) 성능**: Web Worker 및 Lazy Metadata Loading 기술을 적용하여 장문의 문서도 지연 없이 로드.
 
-> **[온라인 데모](https://edwardkim.github.io/rhwp/)** | **[VS Code 확장](https://marketplace.visualstudio.com/items?itemName=edwardkim.rhwp-vscode)** | **[Open VSX](https://open-vsx.org/extension/edwardkim/rhwp-vscode)**
+> **[원본 프로젝트: rhwp](https://github.com/edwardkim/rhwp)**
 
 <p align="center">
   <img src="assets/screenshots/render-example-1.png" alt="rhwp 렌더링 예시 — KTX 노선도" width="700" />
 </p>
 
-## 로드맵
+## 업데이트 기록 (Version History)
 
-혼자 뼈대를 세우고, 함께 살을 붙이고, 모두의 것으로 완성한다.
+### v2026.04.17.V.1.0.0 — 대규모 성능 최적화 & 엔터프라이즈 기능 강화
 
-```
-0.5 ──── 1.0 ──── 2.0 ──── 3.0
-뼈대      조판      협업      완성
-```
+- **[성능] Web Worker 아키텍처 도입**: WASM 엔진을 별도 스레드로 분리하여 300페이지 이상 대형 문서 로드 시 UI 프리징 완전 제거.
+- **[성능] Lazy Metadata Loading**: 문서 전체를 미리 파싱하지 않고 뷰포트에 들어오는 시점에 필요한 정보를 가져오는 프런트엔드 가상화 적용.
+- **[기능] Windows Native 지원**: 파일 시스템 연동 및 네이티브 드래그 앤 드롭 기능 구현.
+- **[UX] 프리미엄 로딩 경험**: 고해상도 로딩 오버레이 및 마일스톤별 진행 상태 피드백 추가.
+- **[배포] MSI/Setup/Portable 자동화**: 기업 환경에 최적화된 3가지 형태의 빌드본 제공 및 GitHub 자동 릴리즈.
 
-| 단계 | 방향 | 전략 |
-|------|------|------|
-| **0.5 → 1.0** | 읽기/쓰기 기반 위에 조판 엔진 체계화 | 핵심 아키텍처를 혼자 견고하게 |
-| **1.0 → 2.0** | AI 조판 파이프라인 위에 커뮤니티 참여 개방 | 기여 진입 장벽을 낮추는 구조 |
-| **2.0 → 3.0** | 커뮤니티가 채운 기능 위에 공공 자산화 | 한컴 대등 수준 달성 |
-
-> 0.5.0까지 혼자 뼈대를 완성하고 공개하는 이유 — 커뮤니티가 붙었을 때 방향이 흔들리지 않으려면 핵심 아키텍처가 먼저 견고해야 합니다.
-
-## 이정표
-
-### v0.5.0 — 뼈대 (현재)
-
-> 역공학 완성, 읽기/쓰기 기반 구축
-
-- HWP 5.0 / HWPX 파서, 문단·표·수식·이미지·차트 렌더링
-- 페이지네이션 (다단 분할, 표 행 분할), 머리말/꼬리말/바탕쪽/각주
-- SVG 내보내기 (CLI) + Canvas 렌더링 (WASM/Web)
-- 웹 에디터 + hwpctl 호환 API (30 Actions, Field API)
-- 783+ 테스트
-
-### v1.0.0 — 조판 엔진
-
-> AI 조판 파이프라인, 뼈대 완성
-
-- 편집 시 동적 재조판 체계화 (LINE_SEG 재계산 + 페이지네이션 연동)
-- AI 기반 문서 생성/편집 파이프라인
-- 문서 조판 품질 한컴 뷰어 수준 도달
-
-### v2.0.0 — 협업
-
-> 커뮤니티가 기능을 채워가는 단계, 살 붙이기
-
-- 플러그인/확장 아키텍처, 실시간 협업 편집
-- 다양한 출력 포맷 (PDF, DOCX 등)
-
-### v3.0.0 — 완성
-
-> 한컴과 대등한 수준, 완전한 공공 자산
-
-- 전체 HWP 기능 커버리지, 접근성(a11y), 모바일 대응
-- 공공기관 실무 투입 가능 수준
-
-자세한 내용은 [로드맵 문서](mydocs/report/rhwp-milestone.md)를 참조하세요.
+---
 
 ---
 
