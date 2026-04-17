@@ -32,7 +32,7 @@ export class AboutDialog extends ModalDialog {
     version.style.fontSize = '13px';
     version.style.color = '#64748b';
     version.style.marginBottom = '20px';
-    version.textContent = 'Version 2026.04.17.V.1.0.0';
+    version.textContent = 'Version 2026.04.17.V.1.1.0';
     body.appendChild(version);
 
     // 정책 전문 영역 (스크롤 가능)
@@ -53,7 +53,7 @@ export class AboutDialog extends ModalDialog {
     licenseBox.innerHTML = `
 <div style="font-weight: bold; font-size: 13px; margin-bottom: 10px;">[ 1. 제품 및 제조사 정보 ]</div>
 제품명: BBDG HWP Editor
-버전: 2026.04.17.V.1.0.0
+버전: 2026.04.17.V.1.1.0
 제조사: 비비디글로벌(주) (BBD Global Co., Ltd.)
 Copyright: © 2026 BBD Global Co., Ltd. All rights reserved.
 
