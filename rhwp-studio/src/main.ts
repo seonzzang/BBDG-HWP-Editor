@@ -23,9 +23,11 @@ import { CellSelectionRenderer } from '@/engine/cell-selection-renderer';
 import { TableObjectRenderer } from '@/engine/table-object-renderer';
 import { TableResizeRenderer } from '@/engine/table-resize-renderer';
 import { Ruler } from '@/view/ruler';
+import { LoadingOverlay } from '@/ui/loading-overlay';
 
 const wasm = new WasmBridge();
 const eventBus = new EventBus();
+const loadingOverlay = new LoadingOverlay();
 
 // E2E 테스트용 전역 노출 (개발 모드 전용)
 if (import.meta.env.DEV) {
@@ -88,9 +90,12 @@ async function initialize(): Promise<void> {
   const msg = sbMessage();
   try {
     msg.textContent = '웹폰트 로딩 중...';
+    loadingOverlay.show('폰트 로딩 중...');
     await loadWebFonts([]);  // CSS @font-face 등록 + CRITICAL 폰트만 로드
     msg.textContent = 'WASM 로딩 중...';
+    loadingOverlay.updateProgress(30, 'WAS 엔진 초기화 중...');
     await wasm.initialize();
+    loadingOverlay.hide();
     msg.textContent = 'HWP 파일을 선택해주세요.';
 
     const container = document.getElementById('scroll-container')!;
@@ -404,12 +409,15 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
   const msg = sbMessage();
   try {
     console.log('[initDoc] 1. 폰트 로딩 시작');
+    loadingOverlay.show('필요한 폰트를 불러오고 있습니다...');
     if (docInfo.fontsUsed?.length) {
       await loadWebFonts(docInfo.fontsUsed, (loaded, total) => {
         msg.textContent = `폰트 로딩 중... (${loaded}/${total})`;
+        loadingOverlay.updateProgress((loaded / total) * 100, `폰트 로딩 중... (${loaded}/${total})`);
       });
     }
     console.log('[initDoc] 2. 폰트 로딩 완료');
+    loadingOverlay.updateProgress(100, '문서 구성 중...');
     msg.textContent = displayName;
     totalSections = docInfo.sectionCount ?? 1;
     sbSection().textContent = `구역: 1 / ${totalSections}`;
@@ -424,7 +432,9 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
     console.log('[initDoc] 7. inputHandler activateWithCaretPosition');
     inputHandler?.activateWithCaretPosition();
     console.log('[initDoc] 8. 완료');
+    loadingOverlay.hide();
   } catch (error) {
+    loadingOverlay.hide();
     console.error('[initDoc] 오류:', error);
     if (window.innerWidth < 768) alert(`초기화 오류: ${error}`);
   }
@@ -434,12 +444,14 @@ async function loadFile(file: File): Promise<void> {
   const msg = sbMessage();
   try {
     msg.textContent = '파일 로딩 중...';
+    loadingOverlay.show('문서를 분석하고 있습니다...');
     const startTime = performance.now();
     const data = new Uint8Array(await file.arrayBuffer());
     const docInfo = wasm.loadDocument(data, file.name);
     const elapsed = performance.now() - startTime;
     await initializeDocument(docInfo, `${file.name} — ${docInfo.pageCount}페이지 (${elapsed.toFixed(1)}ms)`);
   } catch (error) {
+    loadingOverlay.hide();
     const errMsg = `파일 로드 실패: ${error}`;
     msg.textContent = errMsg;
     console.error('[main] 파일 로드 실패:', error);

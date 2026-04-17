@@ -1,0 +1,89 @@
+/* BBDG HWP Editor - Loading Overlay Styles */
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 10, 12, 0.95);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    color: #ffffff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.loading-overlay.active {
+    opacity: 1;
+}
+
+.loading-content {
+    text-align: center;
+    width: 100%;
+    max-width: 400px;
+    padding: 20px;
+}
+
+.loading-logo-container {
+    margin-bottom: 24px;
+    animation: pulse 2s infinite ease-in-out;
+}
+
+.loading-logo {
+    height: 60px;
+    width: auto;
+}
+
+.loading-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #ffffff 0%, #a1a1a1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.loading-subtitle {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 40px;
+}
+
+.loading-progress-container {
+    margin-bottom: 16px;
+}
+
+.loading-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.loading-progress-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb, #60a5fa);
+    border-radius: 2px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+}
+
+.loading-status {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(37, 99, 235, 0)); }
+    50% { transform: scale(1.05); filter: drop-shadow(0 0 15px rgba(37, 99, 235, 0.3)); }
+    100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(37, 99, 235, 0)); }
+}
