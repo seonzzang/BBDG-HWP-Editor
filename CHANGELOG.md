@@ -2,6 +2,16 @@
 
 
 
+## [0.7.7] ??2026-04-20
+
+### Automated Release Notes
+- Version bumped automatically by Version Agent.
+- Changed files included in this commit:
+- `rhwp-studio/src/view/canvas-view.ts`
+
+
+
+
 ## [0.7.6] ??2026-04-20
 
 ### Automated Release Notes

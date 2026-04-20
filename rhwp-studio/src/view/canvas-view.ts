@@ -98,18 +98,22 @@ export class CanvasView {
 
     const prefetchPages = this.virtualScroll.getPrefetchPages(scrollY, vpHeight);
     const visiblePages = this.virtualScroll.getVisiblePages(scrollY, vpHeight);
+    const vpCenter = scrollY + vpHeight / 2;
+    const currentPage = this.virtualScroll.getPageAtY(vpCenter);
+    const windowPages = this.getPageWindow(currentPage);
+    const retainedPages = Array.from(new Set([...prefetchPages, ...windowPages])).sort((a, b) => a - b);
 
     // 벗어난 페이지 해제
-    const prefetchSet = new Set(prefetchPages);
+    const retainedSet = new Set(retainedPages);
     for (const pageIdx of this.canvasPool.activePages) {
-      if (!prefetchSet.has(pageIdx)) {
+      if (!retainedSet.has(pageIdx)) {
         this.pageRenderer.cancelReRender(pageIdx);
         this.canvasPool.release(pageIdx);
       }
     }
 
     // 새로 보이는 페이지 렌더링
-    for (const pageIdx of prefetchPages) {
+    for (const pageIdx of retainedPages) {
       if (!this.canvasPool.has(pageIdx)) {
         this.renderPage(pageIdx);
       }
@@ -117,9 +121,7 @@ export class CanvasView {
 
     // 현재 페이지 번호 갱신
     if (visiblePages.length > 0) {
-      const vpCenter = scrollY + vpHeight / 2;
-      const currentPage = this.virtualScroll.getPageAtY(vpCenter);
-      this.logPageWindow(currentPage, prefetchPages, visiblePages);
+      this.logPageWindow(currentPage, prefetchPages, visiblePages, retainedPages);
       this.eventBus.emit(
         'current-page-changed',
         currentPage,
@@ -130,15 +132,30 @@ export class CanvasView {
     this.currentVisiblePages = visiblePages;
   }
 
-  private logPageWindow(currentPage: number, prefetchPages: number[], visiblePages: number[]): void {
+  private getPageWindow(currentPage: number): number[] {
+    const pageCount = this.virtualScroll.pageCount;
+    if (pageCount === 0) return [];
+
     const windowStart = Math.max(0, currentPage - DEFAULT_PAGE_WINDOW_RADIUS);
-    const windowEnd = Math.min(this.virtualScroll.pageCount - 1, currentPage + DEFAULT_PAGE_WINDOW_RADIUS);
+    const windowEnd = Math.min(pageCount - 1, currentPage + DEFAULT_PAGE_WINDOW_RADIUS);
+    const pages: number[] = [];
+    for (let pageIdx = windowStart; pageIdx <= windowEnd; pageIdx++) {
+      pages.push(pageIdx);
+    }
+    return pages;
+  }
+
+  private logPageWindow(currentPage: number, prefetchPages: number[], visiblePages: number[], retainedPages: number[]): void {
+    const windowPages = this.getPageWindow(currentPage);
+    const windowStart = windowPages[0] ?? 0;
+    const windowEnd = windowPages[windowPages.length - 1] ?? 0;
     const signature = [
       currentPage,
       windowStart,
       windowEnd,
       visiblePages.join(','),
       prefetchPages.join(','),
+      retainedPages.join(','),
     ].join('|');
 
     if (signature === this.lastWindowLogSignature) return;
@@ -150,6 +167,7 @@ export class CanvasView {
       targetWindow: [windowStart, windowEnd],
       visiblePages,
       prefetchPages,
+      retainedPages,
       activeCanvasPages: Array.from(this.canvasPool.activePages).sort((a, b) => a - b),
     });
   }
