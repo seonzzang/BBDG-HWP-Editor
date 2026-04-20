@@ -52,6 +52,7 @@ export class CanvasView {
 
     const traceId = `canvas-load:${Date.now()}`;
     let pageCount = this.wasm.pageCount;
+    const initialFullPageCount = pageCount;
     const progressiveEnabled = this.wasm.supportsProgressivePaging();
     const progressiveChunkSize = 24;
     if (DEBUG_PROGRESSIVE_PAGING) {
@@ -126,6 +127,23 @@ export class CanvasView {
         requestedPageCount: pageCount,
         collectedPageCount: this.pages.length,
       });
+    }
+
+    if (this.pages.length === 0 && initialFullPageCount > 0) {
+      console.warn('[CanvasView] progressive bootstrap did not yield visible pages; falling back to initial pagination snapshot', {
+        traceId,
+        initialFullPageCount,
+        pageCount,
+      });
+      for (let i = 0; i < initialFullPageCount; i++) {
+        try {
+          this.pages.push(this.wasm.getPageInfo(i));
+        } catch (e) {
+          console.error(`[CanvasView] 초기 스냅샷 페이지 ${i} 정보 조회 실패:`, e);
+          break;
+        }
+      }
+      pageCount = this.pages.length;
     }
 
     if (this.pages.length === 0) {
