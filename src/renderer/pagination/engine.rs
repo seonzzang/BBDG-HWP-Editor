@@ -11,6 +11,50 @@ use super::*;
 use super::state::PaginationState;
 
 impl Paginator {
+    /// 증분 페이징의 한 단계를 수행한다.
+    pub fn paginate_step(
+        &self,
+        ctx: &mut IncrementalPagingContext,
+        paragraphs: &[Paragraph],
+        composed: &[ComposedParagraph],
+        styles: &ResolvedStyleSet,
+        para_styles: &[crate::renderer::style_resolver::ResolvedParaStyle],
+        page_def: &PageDef,
+        chunk_size: usize,
+    ) {
+        if ctx.is_finished {
+            return;
+        }
+
+        let measurer = HeightMeasurer::new(self.dpi);
+        let end_idx = (ctx.next_para_idx + chunk_size).min(paragraphs.len());
+
+        measurer.measure_chunk(
+            &mut ctx.measured,
+            paragraphs,
+            composed,
+            styles,
+            ctx.next_para_idx,
+            chunk_size,
+        );
+
+        ctx.next_para_idx = end_idx;
+        if ctx.next_para_idx >= paragraphs.len() {
+            let column_def = crate::document_core::DocumentCore::find_initial_column_def(paragraphs);
+            let result = self.paginate_with_measured_opts(
+                paragraphs,
+                &ctx.measured,
+                page_def,
+                &column_def,
+                ctx.state.section_index,
+                para_styles,
+                false,
+            );
+            ctx.state.pages = result.pages;
+            ctx.is_finished = true;
+        }
+    }
+
     pub fn paginate_with_measured(
         &self,
         paragraphs: &[Paragraph],

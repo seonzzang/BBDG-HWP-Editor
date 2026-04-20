@@ -2,6 +2,16 @@
 
 
 
+## [0.7.17] ??2026-04-20
+
+### Automated Release Notes
+- Version bumped automatically by Version Agent.
+- Changed files included in this commit:
+- `src/renderer/pagination/engine.rs`
+
+
+
+
 ## [0.7.16] ??2026-04-20
 
 ### Automated Release Notes

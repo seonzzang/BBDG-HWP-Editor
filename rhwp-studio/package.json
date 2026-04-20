@@ -1,6 +1,6 @@
 ﻿{
   "name": "rhwp-studio",
-  "version": "0.7.16",
+  "version": "0.7.17",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -19,6 +19,7 @@
     "@tauri-apps/plugin-shell": "^2.3.5"
   }
 }
+
 
 
 
