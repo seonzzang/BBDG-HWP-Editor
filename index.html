@@ -545,16 +545,21 @@
         <h2>최신 버전 다운로드</h2>
         <p class="subtitle">모든 파일은 한글 공식 메뉴와 멀티 플랫폼을 완벽하게 지원합니다.</p>
         
-        <div class="download-grid" id="asset-container">
-            <!-- Windows EXE -->
-            <a href="#" class="download-item" id="win-exe" target="_blank">
-                <h4>Windows (EXE)</h4>
-                <span>포터블/설치 통합형</span>
+        <div class="download-grid" id="asset-container" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+            <!-- Windows Portable -->
+            <a href="#" class="download-item" id="win-portable" target="_blank">
+                <h4>Windows (Portable)</h4>
+                <span>무설치 단일 실행 파일</span>
+            </a>
+            <!-- Windows Setup -->
+            <a href="#" class="download-item" id="win-setup" target="_blank">
+                <h4>Windows (Setup)</h4>
+                <span>표준 설치 프로그램</span>
             </a>
             <!-- Windows MSI -->
             <a href="#" class="download-item" id="win-msi" target="_blank">
                 <h4>Windows (MSI)</h4>
-                <span>기업용 대량 배포 파일</span>
+                <span>기업 전용 배포 패키지</span>
             </a>
             <!-- macOS DMG -->
             <a href="#" class="download-item" id="mac-dmg" target="_blank">
@@ -564,11 +569,11 @@
             <!-- Linux AppImage -->
             <a href="#" class="download-item" id="linux-app" target="_blank">
                 <h4>Linux (AppImage)</h4>
-                <span>범용 리눅스 실행 파일</span>
+                <span>범용 리눅스 배포판</span>
             </a>
         </div>
         <p style="margin-top: 2rem; font-size: 0.9rem; color: var(--text-muted);">
-            전체 플랫폼 릴리즈는 <a href="https://github.com/seonzzang/BBDG-HWP-Editor/releases" target="_blank" style="color: var(--primary); text-decoration: none;">GitHub Releases</a>에서도 확인 가능합니다.
+            전체 플랫폼 릴리즈 히스토리는 <a href="https://github.com/seonzzang/BBDG-HWP-Editor/releases" target="_blank" style="color: var(--primary); text-decoration: none;">GitHub Releases</a>에서 보실 수 있습니다.
         </p>
     </section>
 
@@ -602,23 +607,30 @@
                 const version = data.tag_name;
                 const assets = data.assets;
 
-                // Update Version Badge
                 const badge = document.querySelector('.version-badge');
                 if (badge) badge.innerText = `${version} 최신 버전 출시`;
 
-                // Assets Mapping
                 assets.forEach(asset => {
                     const name = asset.name.toLowerCase();
                     const url = asset.browser_download_url;
 
-                    if (name.endsWith('.exe')) document.getElementById('win-exe').href = url;
+                    // Sophisticated Match Logic
+                    if (name.endsWith('.exe')) {
+                        if (name.includes('portable')) {
+                            document.getElementById('win-portable').href = url;
+                        } else if (name.includes('setup') || name.includes('nsis')) {
+                            document.getElementById('win-setup').href = url;
+                        } else {
+                            // Default EXE to portable if undecided
+                            document.getElementById('win-portable').href = url;
+                        }
+                    }
                     if (name.endsWith('.msi')) document.getElementById('win-msi').href = url;
                     if (name.endsWith('.dmg')) document.getElementById('mac-dmg').href = url;
                     if (name.endsWith('.appimage')) document.getElementById('linux-app').href = url;
                 });
             } catch (error) {
                 console.error("Failed to fetch latest release:", error);
-                // Fallback to releases page
                 const items = document.querySelectorAll('.download-item');
                 items.forEach(item => {
                     if (item.href === "#" || item.href === window.location.href) {
