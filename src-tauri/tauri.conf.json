@@ -1,11 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "BBDG HWP Editor",
-  "version": "0.7.28",
+  "version": "0.7.29",
   "identifier": "com.bbdg.hwp-editor",
   "build": {
-    "beforeDevCommand": "cd ../rhwp-studio && npm run dev -- --host localhost --port 7700",
-    "beforeBuildCommand": "cd ../rhwp-studio && npm run build",
+    "beforeDevCommand": "powershell -NoProfile -Command \"Set-Location '../rhwp-studio'; npm run dev -- --host localhost --port 7700\"",
+    "beforeBuildCommand": "powershell -NoProfile -Command \"Set-Location '../rhwp-studio'; npm run build\"",
     "devUrl": "http://localhost:7700",
     "frontendDist": "../rhwp-studio/dist"
   },

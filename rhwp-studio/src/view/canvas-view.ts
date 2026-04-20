@@ -54,7 +54,6 @@ export class CanvasView {
     let pageCount = this.wasm.pageCount;
     const progressiveEnabled = this.wasm.supportsProgressivePaging();
     const progressiveChunkSize = 24;
-    const maxBootstrapSteps = 256;
     if (DEBUG_PROGRESSIVE_PAGING) {
       console.log('[CanvasView] paging capability', {
         traceId,
@@ -86,18 +85,18 @@ export class CanvasView {
               progressiveChunkSize,
             });
           }
-
-          let bootstrapSteps = 1;
-          while (pageCount === 0 && !this.wasm.isPagingFinished() && bootstrapSteps < maxBootstrapSteps) {
-            await new Promise((resolve) => setTimeout(resolve, 0));
-            pageCount = this.wasm.stepProgressivePaging(progressiveChunkSize);
-            bootstrapSteps += 1;
-          }
+          const bootstrapResult = await this.waitForFirstProgressivePage(
+            traceId,
+            loadGeneration,
+            progressiveChunkSize,
+            1,
+          );
+          pageCount = bootstrapResult.pageCount;
 
           if (DEBUG_PROGRESSIVE_PAGING) {
             console.log('[CanvasView] progressive bootstrap steps complete', {
               traceId,
-              bootstrapSteps,
+              bootstrapSteps: bootstrapResult.steps,
               pageCount,
               pagingFinished: this.wasm.isPagingFinished(),
             });
@@ -156,6 +155,33 @@ export class CanvasView {
     if (progressiveEnabled && !this.wasm.isPagingFinished()) {
       void this.continueProgressivePagingInBackground(traceId, loadGeneration, pageCount);
     }
+  }
+
+  private async waitForFirstProgressivePage(
+    traceId: string,
+    loadGeneration: number,
+    progressiveChunkSize: number,
+    initialSteps: number,
+  ): Promise<{ pageCount: number; steps: number }> {
+    let steps = initialSteps;
+    let pageCount = this.wasm.pageCount;
+
+    while (loadGeneration === this.loadGeneration && pageCount === 0 && !this.wasm.isPagingFinished()) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      pageCount = this.wasm.stepProgressivePaging(progressiveChunkSize);
+      steps += 1;
+
+      if (DEBUG_PROGRESSIVE_PAGING && steps % 32 === 0) {
+        console.log('[CanvasView] progressive bootstrap waiting for first page', {
+          traceId,
+          steps,
+          pageCount,
+          pagingFinished: this.wasm.isPagingFinished(),
+        });
+      }
+    }
+
+    return { pageCount, steps };
   }
 
   private async continueProgressivePagingInBackground(
