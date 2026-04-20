@@ -1,4 +1,5 @@
 export class CanvasPool {
+  private static readonly MAX_POOLED_CANVASES = 12;
   private available: HTMLCanvasElement[] = [];
   private inUse = new Map<number, HTMLCanvasElement>();
   private debugEnabled = true;
@@ -35,8 +36,12 @@ export class CanvasPool {
       // 픽셀 버퍼를 즉시 비워 범위 밖 페이지 메모리 회수를 유도한다.
       canvas.width = 0;
       canvas.height = 0;
-      this.available.push(canvas);
-      this.debugLog('release', pageIdx);
+      if (this.available.length < CanvasPool.MAX_POOLED_CANVASES) {
+        this.available.push(canvas);
+        this.debugLog('release', pageIdx);
+      } else {
+        this.debugLog('discard', pageIdx);
+      }
     }
   }
 

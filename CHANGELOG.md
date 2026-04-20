@@ -2,6 +2,16 @@
 
 
 
+## [0.7.11] ??2026-04-20
+
+### Automated Release Notes
+- Version bumped automatically by Version Agent.
+- Changed files included in this commit:
+- `rhwp-studio/src/view/canvas-pool.ts`
+
+
+
+
 ## [0.7.10] ??2026-04-20
 
 ### Automated Release Notes
