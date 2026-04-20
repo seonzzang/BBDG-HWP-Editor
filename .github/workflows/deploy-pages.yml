@@ -67,10 +67,19 @@ jobs:
         working-directory: rhwp-studio
         run: npx vite build --base=/rhwp/
 
+      - name: Prepare Deployment Directory
+        run: |
+          mkdir -p deploy/rhwp
+          # 루트의 랜딩 페이지와 자산 복사
+          cp index.html deploy/
+          cp -r assets deploy/ || true
+          # 에디터 빌드 결과물을 /rhwp/ 폴더로 이동
+          cp -r rhwp-studio/dist/* deploy/rhwp/
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: rhwp-studio/dist
+          path: deploy
 
   deploy:
     name: Deploy
