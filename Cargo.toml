@@ -35,8 +35,6 @@ unicode-segmentation = "1.12.0"
 unicode-width = "0.2.2"
 
 console_error_panic_hook = { version = "0.1", optional = true }
-tauri-plugin-fs = "2"
-tauri-plugin-dialog = "2"
 
 [features]
 default = ["console_error_panic_hook"]
@@ -48,6 +46,8 @@ usvg = "0.45"
 pdf-writer = "0.12"
 subsetter = "0.2"
 ttf-parser = "0.25"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = [

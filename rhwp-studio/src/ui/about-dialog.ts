@@ -1,109 +1,105 @@
+/**
+ * 제품 정보 / 라이센스 다이얼로그
+ *
+ * HWP 공개 스펙(hwp_spec_5.0) 저작권 조항에 따른 필수 고지 문구를 포함한다.
+ * 사용된 외부 크레이트의 오픈소스 라이선스 목록도 표시한다.
+ */
 import { ModalDialog } from './dialog';
+
+/** 외부 크레이트 라이선스 정보 */
+const THIRD_PARTY_LICENSES = [
+  { name: 'wasm-bindgen', license: 'MIT / Apache-2.0' },
+  { name: 'web-sys', license: 'MIT / Apache-2.0' },
+  { name: 'js-sys', license: 'MIT / Apache-2.0' },
+  { name: 'cfb', license: 'MIT' },
+  { name: 'flate2', license: 'MIT / Apache-2.0' },
+  { name: 'byteorder', license: 'MIT / Unlicense' },
+  { name: 'base64', license: 'MIT / Apache-2.0' },
+  { name: 'console_error_panic_hook', license: 'MIT / Apache-2.0' },
+];
 
 export class AboutDialog extends ModalDialog {
   constructor() {
-    super('제품 정보', 550);
+    super('제품 정보', 460);
   }
 
   protected createBody(): HTMLElement {
     const body = document.createElement('div');
     body.className = 'about-body';
-    body.style.padding = '25px';
-    body.style.display = 'flex';
-    body.style.flexDirection = 'column';
-    body.style.alignItems = 'center';
 
-    // 로고 (센터 정렬)
-    const logo = document.createElement('img');
-    logo.src = '/logo.png';
-    logo.style.width = '120px';
-    logo.style.marginBottom = '20px';
-    body.appendChild(logo);
+    // 제품 영문명
+    const titleEn = document.createElement('div');
+    titleEn.className = 'about-product-name';
+    titleEn.textContent = 'HWP 5.0 Compatible Module for Rust';
+    body.appendChild(titleEn);
 
-    // 제품명 및 버전
-    const title = document.createElement('div');
-    title.style.fontSize = '22px';
-    title.style.fontWeight = 'bold';
-    title.style.marginBottom = '4px';
-    title.textContent = 'BBDG HWP Editor';
-    body.appendChild(title);
+    // 제품 한글명
+    const titleKo = document.createElement('div');
+    titleKo.className = 'about-product-name-ko';
+    titleKo.textContent = '한글 문서 호환 저장 도구';
+    body.appendChild(titleKo);
 
+    // 버전
     const version = document.createElement('div');
-    version.style.fontSize = '13px';
-    version.style.color = '#64748b';
-    version.style.marginBottom = '20px';
-    version.textContent = 'Version 2026.04.17.V.1.1.0';
+    version.className = 'about-version';
+    version.textContent = `Version ${__APP_VERSION__}`;
     body.appendChild(version);
 
-    // 정책 전문 영역 (스크롤 가능)
-    const licenseBox = document.createElement('div');
-    licenseBox.style.width = '100%';
-    licenseBox.style.height = '300px';
-    licenseBox.style.overflowY = 'auto';
-    licenseBox.style.background = '#f8fafc';
-    licenseBox.style.padding = '15px';
-    licenseBox.style.border = '1px solid #e2e8f0';
-    licenseBox.style.borderRadius = '6px';
-    licenseBox.style.textAlign = 'left';
-    licenseBox.style.fontSize = '12px';
-    licenseBox.style.lineHeight = '1.6';
-    licenseBox.style.color = '#334155';
-    licenseBox.style.whiteSpace = 'pre-wrap';
+    // 기술 스택
+    const tech = document.createElement('div');
+    tech.className = 'about-tech';
+    tech.textContent = 'Rust + WebAssembly + TypeScript';
+    body.appendChild(tech);
 
-    licenseBox.innerHTML = `
-<div style="font-weight: bold; font-size: 13px; margin-bottom: 10px;">[ 1. 제품 및 제조사 정보 ]</div>
-제품명: BBDG HWP Editor
-버전: 2026.04.17.V.1.1.0
-제조사: 비비디글로벌(주) (BBD Global Co., Ltd.)
-Copyright: © 2026 BBD Global Co., Ltd. All rights reserved.
+    // HWP 스펙 고지 문구 (필수)
+    const notice = document.createElement('div');
+    notice.className = 'about-notice';
+    notice.textContent =
+      '본 제품은 한글과컴퓨터의 한글 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다.';
+    body.appendChild(notice);
 
-<div style="font-weight: bold; font-size: 13px; margin-top: 15px; margin-bottom: 10px;">[ 2. 상표권 및 권리 고지 (Notice & Trademark) ]</div>
-본 제품은 주식회사 한글과컴퓨터의 한글 문서 파일(.hwp) 공개 문서를 참고하여 개발되었습니다.
+    // 오픈소스 라이선스
+    const licenseTitle = document.createElement('div');
+    licenseTitle.className = 'about-license-title';
+    licenseTitle.textContent = '오픈소스 라이선스';
+    body.appendChild(licenseTitle);
 
-"한글", "한컴", "HWP", "HWPX"는 주식회사 한글과컴퓨터의 등록 상표입니다. 본 소프트웨어는 비비디글로벌(주)에서 리패키징 및 최적화한 도구이며, 주식회사 한글과컴퓨터와 제휴, 후원, 승인 관계가 없는 독립적인 오픈소스 기반 프로젝트입니다.
+    const licenseTable = document.createElement('table');
+    licenseTable.className = 'about-license-table';
+    for (const lib of THIRD_PARTY_LICENSES) {
+      const tr = document.createElement('tr');
+      const tdName = document.createElement('td');
+      tdName.textContent = lib.name;
+      const tdLicense = document.createElement('td');
+      tdLicense.textContent = lib.license;
+      tr.appendChild(tdName);
+      tr.appendChild(tdLicense);
+      licenseTable.appendChild(tr);
+    }
+    body.appendChild(licenseTable);
 
-"Hangul", "Hancom", "HWP", and "HWPX" are registered trademarks of Hancom Inc. This project is an independent open-source project with no affiliation, sponsorship, or endorsement by Hancom Inc.
-
-<div style="font-weight: bold; font-size: 13px; margin-top: 15px; margin-bottom: 10px;">[ 3. 원저작자 고지 (Original Author) ]</div>
-This software is based on "rhwp", an open-source project.
-Copyright (c) 2025-2026 Edward Kim
-
-<div style="font-weight: bold; font-size: 13px; margin-top: 15px; margin-bottom: 10px;">[ 4. MIT 라이선스 전문 (MIT License Text) ]</div>
-The MIT License (MIT)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-<div style="font-weight: bold; font-size: 13px; margin-top: 15px; margin-bottom: 10px;">[ 5. 사내 보안 정책 안내 (Internal Security Policy) ]</div>
-본 소프트웨어는 BBDG 사내 보안 정책 및 정부 부처 상주 인력의 업무 환경을 고려하여, 외부 서버 통신 기능을 배제하고 모든 문서 처리를 로컬 시스템 내에서만 수행하도록 설계되었습니다.
-    `.trim();
-
-    body.appendChild(licenseBox);
-
+    // 저작권
     const copyright = document.createElement('div');
-    copyright.style.marginTop = '15px';
-    copyright.style.fontSize = '11px';
-    copyright.style.color = '#94a3b8';
-    copyright.textContent = '© 2026 BBD Global Co., Ltd. All rights reserved.';
+    copyright.className = 'about-copyright';
+    copyright.textContent = '\u00A9 2026';
     body.appendChild(copyright);
 
     return body;
   }
 
-  protected onConfirm(): void { }
+  protected onConfirm(): void {
+    // 정보 표시 전용 — 확인 동작 없음
+  }
 
   override show(): void {
     super.show();
+    // footer를 "닫기" 버튼 하나로 교체
     const footer = this.dialog.querySelector('.dialog-footer');
     if (footer) {
       footer.innerHTML = '';
       const closeBtn = document.createElement('button');
       closeBtn.className = 'dialog-btn dialog-btn-primary';
-      closeBtn.textContent = '확인';
-      closeBtn.style.minWidth = '120px';
+      closeBtn.textContent = '닫기';
       closeBtn.addEventListener('click', () => this.hide());
       footer.appendChild(closeBtn);
     }
