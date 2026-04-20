@@ -48,6 +48,11 @@ export class CanvasView {
 
     const pageCount = this.wasm.pageCount;
     const traceId = `canvas-load:${Date.now()}`;
+    console.log('[CanvasView] paging capability', {
+      traceId,
+      supportsProgressivePaging: this.wasm.supportsProgressivePaging(),
+      pageCount,
+    });
     console.time(`[${traceId}] collectPageInfo`);
     this.pages = [];
     for (let i = 0; i < pageCount; i++) {
