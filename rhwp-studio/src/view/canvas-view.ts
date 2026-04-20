@@ -46,13 +46,32 @@ export class CanvasView {
   async loadDocument(): Promise<void> {
     this.reset();
 
-    const pageCount = this.wasm.pageCount;
     const traceId = `canvas-load:${Date.now()}`;
+    let pageCount = this.wasm.pageCount;
+    const progressiveEnabled = this.wasm.supportsProgressivePaging();
     console.log('[CanvasView] paging capability', {
       traceId,
-      supportsProgressivePaging: this.wasm.supportsProgressivePaging(),
+      supportsProgressivePaging: progressiveEnabled,
       pageCount,
     });
+
+    if (progressiveEnabled) {
+      try {
+        console.time(`[${traceId}] progressive.firstStep`);
+        this.wasm.startProgressivePaging();
+        pageCount = this.wasm.stepProgressivePaging(24);
+        console.timeEnd(`[${traceId}] progressive.firstStep`);
+        console.log('[CanvasView] progressive first step complete', {
+          traceId,
+          pageCount,
+          pagingFinished: this.wasm.isPagingFinished(),
+        });
+      } catch (error) {
+        console.error('[CanvasView] progressive paging bootstrap failed, fallback to full collection', error);
+        pageCount = this.wasm.pageCount;
+      }
+    }
+
     console.time(`[${traceId}] collectPageInfo`);
     this.pages = [];
     for (let i = 0; i < pageCount; i++) {
