@@ -543,22 +543,33 @@
 
     <section id="download" class="download-section">
         <h2>최신 버전 다운로드</h2>
-        <p class="subtitle">모든 파일은 한글 공식 메뉴와 윈도우 64비트 환경을 완벽하게 지원합니다.</p>
+        <p class="subtitle">모든 파일은 한글 공식 메뉴와 멀티 플랫폼을 완벽하게 지원합니다.</p>
         
-        <div class="download-grid">
-            <a href="https://github.com/seonzzang/BBDG-HWP-Editor/raw/main/BBDG_Final_Builds/v1.1.0/BBDG_HWP_Editor_Portable_v1.1.0.exe" class="download-item">
-                <h4>포터블 버전 (EXE)</h4>
-                <span>무설치 단일 실행 파일</span>
+        <div class="download-grid" id="asset-container">
+            <!-- Windows EXE -->
+            <a href="#" class="download-item" id="win-exe" target="_blank">
+                <h4>Windows (EXE)</h4>
+                <span>포터블/설치 통합형</span>
             </a>
-            <a href="https://github.com/seonzzang/BBDG-HWP-Editor/raw/main/BBDG_Final_Builds/v1.1.0/BBDG_HWP_Editor_Setup_v1.1.0.exe" class="download-item">
-                <h4>설치형 셋업 (EXE)</h4>
-                <span>윈도우 표준 설치 프로그램</span>
-            </a>
-            <a href="https://github.com/seonzzang/BBDG-HWP-Editor/raw/main/BBDG_Final_Builds/v1.1.0/BBDG_HWP_Editor_Installer_v1.1.0.msi" class="download-item">
-                <h4>엔터프라이즈 (MSI)</h4>
+            <!-- Windows MSI -->
+            <a href="#" class="download-item" id="win-msi" target="_blank">
+                <h4>Windows (MSI)</h4>
                 <span>기업용 대량 배포 파일</span>
             </a>
+            <!-- macOS DMG -->
+            <a href="#" class="download-item" id="mac-dmg" target="_blank">
+                <h4>macOS (DMG)</h4>
+                <span>애플 실리콘 & 인텔 통합</span>
+            </a>
+            <!-- Linux AppImage -->
+            <a href="#" class="download-item" id="linux-app" target="_blank">
+                <h4>Linux (AppImage)</h4>
+                <span>범용 리눅스 실행 파일</span>
+            </a>
         </div>
+        <p style="margin-top: 2rem; font-size: 0.9rem; color: var(--text-muted);">
+            전체 플랫폼 릴리즈는 <a href="https://github.com/seonzzang/BBDG-HWP-Editor/releases" target="_blank" style="color: var(--primary); text-decoration: none;">GitHub Releases</a>에서도 확인 가능합니다.
+        </p>
     </section>
 
     <footer>
@@ -581,6 +592,43 @@
                 });
             });
         });
+
+        // GitHub Latest Release API Integration
+        async function updateLatestAssets() {
+            const repo = "seonzzang/BBDG-HWP-Editor";
+            try {
+                const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
+                const data = await response.json();
+                const version = data.tag_name;
+                const assets = data.assets;
+
+                // Update Version Badge
+                const badge = document.querySelector('.version-badge');
+                if (badge) badge.innerText = `${version} 최신 버전 출시`;
+
+                // Assets Mapping
+                assets.forEach(asset => {
+                    const name = asset.name.toLowerCase();
+                    const url = asset.browser_download_url;
+
+                    if (name.endsWith('.exe')) document.getElementById('win-exe').href = url;
+                    if (name.endsWith('.msi')) document.getElementById('win-msi').href = url;
+                    if (name.endsWith('.dmg')) document.getElementById('mac-dmg').href = url;
+                    if (name.endsWith('.appimage')) document.getElementById('linux-app').href = url;
+                });
+            } catch (error) {
+                console.error("Failed to fetch latest release:", error);
+                // Fallback to releases page
+                const items = document.querySelectorAll('.download-item');
+                items.forEach(item => {
+                    if (item.href === "#" || item.href === window.location.href) {
+                        item.href = `https://github.com/${repo}/releases/latest`;
+                    }
+                });
+            }
+        }
+
+        updateLatestAssets();
     </script>
 </body>
 </html>
