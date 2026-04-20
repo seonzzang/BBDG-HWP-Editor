@@ -41,19 +41,16 @@ export class CanvasView {
     );
   }
 
-  /** 문서 로드 후 호출 — 페이지 정보 수집 및 가상 스크롤 초기화 */
+  /** 문서 로드 후 호출 — 페이지 정보 지연 로딩 및 가상 스크롤 초기화 */
   loadDocument(): void {
     this.reset();
 
     const pageCount = this.wasm.pageCount;
     this.pages = [];
-    for (let i = 0; i < pageCount; i++) {
-      try {
-        this.pages.push(this.wasm.getPageInfo(i));
-      } catch (e) {
-        console.error(`[CanvasView] 페이지 ${i} 정보 조회 실패:`, e);
-      }
-    }
+    
+    // 1단계: 초기 렌더링에 필요한 페이지만 즉시 로드 (최대 20페이지)
+    const initialBatch = Math.min(pageCount, 20);
+    this.fetchPageInfos(0, initialBatch);
 
     if (this.pages.length === 0) {
       console.error('[CanvasView] 로드된 페이지가 없습니다');
@@ -63,19 +60,62 @@ export class CanvasView {
     // 모바일: 문서 로드 시 폭 맞춤 줌 자동 적용
     if (window.innerWidth < 1024 && this.pages.length > 0) {
       const containerWidth = this.container.clientWidth - 20;
-      const pageWidth = this.pages[0].width;
-      if (pageWidth > 0 && containerWidth > 0) {
-        const fitZoom = containerWidth / pageWidth;
+      const firstPage = this.pages[0];
+      if (firstPage && firstPage.width > 0 && containerWidth > 0) {
+        const fitZoom = containerWidth / firstPage.width;
         this.viewportManager.setZoom(Math.max(0.1, Math.min(fitZoom, 4.0)));
       }
     }
 
     this.recalcLayout();
-
     this.container.scrollTop = 0;
     this.updateVisiblePages();
 
-    console.log(`[CanvasView] ${this.pages.length}/${pageCount}페이지 로드, 총 높이: ${this.virtualScroll.getTotalHeight()}px`);
+    // 2단계: 나머지 페이지는 백그라운드에서 지연 로딩 (UI 프리징 방지)
+    if (pageCount > initialBatch) {
+      this.deferredFetchPages(initialBatch, pageCount);
+    }
+
+    console.log(`[CanvasView] 초기 ${this.pages.length}/${pageCount}페이지 로드, 레이아웃 준비 완료`);
+  }
+
+  /** 특정 범위의 페이지 정보를 가져온다 */
+  private fetchPageInfos(start: number, end: number): void {
+    for (let i = start; i < end; i++) {
+      try {
+        this.pages[i] = this.wasm.getPageInfo(i);
+      } catch (e) {
+        console.error(`[CanvasView] 페이지 ${i} 정보 조회 실패:`, e);
+      }
+    }
+  }
+
+  /** 백그라운드에서 페이지 정보를 나누어 수집한다 */
+  private deferredFetchPages(start: number, total: number): void {
+    const BATCH_SIZE = 50;
+    let current = start;
+
+    const fetchNext = () => {
+      const end = Math.min(current + BATCH_SIZE, total);
+      this.fetchPageInfos(current, end);
+      current = end;
+
+      // 레이아웃 정보 갱신 (스크롤바 크기 업데이트)
+      this.recalcLayout();
+      this.updateVisiblePages();
+
+      if (current < total) {
+        if ('requestIdleCallback' in window) {
+          (window as any).requestIdleCallback(fetchNext);
+        } else {
+          setTimeout(fetchNext, 10);
+        }
+      } else {
+        console.log(`[CanvasView] 총 ${total}페이지 전체 로드 완료`);
+      }
+    };
+
+    fetchNext();
   }
 
   /** 레이아웃을 재계산한다 (줌/리사이즈 공통) */
