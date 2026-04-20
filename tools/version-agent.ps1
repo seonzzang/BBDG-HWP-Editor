@@ -59,7 +59,8 @@ function Update-TextFile([string]$path, [scriptblock]$transform) {
   $original = Get-Content -LiteralPath $path -Raw
   $updated = & $transform $original
   if ($updated -ne $original) {
-    Set-Content -LiteralPath $path -Value $updated -Encoding UTF8
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($path, $updated, $utf8NoBom)
     return $true
   }
   return $false
@@ -137,7 +138,8 @@ function Update-Changelog([string]$repoRoot, [string]$nextVersion, [string[]]$co
     $newContent = (($entry + $lines) -join [Environment]::NewLine)
   }
 
-  Set-Content -LiteralPath $changelogPath -Value $newContent -Encoding UTF8
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($changelogPath, $newContent, $utf8NoBom)
   return $true
 }
 

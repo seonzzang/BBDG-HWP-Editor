@@ -1,4 +1,17 @@
-﻿# Changelog
+# Changelog
+
+
+
+## [0.7.19] ??2026-04-20
+
+### Automated Release Notes
+- Version bumped automatically by Version Agent.
+- Changed files included in this commit:
+- `.gitignore`
+- `rhwp-studio/package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
 
 
 
