@@ -107,6 +107,14 @@ export class AboutDialog extends ModalDialog {
     `;
     body.appendChild(copyright);
 
+    // 5. 사내 보안 정책 안내 (Internal Security Policy)
+    const securityPolicy = document.createElement('div');
+    securityPolicy.style.marginTop = '1rem';
+    securityPolicy.style.fontSize = '0.8rem';
+    securityPolicy.style.color = '#475569';
+    securityPolicy.textContent = '본 소프트웨어는 외부 서버 통신 기능을 배제하고 모든 문서 처리를 로컬 시스템 내에서만 수행하도록 설계되었습니다.';
+    body.appendChild(securityPolicy);
+
     return body;
   }
 
