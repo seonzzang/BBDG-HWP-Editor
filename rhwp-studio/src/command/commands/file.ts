@@ -18,17 +18,14 @@ function printSvgPages(
   svgPages: string[],
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.setAttribute('aria-hidden', 'true');
+    const printRoot = document.createElement('div');
+    const printStyle = document.createElement('style');
+    const cleanupDelayMs = 1200;
 
     const cleanup = () => {
-      iframe.remove();
+      document.body.removeAttribute('data-printing');
+      printRoot.remove();
+      printStyle.remove();
       window.removeEventListener('afterprint', handleAfterPrint);
     };
 
@@ -37,66 +34,84 @@ function printSvgPages(
       resolve();
     };
 
-    iframe.onload = () => {
-      try {
-        const printWindow = iframe.contentWindow;
-        if (!printWindow) {
+    printRoot.id = 'tauri-print-root';
+    printRoot.setAttribute('aria-hidden', 'true');
+    printRoot.innerHTML = `
+<div class="tauri-print-shell">
+  ${svgPages.map(svg => `<div class="tauri-print-page">${svg}</div>`).join('\n')}
+</div>`;
+
+    printStyle.textContent = `
+@page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
+body[data-printing="true"] > :not(#tauri-print-root):not(script):not(style) {
+  display: none !important;
+}
+#tauri-print-root {
+  display: none;
+}
+body[data-printing="true"] #tauri-print-root {
+  display: block;
+}
+body[data-printing="true"] {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #fff !important;
+}
+.tauri-print-shell {
+  background: #fff;
+}
+.tauri-print-page {
+  width: ${widthMm}mm;
+  height: ${heightMm}mm;
+  overflow: hidden;
+  break-after: page;
+  page-break-after: always;
+}
+.tauri-print-page:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+.tauri-print-page svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+@media screen {
+  body[data-printing="true"] #tauri-print-root {
+    position: fixed;
+    inset: 0;
+    overflow: auto;
+    background: rgba(255, 255, 255, 0.98);
+    z-index: 99999;
+  }
+}
+`;
+
+    try {
+      document.head.appendChild(printStyle);
+      document.body.appendChild(printRoot);
+      document.body.setAttribute('data-printing', 'true');
+      window.addEventListener('afterprint', handleAfterPrint, { once: true });
+
+      setTimeout(() => {
+        try {
+          window.focus();
+          window.print();
+          setTimeout(() => {
+            if (document.body.contains(printRoot)) {
+              cleanup();
+              resolve();
+            }
+          }, cleanupDelayMs);
+        } catch (error) {
           cleanup();
-          reject(new Error('인쇄 프레임을 초기화하지 못했습니다.'));
-          return;
+          reject(error instanceof Error ? error : new Error(String(error)));
         }
-
-        window.addEventListener('afterprint', handleAfterPrint, { once: true });
-        setTimeout(() => {
-          try {
-            printWindow.focus();
-            printWindow.print();
-            // 일부 환경에서는 afterprint가 오지 않으므로 안전하게 정리
-            setTimeout(() => {
-              if (document.body.contains(iframe)) {
-                cleanup();
-                resolve();
-              }
-            }, 1000);
-          } catch (error) {
-            cleanup();
-            reject(error instanceof Error ? error : new Error(String(error)));
-          }
-        }, 150);
-      } catch (error) {
-        cleanup();
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    };
-
-    document.body.appendChild(iframe);
-
-    const printDoc = iframe.contentDocument;
-    if (!printDoc) {
+      }, 100);
+    } catch (error) {
       cleanup();
-      reject(new Error('인쇄 문서를 생성하지 못했습니다.'));
-      return;
+      reject(error instanceof Error ? error : new Error(String(error)));
     }
-
-    printDoc.open();
-    printDoc.write(`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>${fileName} — 인쇄</title>
-<style>
-  @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
-  html, body { margin: 0; padding: 0; background: #fff; }
-  .page { page-break-after: always; width: ${widthMm}mm; height: ${heightMm}mm; overflow: hidden; }
-  .page:last-child { page-break-after: auto; }
-  .page svg { width: 100%; height: 100%; display: block; }
-</style>
-</head>
-<body>
-${svgPages.map(svg => `<div class="page">${svg}</div>`).join('\n')}
-</body>
-</html>`);
-    printDoc.close();
   });
 }
 
