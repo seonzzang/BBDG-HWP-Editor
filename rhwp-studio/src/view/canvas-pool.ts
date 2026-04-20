@@ -1,6 +1,19 @@
 export class CanvasPool {
   private available: HTMLCanvasElement[] = [];
   private inUse = new Map<number, HTMLCanvasElement>();
+  private debugEnabled = true;
+
+  private debugLog(action: string, pageIdx?: number): void {
+    if (!this.debugEnabled) return;
+    console.log('[CanvasPool]', {
+      action,
+      pageIdx,
+      activePages: Array.from(this.inUse.keys()).sort((a, b) => a - b),
+      activeCount: this.inUse.size,
+      pooledCount: this.available.length,
+      totalCount: this.totalCount,
+    });
+  }
 
   /** Canvas를 할당한다 (풀에서 꺼내거나 새로 생성) */
   acquire(pageIdx: number): HTMLCanvasElement {
@@ -9,6 +22,7 @@ export class CanvasPool {
       canvas = document.createElement('canvas');
     }
     this.inUse.set(pageIdx, canvas);
+    this.debugLog('acquire', pageIdx);
     return canvas;
   }
 
@@ -19,6 +33,7 @@ export class CanvasPool {
       canvas.parentElement?.removeChild(canvas);
       this.inUse.delete(pageIdx);
       this.available.push(canvas);
+      this.debugLog('release', pageIdx);
     }
   }
 
@@ -38,6 +53,7 @@ export class CanvasPool {
     for (const pageIdx of pages) {
       this.release(pageIdx);
     }
+    this.debugLog('releaseAll');
   }
 
   /** 현재 사용 중인 페이지 인덱스 목록 */
