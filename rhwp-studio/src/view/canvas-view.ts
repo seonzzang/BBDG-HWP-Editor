@@ -47,6 +47,8 @@ export class CanvasView {
     this.reset();
 
     const pageCount = this.wasm.pageCount;
+    const traceId = `canvas-load:${Date.now()}`;
+    console.time(`[${traceId}] collectPageInfo`);
     this.pages = [];
     for (let i = 0; i < pageCount; i++) {
       try {
@@ -55,6 +57,12 @@ export class CanvasView {
         console.error(`[CanvasView] 페이지 ${i} 정보 조회 실패:`, e);
       }
     }
+    console.timeEnd(`[${traceId}] collectPageInfo`);
+    console.log('[CanvasView] page info collection summary', {
+      traceId,
+      requestedPageCount: pageCount,
+      collectedPageCount: this.pages.length,
+    });
 
     if (this.pages.length === 0) {
       console.error('[CanvasView] 로드된 페이지가 없습니다');
