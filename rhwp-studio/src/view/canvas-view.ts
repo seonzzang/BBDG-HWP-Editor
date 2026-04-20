@@ -19,6 +19,7 @@ export class CanvasView {
   private currentVisiblePages: number[] = [];
   private unsubscribers: (() => void)[] = [];
   private lastWindowLogSignature = '';
+  private loadGeneration = 0;
 
   constructor(
     private container: HTMLElement,
@@ -45,6 +46,7 @@ export class CanvasView {
   /** 문서 로드 후 호출 — 페이지 정보 수집 및 가상 스크롤 초기화 */
   async loadDocument(): Promise<void> {
     this.reset();
+    const loadGeneration = this.loadGeneration;
 
     const traceId = `canvas-load:${Date.now()}`;
     let pageCount = this.wasm.pageCount;
@@ -132,6 +134,65 @@ export class CanvasView {
     this.updateVisiblePages();
 
     console.log(`[CanvasView] ${this.pages.length}/${pageCount}페이지 로드, 총 높이: ${this.virtualScroll.getTotalHeight()}px`);
+
+    if (progressiveEnabled && !this.wasm.isPagingFinished()) {
+      void this.continueProgressivePagingInBackground(traceId, loadGeneration, pageCount);
+    }
+  }
+
+  private async continueProgressivePagingInBackground(
+    traceId: string,
+    loadGeneration: number,
+    initialPageCount: number,
+  ): Promise<void> {
+    const progressiveChunkSize = 24;
+    let lastPageCount = initialPageCount;
+    let steps = 0;
+
+    console.log('[CanvasView] progressive background paging start', {
+      traceId,
+      loadGeneration,
+      initialPageCount,
+    });
+
+    while (loadGeneration === this.loadGeneration && !this.wasm.isPagingFinished()) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const pageCount = this.wasm.stepProgressivePaging(progressiveChunkSize);
+      steps += 1;
+
+      if (pageCount > lastPageCount) {
+        for (let i = lastPageCount; i < pageCount; i++) {
+          try {
+            this.pages.push(this.wasm.getPageInfo(i));
+          } catch (error) {
+            console.error(`[CanvasView] progressive page info ${i} 조회 실패:`, error);
+            break;
+          }
+        }
+
+        lastPageCount = this.pages.length;
+        this.recalcLayout();
+        this.updateVisiblePages();
+
+        console.log('[CanvasView] progressive pages appended', {
+          traceId,
+          loadGeneration,
+          steps,
+          pageCount,
+          pagingFinished: this.wasm.isPagingFinished(),
+        });
+      }
+    }
+
+    console.log('[CanvasView] progressive background paging done', {
+      traceId,
+      loadGeneration,
+      steps,
+      finalPageCount: this.pages.length,
+      pagingFinished: this.wasm.isPagingFinished(),
+      aborted: loadGeneration !== this.loadGeneration,
+    });
   }
 
   /** 레이아웃을 재계산한다 (줌/리사이즈 공통) */
@@ -368,6 +429,7 @@ export class CanvasView {
 
   /** 리소스를 정리한다 */
   private reset(): void {
+    this.loadGeneration += 1;
     this.pageRenderer.cancelAll();
     this.canvasPool.releaseAll();
     this.currentVisiblePages = [];
