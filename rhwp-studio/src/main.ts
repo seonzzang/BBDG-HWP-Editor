@@ -419,7 +419,7 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
     console.log('[initDoc] 3. inputHandler deactivate');
     inputHandler?.deactivate();
     console.log('[initDoc] 4. canvasView loadDocument');
-    canvasView?.loadDocument();
+    await canvasView?.loadDocument();
     console.log('[initDoc] 5. toolbar setEnabled');
     toolbar?.setEnabled(true);
     console.log('[initDoc] 6. toolbar initStyleDropdown');

@@ -43,7 +43,7 @@ export class CanvasView {
   }
 
   /** 문서 로드 후 호출 — 페이지 정보 수집 및 가상 스크롤 초기화 */
-  loadDocument(): void {
+  async loadDocument(): Promise<void> {
     this.reset();
 
     const pageCount = this.wasm.pageCount;
