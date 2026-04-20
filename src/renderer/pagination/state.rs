@@ -40,7 +40,21 @@ pub(super) struct PaginationState {
     pub overflow_carry: Option<PageItem>,
     /// 레이어 1이 advance_column_or_new_page를 호출 중임을 표시.
     /// 이 플래그가 true이면 레이어 2(check_last_item_overflow)를 스킵하여 이중 이동 방지.
+    /// 레이어 1이 advance_column_or_new_page를 호출 중임을 표시.
+    /// 이 플래그가 true이면 레이어 2(check_last_item_overflow)를 스킵하여 이중 이동 방지.
     pub layer1_advancing: bool,
+
+    // --- 증분 페이징을 위한 추가 상태 (Task #9, #19 대응) ---
+    pub wrap_around_cs: i32,
+    pub wrap_around_sw: i32,
+    pub wrap_around_table_para: usize,
+    pub prev_pagination_para: Option<usize>,
+    pub fix_table_visual_h: f64,
+    pub fix_vpos_tmp: f64,
+    pub fix_overlay_active: bool,
+    pub hidden_empty_lines: u8,
+    pub hidden_empty_page: usize,
+    pub hidden_empty_paras: std::collections::HashSet<usize>,
 }
 
 impl PaginationState {
@@ -72,6 +86,16 @@ impl PaginationState {
             defense_counts: HashMap::new(),
             overflow_carry: None,
             layer1_advancing: false,
+            wrap_around_cs: -1,
+            wrap_around_sw: -1,
+            wrap_around_table_para: 0,
+            prev_pagination_para: None,
+            fix_table_visual_h: 0.0,
+            fix_vpos_tmp: 0.0,
+            fix_overlay_active: false,
+            hidden_empty_lines: 0,
+            hidden_empty_page: 0,
+            hidden_empty_paras: std::collections::HashSet::new(),
         }
     }
 

@@ -45,9 +45,14 @@ impl From<HwpError> for JsValue {
 ///
 /// 도메인 로직은 `DocumentCore`에 구현되어 있으며,
 /// `Deref`/`DerefMut`를 통해 투명하게 접근한다.
+use crate::renderer::pagination::{IncrementalPagingContext, Paginator};
+
 #[wasm_bindgen]
 pub struct HwpDocument {
     core: DocumentCore,
+    styles: ResolvedStyleSet,
+    /// 증분 페이징 상태 (진행 중일 때만 Some)
+    paging_ctx: Option<IncrementalPagingContext>,
 }
 
 impl std::ops::Deref for HwpDocument {
@@ -85,9 +90,71 @@ impl HwpDocument {
     /// HWP 파일 바이트를 로드하여 문서 객체를 생성한다.
     #[wasm_bindgen(constructor)]
     pub fn new(data: &[u8]) -> Result<HwpDocument, JsValue> {
-        DocumentCore::from_bytes(data)
-            .map(|core| HwpDocument { core })
-            .map_err(|e| e.into())
+        let mut core = DocumentCore::from_bytes(data).map_err(|e| JsValue::from(e))?;
+        let styles = resolve_styles(&core.document, &core.doc_info, DEFAULT_DPI, DEFAULT_FALLBACK_FONT);
+        Ok(HwpDocument { core, styles, paging_ctx: None })
+    }
+
+    /// 증분 페이징을 시작한다 (대형 문서용)
+    #[wasm_bindgen(js_name = startProgressivePaging)]
+    pub fn start_progressive_paging(&mut self) -> Result<(), JsValue> {
+        let section_idx = 0; // 일단 0번 구역만 처리
+        let section = self.document.sections.get(section_idx)
+            .ok_or_else(|| JsValue::from_str("Section not found"))?;
+        let page_def = &section.page_def;
+        let column_def = Self::find_initial_column_def(&section.paragraphs);
+        
+        self.paging_ctx = Some(IncrementalPagingContext::new(
+            page_def, &column_def, section_idx, DEFAULT_DPI
+        ));
+        Ok(())
+    }
+
+    /// 페이징을 한 단계 진행한다.
+    /// @param chunk_size 진행할 문단 수
+    /// @returns 현재까지 계산된 총 페이지 수
+    #[wasm_bindgen(js_name = stepProgressivePaging)]
+    pub fn step_progressive_paging(&mut self, chunk_size: usize) -> Result<u32, JsValue> {
+        if let Some(ref mut ctx) = self.paging_ctx {
+            let section_idx = ctx.state.section_index;
+            let section = self.document.sections.get(section_idx)
+                .ok_or_else(|| JsValue::from_str("Section not found"))?;
+            
+            // 전처리 (ComposedParagraphs 수집)
+            let composed: Vec<ComposedParagraph> = section.paragraphs.iter()
+                .map(|p| compose_paragraph(p))
+                .collect();
+            let para_styles = &self.styles.para_styles;
+
+            let paginator = Paginator::new(DEFAULT_DPI);
+            paginator.paginate_step(
+                ctx, &section.paragraphs, &composed, &self.styles,
+                para_styles, &section.page_def, chunk_size
+            );
+
+            let current_pages = ctx.state.pages.len() as u32;
+
+            if ctx.is_finished {
+                // 페이징 완료됨 -> 결과를 core에 반영
+                let res = PaginationResult {
+                    pages: std::mem::take(&mut ctx.state.pages),
+                    wrap_around_paras: Vec::new(), // TODO: 수집 보완
+                    hidden_empty_paras: std::mem::take(&mut ctx.state.hidden_empty_paras),
+                };
+                self.core.pagination[section_idx] = res;
+                self.paging_ctx = None;
+            }
+
+            Ok(current_pages)
+        } else {
+            Ok(self.page_count())
+        }
+    }
+
+    /// 증분 페이징이 완료되었는지 확인한다.
+    #[wasm_bindgen(js_name = isPagingFinished)]
+    pub fn is_paging_finished(&self) -> bool {
+        self.paging_ctx.is_none()
     }
 
     /// 빈 문서 생성 (테스트/미리보기용)
@@ -95,7 +162,8 @@ impl HwpDocument {
     pub fn create_empty() -> HwpDocument {
         let mut core = DocumentCore::new_empty();
         core.paginate();
-        HwpDocument { core }
+        let styles = resolve_styles(&core.document, &core.doc_info, DEFAULT_DPI, DEFAULT_FALLBACK_FONT);
+        HwpDocument { core, styles, paging_ctx: None }
     }
 
     /// 내장 템플릿에서 빈 문서를 생성한다.
@@ -154,7 +222,11 @@ impl HwpDocument {
     /// 총 페이지 수를 반환한다.
     #[wasm_bindgen(js_name = pageCount)]
     pub fn page_count(&self) -> u32 {
-        self.core.page_count()
+        if let Some(ref ctx) = self.paging_ctx {
+            ctx.state.pages.len() as u32
+        } else {
+            self.core.page_count()
+        }
     }
 
     /// 특정 페이지를 SVG 문자열로 렌더링한다.

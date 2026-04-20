@@ -11,6 +11,57 @@ use super::*;
 use super::state::PaginationState;
 
 impl Paginator {
+    /// 증분 페이징의 한 단계를 수행한다.
+    pub fn paginate_step(
+        &self,
+        ctx: &mut IncrementalPagingContext,
+        paragraphs: &[Paragraph],
+        composed: &[ComposedParagraph],
+        styles: &ResolvedStyleSet,
+        para_styles: &[crate::renderer::style_resolver::ResolvedParaStyle],
+        page_def: &PageDef,
+        chunk_size: usize,
+    ) {
+        if ctx.is_finished { return; }
+
+        let measurer = HeightMeasurer::new(self.dpi);
+        let end_idx = (ctx.next_para_idx + chunk_size).min(paragraphs.len());
+
+        // 1. 측정 (Chunk 범위)
+        measurer.measure_chunk(&mut ctx.measured, paragraphs, composed, styles, ctx.next_para_idx, chunk_size);
+
+        // 2. 분할 (측정된 범위 내)
+        for para_idx in ctx.next_para_idx..end_idx {
+            self.paginate_single_paragraph(
+                &mut ctx.state,
+                para_idx,
+                &paragraphs[para_idx],
+                &ctx.measured,
+                paragraphs,
+                page_def,
+                para_styles,
+                &measurer,
+                false, // hide_empty_line (일단 false)
+            );
+        }
+
+        ctx.next_para_idx = end_idx;
+        if ctx.next_para_idx >= paragraphs.len() {
+            // 마지막 처리
+            if !ctx.state.current_items.is_empty() {
+                ctx.state.flush_column_always();
+            }
+            ctx.state.ensure_page();
+            
+            // 머리말/꼬리말 등 최종 할당 (전체 문단 대상)
+            let (hf_entries, page_number_pos, page_hides, new_page_numbers) =
+                Self::collect_header_footer_controls(paragraphs, ctx.state.section_index);
+            Self::finalize_pages(&mut ctx.state.pages, &hf_entries, &page_number_pos, &page_hides, &new_page_numbers, ctx.state.section_index);
+            
+            ctx.is_finished = true;
+        }
+    }
+
     pub fn paginate_with_measured(
         &self,
         paragraphs: &[Paragraph],
@@ -57,201 +108,203 @@ impl Paginator {
         // 어울림 표는 후속 문단들 위에 겹쳐서 렌더링됨.
         // 동일한 column_start(cs) 값을 가진 빈 문단은 표와 나란히 배치되므로
         // pagination에서 높이를 소비하지 않음.
-        let mut wrap_around_cs: i32 = -1;  // -1 = 비활성
-        let mut wrap_around_sw: i32 = -1;  // wrap zone의 segment_width
-        let mut wrap_around_table_para: usize = 0;  // 어울림 표의 문단 인덱스
-        let mut prev_pagination_para: Option<usize> = None;  // vpos 보정용 이전 문단
-
-        // 고정값 줄간격 TAC 표 병행 (Task #9):
-        // Percent 전환 시 표 높이 - Fixed 누적 차이분을 current_height에 추가
-        let mut fix_table_visual_h: f64 = 0.0;
-        let mut fix_vpos_tmp: f64 = 0.0;
-        let mut fix_overlay_active = false;
-
-        // 빈 줄 감추기: 페이지 시작 부분에서 감춘 빈 줄 수 (최대 2개)
-        let mut hidden_empty_lines: u8 = 0;
-        let mut hidden_empty_page: usize = 0; // 현재 감추기 중인 페이지
-        let mut hidden_empty_paras: std::collections::HashSet<usize> = std::collections::HashSet::new();
-
         for (para_idx, para) in paragraphs.iter().enumerate() {
-            // 표 컨트롤 여부 사전 감지
-            let has_table = measured.paragraph_has_table(para_idx);
+            self.paginate_single_paragraph(
+                &mut st, para_idx, para, measured, paragraphs, page_def, para_styles, &measurer, hide_empty_line
+            );
+        }
 
-            // 사전 측정된 문단 높이
-            let mut para_height = measured.get_paragraph_height(para_idx).unwrap_or(0.0);
+        // 마지막 남은 항목 처리
+        if !st.current_items.is_empty() {
+            st.flush_column_always();
+        }
 
-            // 빈 줄 감추기 (구역 설정 bit 19)
-            // 한컴 도움말: "각 쪽의 시작 부분에 빈 줄이 나오면, 두 개의 빈 줄까지는
-            // 없는 것처럼 간주하여 본문 내용을 위로 두 줄 당겨서 쪽을 정돈합니다."
-            // 구현: 페이지 끝에서 빈 줄이 overflow를 유발하면 높이 0으로 처리 (최대 2개/페이지)
-            if hide_empty_line {
-                let current_page = st.pages.len();
-                if current_page != hidden_empty_page {
-                    hidden_empty_lines = 0;
-                    hidden_empty_page = current_page;
+        // 빈 문서인 경우 최소 1페이지 보장
+        st.ensure_page();
+
+        // 전체 어울림 리턴 문단 수집
+        let mut all_wrap_around_paras = Vec::new();
+        let hidden_empty_paras = st.hidden_empty_paras.clone();
+        for page in &mut st.pages {
+            for col in &mut page.column_contents {
+                all_wrap_around_paras.append(&mut col.wrap_around_paras);
+            }
+        }
+        // 페이지 번호 + 머리말/꼬리말 할당
+        Self::finalize_pages(&mut st.pages, &hf_entries, &page_number_pos, &page_hides, &new_page_numbers, section_index);
+
+        PaginationResult { pages: st.pages, wrap_around_paras: all_wrap_around_paras, hidden_empty_paras }
+    }
+
+    /// 단일 문단을 페이징 처리한다.
+    fn paginate_single_paragraph(
+        &self,
+        st: &mut PaginationState,
+        para_idx: usize,
+        para: &Paragraph,
+        measured: &MeasuredSection,
+        paragraphs: &[Paragraph],
+        page_def: &PageDef,
+        para_styles: &[crate::renderer::style_resolver::ResolvedParaStyle],
+        measurer: &HeightMeasurer,
+        hide_empty_line: bool,
+    ) {
+        // 표 컨트롤 여부 사전 감지
+        let has_table = measured.paragraph_has_table(para_idx);
+
+        // 사전 측정된 문단 높이
+        let mut para_height = measured.get_paragraph_height(para_idx).unwrap_or(0.0);
+
+        // 빈 줄 감추기 (구역 설정 bit 19)
+        if hide_empty_line {
+            let current_page = st.pages.len();
+            if current_page != st.hidden_empty_page {
+                st.hidden_empty_lines = 0;
+                st.hidden_empty_page = current_page;
+            }
+            let trimmed = para.text.replace(|c: char| c.is_control(), "");
+            let is_empty_para = trimmed.trim().is_empty() && para.controls.is_empty();
+            if is_empty_para
+                && !st.current_items.is_empty()
+                && st.current_height + para_height > st.available_height()
+                && st.hidden_empty_lines < 2
+            {
+                st.hidden_empty_lines += 1;
+                para_height = 0.0;
+                st.hidden_empty_paras.insert(para_idx);
+            }
+        }
+
+        // 고정값→글자에따라 전환
+        if st.fix_overlay_active && !has_table {
+            let is_fixed = para_styles.get(para.para_shape_id as usize)
+                .map(|ps| ps.line_spacing_type == crate::model::style::LineSpacingType::Fixed)
+                .unwrap_or(false);
+            if !is_fixed {
+                if st.fix_table_visual_h > st.fix_vpos_tmp {
+                    st.current_height += st.fix_table_visual_h - st.fix_vpos_tmp;
                 }
-                let trimmed = para.text.replace(|c: char| c.is_control(), "");
-                let is_empty_para = trimmed.trim().is_empty() && para.controls.is_empty();
-                if is_empty_para
-                    && !st.current_items.is_empty()
-                    && st.current_height + para_height > st.available_height()
-                    && hidden_empty_lines < 2
-                {
-                    hidden_empty_lines += 1;
-                    para_height = 0.0;
-                    hidden_empty_paras.insert(para_idx);
-                }
+                st.fix_overlay_active = false;
             }
+        }
 
-            // 고정값→글자에따라 전환: 표 높이와 Fixed 누적의 차이분 추가 (Task #9)
-            if fix_overlay_active && !has_table {
-                let is_fixed = para_styles.get(para.para_shape_id as usize)
-                    .map(|ps| ps.line_spacing_type == crate::model::style::LineSpacingType::Fixed)
-                    .unwrap_or(false);
-                if !is_fixed {
-                    // 표 높이가 Fixed 누적보다 크면 차이분을 current_height에 추가
-                    if fix_table_visual_h > fix_vpos_tmp {
-                        st.current_height += fix_table_visual_h - fix_vpos_tmp;
-                    }
-                    fix_overlay_active = false;
-                }
+        // 다단 나누기(MultiColumn)
+        if para.column_type == ColumnBreakType::MultiColumn {
+            self.process_multicolumn_break(st, para_idx, paragraphs, page_def);
+        }
+
+        // 단 나누기(Column)
+        if para.column_type == ColumnBreakType::Column {
+            if !st.current_items.is_empty() {
+                self.process_column_break(st);
             }
+        }
 
-            // 다단 나누기(MultiColumn)
-            if para.column_type == ColumnBreakType::MultiColumn {
-                self.process_multicolumn_break(&mut st, para_idx, paragraphs, page_def);
-            }
+        let base_available_height = st.base_available_height();
+        let available_height = st.available_height();
 
-            // 단 나누기(Column)
-            if para.column_type == ColumnBreakType::Column {
-                if !st.current_items.is_empty() {
-                    self.process_column_break(&mut st);
-                }
-            }
+        // 쪽/단 나누기 감지
+        let force_page_break = para.column_type == ColumnBreakType::Page
+            || para.column_type == ColumnBreakType::Section;
 
-            let base_available_height = st.base_available_height();
-            let available_height = st.available_height();
+        let para_style = para_styles.get(para.para_shape_id as usize);
+        let para_style_break = para_style.map(|s| s.page_break_before).unwrap_or(false);
 
-            // 쪽/단 나누기 감지
-            let force_page_break = para.column_type == ColumnBreakType::Page
-                || para.column_type == ColumnBreakType::Section;
+        if (force_page_break || para_style_break) && !st.current_items.is_empty() {
+            self.process_page_break(st);
+        }
 
-            // ParaShape의 "문단 앞에서 항상 쪽 나눔" 속성
-            let para_style = para_styles.get(para.para_shape_id as usize);
-            let para_style_break = para_style.map(|s| s.page_break_before).unwrap_or(false);
-
-
-            if (force_page_break || para_style_break) && !st.current_items.is_empty() {
-                self.process_page_break(&mut st);
-            }
-
-            // tac 표: 표 실측 높이 + 텍스트 줄 높이(th)로 판단 (Task #19)
-            let para_height_for_fit = if has_table {
-                let has_tac = para.controls.iter().any(|c|
-                    matches!(c, Control::Table(t) if t.common.treat_as_char));
-                if has_tac {
-                    // 표 실측 높이 합산 (outer_top 포함, outer_bottom 제외)
-                    // 캡션은 paginate_table_control에서 별도 처리하므로 여기서는 제외
-                    // 표 실측 높이 합산 (outer_top + line_spacing 포함, outer_bottom 제외)
-                    // 캡션은 paginate_table_control에서 별도 처리하므로 여기서는 제외
-                    let mut tac_ci = 0usize;
-                    let tac_h: f64 = para.controls.iter().enumerate()
-                        .filter_map(|(ci, c)| {
-                            if let Control::Table(t) = c {
-                                if t.common.treat_as_char {
-                                    let mt = measured.get_measured_table(para_idx, ci);
-                                    let mt_h = mt.map(|m| {
-                                        let cap_h = m.caption_height;
-                                        let cap_s = if cap_h > 0.0 {
-                                            t.caption.as_ref()
-                                                .map(|c| crate::renderer::hwpunit_to_px(c.spacing as i32, self.dpi))
-                                                .unwrap_or(0.0)
-                                        } else { 0.0 };
-                                        m.total_height - cap_h - cap_s
-                                    }).unwrap_or(0.0);
-                                    let outer_top = crate::renderer::hwpunit_to_px(
-                                        t.outer_margin_top as i32, self.dpi);
-                                    let ls = para.line_segs.get(tac_ci)
-                                        .filter(|seg| seg.line_spacing > 0)
-                                        .map(|seg| crate::renderer::hwpunit_to_px(seg.line_spacing, self.dpi))
-                                        .unwrap_or(0.0);
-                                    tac_ci += 1;
-                                    Some(mt_h + outer_top + ls)
-                                } else { None }
+        // tac 표 적합성 판단
+        let para_height_for_fit = if has_table {
+            let has_tac = para.controls.iter().any(|c|
+                matches!(c, Control::Table(t) if t.common.treat_as_char));
+            if has_tac {
+                let mut tac_ci = 0usize;
+                let tac_h: f64 = para.controls.iter().enumerate()
+                    .filter_map(|(ci, c)| {
+                        if let Control::Table(t) = c {
+                            if t.common.treat_as_char {
+                                let mt = measured.get_measured_table(para_idx, ci);
+                                let mt_h = mt.map(|m| {
+                                    let cap_h = m.caption_height;
+                                    let cap_s = if cap_h > 0.0 {
+                                        t.caption.as_ref()
+                                            .map(|c| crate::renderer::hwpunit_to_px(c.spacing as i32, self.dpi))
+                                            .unwrap_or(0.0)
+                                    } else { 0.0 };
+                                    m.total_height - cap_h - cap_s
+                                }).unwrap_or(0.0);
+                                let outer_top = crate::renderer::hwpunit_to_px(
+                                    t.outer_margin_top as i32, self.dpi);
+                                let ls = para.line_segs.get(tac_ci)
+                                    .filter(|seg| seg.line_spacing > 0)
+                                    .map(|seg| crate::renderer::hwpunit_to_px(seg.line_spacing, self.dpi))
+                                    .unwrap_or(0.0);
+                                tac_ci += 1;
+                                Some(mt_h + outer_top + ls)
                             } else { None }
-                        })
-                        .sum();
-                    // 텍스트 줄 높이: th 기반 (lh에 표 높이가 포함되므로 th 사용)
-                    let text_h: f64 = para.line_segs.iter()
-                        .filter(|seg| seg.text_height > 0 && seg.text_height < seg.line_height / 3)
-                        .map(|seg| {
-                            crate::renderer::hwpunit_to_px(seg.text_height + seg.line_spacing, self.dpi)
-                        })
-                        .sum();
-                    // host spacing (sb + sa)
-                    let mp = measured.get_measured_paragraph(para_idx);
-                    let sb = mp.map(|m| m.spacing_before).unwrap_or(0.0);
-                    let sa = mp.map(|m| m.spacing_after).unwrap_or(0.0);
-                    tac_h + text_h + sb + sa
-                } else {
-                    para_height
-                }
+                        } else { None }
+                    })
+                    .sum();
+                let text_h: f64 = para.line_segs.iter()
+                    .filter(|seg| seg.text_height > 0 && seg.text_height < seg.line_height / 3)
+                    .map(|seg| {
+                        crate::renderer::hwpunit_to_px(seg.text_height + seg.line_spacing, self.dpi)
+                    })
+                    .sum();
+                let mp = measured.get_measured_paragraph(para_idx);
+                let sb = mp.map(|m| m.spacing_before).unwrap_or(0.0);
+                let sa = mp.map(|m| m.spacing_after).unwrap_or(0.0);
+                tac_h + text_h + sb + sa
             } else {
                 para_height
-            };
-
-            // 현재 페이지에 넣을 수 있는지 확인 (표 문단만 플러시)
-            // 다중 TAC 표 문단은 개별 표가 paginate_table_control에서 처리되므로 스킵
-            let tac_table_count_for_flush = para.controls.iter()
-                .filter(|c| matches!(c, Control::Table(t) if t.common.treat_as_char))
-                .count();
-            // trailing ls 경계 조건: trailing ls 제거 시 들어가면 flush 안 함
-            let has_tac_for_flush = para.controls.iter().any(|c|
-                matches!(c, Control::Table(t) if t.common.treat_as_char));
-            let trailing_tac_ls = if has_tac_for_flush {
-                para.line_segs.last()
-                    .filter(|seg| seg.line_spacing > 0)
-                    .map(|seg| crate::renderer::hwpunit_to_px(seg.line_spacing, self.dpi))
-                    .unwrap_or(0.0)
-            } else { 0.0 };
-            let fit_without_trail = st.current_height + para_height_for_fit - trailing_tac_ls <= available_height + 0.5;
-            let fit_with_trail = st.current_height + para_height_for_fit <= available_height + 0.5;
-            if !fit_with_trail && !fit_without_trail
-                && !st.current_items.is_empty()
-                && has_table
-                && tac_table_count_for_flush <= 1
-            {
-                st.advance_column_or_new_page();
             }
+        } else {
+            para_height
+        };
 
-            // 페이지가 아직 없으면 생성
-            st.ensure_page();
+        // 현재 페이지에 넣을 수 있는지 확인
+        let tac_table_count_for_flush = para.controls.iter()
+            .filter(|c| matches!(c, Control::Table(t) if t.common.treat_as_char))
+            .count();
+        let has_tac_for_flush = para.controls.iter().any(|c|
+            matches!(c, Control::Table(t) if t.common.treat_as_char));
+        let trailing_tac_ls = if has_tac_for_flush {
+            para.line_segs.last()
+                .filter(|seg| seg.line_spacing > 0)
+                .map(|seg| crate::renderer::hwpunit_to_px(seg.line_spacing, self.dpi))
+                .unwrap_or(0.0)
+        } else { 0.0 };
+        let fit_without_trail = st.current_height + para_height_for_fit - trailing_tac_ls <= available_height + 0.5;
+        let fit_with_trail = st.current_height + para_height_for_fit <= available_height + 0.5;
+        if !fit_with_trail && !fit_without_trail
+            && !st.current_items.is_empty()
+            && has_table
+            && tac_table_count_for_flush <= 1
+        {
+            st.advance_column_or_new_page();
+        }
 
-            // vpos 기준점 설정: 페이지 첫 문단
-            if st.page_vpos_base.is_none() {
-                if let Some(seg) = para.line_segs.first() {
-                    st.page_vpos_base = Some(seg.vertical_pos);
-                }
+        st.ensure_page();
+
+        if st.page_vpos_base.is_none() {
+            if let Some(seg) = para.line_segs.first() {
+                st.page_vpos_base = Some(seg.vertical_pos);
             }
+        }
 
-            // vpos 기반 current_height 보정: layout의 vpos 보정과 동기화
-            // 현재 페이지에 블록 표(비-TAC)가 존재하면 적용 — 블록 표는 layout의
-            // vpos 보정과 pagination의 높이 누적 사이에 누적 drift를 만듦.
-            // 핵심: max(current_height, vpos_consumed) — 절대 감소하지 않음
-            // 단, TAC 수식/그림 포함 문단은 제외 — LINE_SEG lh에 수식/그림 높이가
-            // 포함되어 vpos가 과대하므로 보정하면 current_height가 과대 누적됨
-            if let Some(prev_pi) = prev_pagination_para {
-                if para_idx != prev_pi && st.page_has_block_table {
-                    let prev_has_tac_eq = paragraphs.get(prev_pi).map(|p| {
-                        p.controls.iter().any(|c|
-                            matches!(c, Control::Equation(_)) ||
-                            matches!(c, Control::Picture(pic) if pic.common.treat_as_char) ||
-                            matches!(c, Control::Shape(s) if s.common().treat_as_char) ||
-                            // 글앞으로/글뒤로 Shape: vpos에 Shape 높이가 포함되어 과대 → bypass
-                            matches!(c, Control::Shape(s) if matches!(s.common().text_wrap,
-                                crate::model::shape::TextWrap::InFrontOfText | crate::model::shape::TextWrap::BehindText)))
-                    }).unwrap_or(false);
-                    if !prev_has_tac_eq {
+        // vpos 보정
+        if let Some(prev_pi) = st.prev_pagination_para {
+            if para_idx != prev_pi && st.page_has_block_table {
+                let prev_has_tac_eq = paragraphs.get(prev_pi).map(|p| {
+                    p.controls.iter().any(|c|
+                        matches!(c, Control::Equation(_)) ||
+                        matches!(c, Control::Picture(pic) if pic.common.treat_as_char) ||
+                        matches!(c, Control::Shape(s) if s.common().treat_as_char) ||
+                        matches!(c, Control::Shape(s) if matches!(s.common().text_wrap,
+                            crate::model::shape::TextWrap::InFrontOfText | crate::model::shape::TextWrap::BehindText)))
+                }).unwrap_or(false);
+                if !prev_has_tac_eq {
                     if let Some(base) = st.page_vpos_base {
                         if let Some(prev_para) = paragraphs.get(prev_pi) {
                             let col_width_hu = st.layout.column_width_hu();
@@ -261,13 +314,8 @@ impl Paginator {
                             });
                             if let Some(seg) = prev_seg {
                                 if !(seg.vertical_pos == 0 && prev_pi > 0) {
-                                    let vpos_end = seg.vertical_pos
-                                        + seg.line_height
-                                        + seg.line_spacing;
-                                    let vpos_h = crate::renderer::hwpunit_to_px(
-                                        vpos_end - base,
-                                        self.dpi,
-                                    );
+                                    let vpos_end = seg.vertical_pos + seg.line_height + seg.line_spacing;
+                                    let vpos_h = crate::renderer::hwpunit_to_px(vpos_end - base, self.dpi);
                                     if vpos_h > st.current_height && vpos_h > 0.0 {
                                         let avail = st.available_height();
                                         if vpos_h <= avail {
@@ -278,153 +326,80 @@ impl Paginator {
                             }
                         }
                     }
-                    }
                 }
             }
-            prev_pagination_para = Some(para_idx);
+        }
+        st.prev_pagination_para = Some(para_idx);
 
-            // 어울림 배치 표 오버랩 구간: 동일 cs를 가진 문단은 표 옆에 배치
-            if wrap_around_cs >= 0 && !has_table {
-                let para_cs = para.line_segs.first().map(|s| s.column_start).unwrap_or(0);
-                let para_sw = para.line_segs.first().map(|s| s.segment_width as i32).unwrap_or(0);
-                let is_empty_para = para.text.chars().all(|ch| ch.is_whitespace() || ch == '\r' || ch == '\n')
-                    && para.controls.is_empty();
-                // 여러 LINE_SEG 중 하나라도 어울림 cs/sw와 일치하면 어울림 문단
-                let any_seg_matches = para.line_segs.iter().any(|s|
-                    s.column_start == wrap_around_cs && s.segment_width as i32 == wrap_around_sw
-                );
-                // sw=0인 어울림 표: 표가 전체 폭을 차지하므로
-                // 후속 빈 문단의 sw가 문서 본문 폭보다 현저히 작으면 어울림 문단
-                let body_w = (page_def.width as i32) - (page_def.margin_left as i32) - (page_def.margin_right as i32);
-                let sw0_match = wrap_around_sw == 0 && is_empty_para && para_sw > 0
-                    && para_sw < body_w / 2;
-                if para_cs == wrap_around_cs && para_sw == wrap_around_sw
-                    || (any_seg_matches && is_empty_para)
-                    || sw0_match {
-                    // 어울림 문단: 표 옆에 배치 — pagination에서 높이 소비 없이 기록
-                    // (표가 이미 이 공간을 차지하고 있음)
-                    st.current_column_wrap_around_paras.push(
-                        super::WrapAroundPara {
-                            para_index: para_idx,
-                            table_para_index: wrap_around_table_para,
-                            has_text: !is_empty_para,
-                        }
-                    );
-                    continue;
-                } else {
-                    wrap_around_cs = -1;
-                    wrap_around_sw = -1;
-                }
-            }
-
-            // 비-표 문단 처리
-            if !has_table {
-                self.paginate_text_lines(
-                    &mut st, para_idx, para, measured, para_height,
-                    base_available_height,
-                );
-            }
-
-            // 표 문단의 높이 보정용
-            let height_before_controls = st.current_height;
-            let page_count_before_controls = st.pages.len();
-
-            // 인라인 컨트롤 감지 (표/도형/각주)
-            self.process_controls(
-                &mut st, para_idx, para, measured, &measurer,
-                para_height, para_height_for_fit, base_available_height, page_def,
-                height_before_controls,
+        // 어울림 배치 표 오버랩 구간
+        if st.wrap_around_cs >= 0 && !has_table {
+            let para_cs = para.line_segs.first().map(|s| s.column_start).unwrap_or(0);
+            let para_sw = para.line_segs.first().map(|s| s.segment_width as i32).unwrap_or(0);
+            let is_empty_para = para.text.chars().all(|ch| ch.is_whitespace() || ch == '\r' || ch == '\n')
+                && para.controls.is_empty();
+            let any_seg_matches = para.line_segs.iter().any(|s|
+                s.column_start == st.wrap_around_cs && s.segment_width as i32 == st.wrap_around_sw
             );
-
-            let page_changed = st.pages.len() != page_count_before_controls;
-
-            // treat_as_char 표 문단의 높이 보정
-            // line_seg.line_height가 실측 표 높이보다 클 수 있으므로
-            // 실측 높이를 기준으로 보정하여 레이아웃과 일치시킴
-            let has_tac_block_table = para.controls.iter().any(|c| {
-                if let Control::Table(t) = c { t.common.treat_as_char } else { false }
-            });
-            // 비-TAC 어울림(text_wrap=0) 표: 후속 빈 문단의 cs를 기록
-            let has_non_tac_table = has_table && !has_tac_block_table;
-            // 표 존재 시 플래그 설정 (vpos drift 보정용)
-            // TAC/비-TAC 모두 layout의 vpos 보정과 drift를 만들 수 있음
-            if has_table && !page_changed {
-                st.page_has_block_table = true;
-            }
-            if has_non_tac_table {
-                let is_wrap_around = para.controls.iter().any(|c| {
-                    if let Control::Table(t) = c {
-                        matches!(t.common.text_wrap, crate::model::shape::TextWrap::Square)
-                    } else { false }
-                });
-                if is_wrap_around {
-                    // 어울림 배치: 표의 LINE_SEG (cs, sw) 쌍과 동일한 후속 문단은
-                    // 표 옆에 배치되므로 높이를 소비하지 않음
-                    wrap_around_cs = para.line_segs.first()
-                        .map(|s| s.column_start)
-                        .unwrap_or(0);
-                    wrap_around_sw = para.line_segs.first()
-                        .map(|s| s.segment_width as i32)
-                        .unwrap_or(0);
-                    wrap_around_table_para = para_idx;
-                }
-            }
-
-            if has_tac_block_table && para_height > 0.0 && !page_changed {
-                let height_added = st.current_height - height_before_controls;
-                // Layout과 동일한 기준으로 TAC 표 높이 계산:
-                // layout에서는 max(표 실측 높이, seg.vpos + seg.lh) + ls/2를 사용하므로
-                // line_seg의 line_height를 기준으로 계산해야 layout과 일치함
-                let tac_count = para.controls.iter()
-                    .filter(|c| matches!(c, Control::Table(t) if t.common.treat_as_char))
-                    .count();
-                let tac_seg_total: f64 = if tac_count > 0 && !para.line_segs.is_empty() {
-                    // 각 TAC 표는 대응하는 line_seg를 사용
-                    let mut total = 0.0;
-                    let mut tac_idx = 0;
-                    for (ci, c) in para.controls.iter().enumerate() {
-                        if let Control::Table(t) = c {
-                            if t.common.treat_as_char {
-                                if let Some(seg) = para.line_segs.get(tac_idx) {
-                                    // layout과 동일: max(표 실측, seg.lh) + ls
-                                    let seg_lh = crate::renderer::hwpunit_to_px(seg.line_height, self.dpi);
-                                    let mt_h = measured.get_table_height(para_idx, ci).unwrap_or(0.0);
-                                    let effective_h = seg_lh.max(mt_h);
-                                    let ls = if seg.line_spacing > 0 {
-                                        crate::renderer::hwpunit_to_px(seg.line_spacing, self.dpi)
-                                    } else { 0.0 };
-                                    total += effective_h + ls;
-                                }
-                                tac_idx += 1;
-                            }
-                        }
+            let body_w = (page_def.width as i32) - (page_def.margin_left as i32) - (page_def.margin_right as i32);
+            let sw0_match = st.wrap_around_sw == 0 && is_empty_para && para_sw > 0 && para_sw < body_w / 2;
+            if para_cs == st.wrap_around_cs && para_sw == st.wrap_around_sw
+                || (any_seg_matches && is_empty_para)
+                || sw0_match {
+                st.current_column_wrap_around_paras.push(
+                    super::WrapAroundPara {
+                        para_index: para_idx,
+                        table_para_index: st.wrap_around_table_para,
+                        has_text: !is_empty_para,
                     }
-                    total
-                } else {
-                    0.0
-                };
-                let cap = if tac_seg_total > 0.0 {
-                    let mp = measured.get_measured_paragraph(para_idx);
-                    let sb = mp.map(|m| m.spacing_before).unwrap_or(0.0);
-                    let sa = mp.map(|m| m.spacing_after).unwrap_or(0.0);
-                    let outer_top: f64 = para.controls.iter()
-                        .filter_map(|c| match c {
-                            Control::Table(t) if t.common.treat_as_char =>
-                                Some(crate::renderer::hwpunit_to_px(t.outer_margin_top as i32, self.dpi)),
-                            _ => None,
-                        })
-                        .sum();
-                    let is_col_top = height_before_controls < 1.0;
-                    let effective_sb = if is_col_top { 0.0 } else { sb };
-                    // TAC 블록 표 문단의 post-text 줄 높이 (마지막 LINE_SEG)
-                    let post_text_h = if para.line_segs.len() > tac_count {
-                        para.line_segs.last()
-                            .map(|seg| crate::renderer::hwpunit_to_px(seg.line_height + seg.line_spacing, self.dpi))
-                            .unwrap_or(0.0)
-                    } else { 0.0 };
-                    (effective_sb + outer_top + tac_seg_total + post_text_h + sa).min(para_height)
-                } else {
-                    para_height
+                );
+                return;
+            } else {
+                st.wrap_around_cs = -1;
+                st.wrap_around_sw = -1;
+            }
+        }
+
+        if !has_table {
+            self.paginate_text_lines(st, para_idx, para, measured, para_height, base_available_height);
+        }
+
+        let height_before_controls = st.current_height;
+        let page_count_before_controls = st.pages.len();
+
+        self.process_controls(
+            st, para_idx, para, measured, measurer,
+            para_height, para_height_for_fit, base_available_height, page_def, height_before_controls,
+        );
+
+        let page_changed = st.pages.len() != page_count_before_controls;
+        let has_tac_block_table = para.controls.iter().any(|c| {
+            if let Control::Table(t) = c { t.common.treat_as_char } else { false }
+        });
+        let has_non_tac_table = has_table && !has_tac_block_table;
+        if has_table && !page_changed {
+            st.page_has_block_table = true;
+        }
+        if has_non_tac_table {
+            let is_wrap_around = para.controls.iter().any(|c| {
+                if let Control::Table(t) = c {
+                    matches!(t.common.text_wrap, crate::model::shape::TextWrap::Square)
+                } else { false }
+            });
+            if is_wrap_around {
+                st.wrap_around_cs = para.line_segs.first().map(|s| s.column_start).unwrap_or(0);
+                st.wrap_around_sw = para.line_segs.first().map(|s| s.segment_width as i32).unwrap_or(0);
+                st.wrap_around_table_para = para_idx;
+            }
+        }
+
+        if has_tac_block_table && para_height > 0.0 && !page_changed {
+            let height_added = st.current_height - height_before_controls;
+            let tac_count = para.controls.iter().filter(|c| matches!(c, Control::Table(t) if t.common.treat_as_char)).count();
+            let tac_seg_total: f64 = if tac_count > 0 && !para.line_segs.is_empty() {
+                let mut total = 0.0;
+                let mut tac_idx = 0;
+                for (ci, c) in para.controls.iter().enumerate() {
+                    if let Control::Table(t) = c {
                 };
                 if height_added > cap {
                     st.current_height = height_before_controls + cap;

@@ -67,9 +67,26 @@ export class WasmBridge {
     this.doc = new HwpDocument(data);
     this.doc.convertToEditable();
     this.doc.setFileName(this._fileName);
+    
+    // 초기 페이징은 CanvasView에서 명시적으로 제어하도록 함
     const info: DocumentInfo = JSON.parse(this.doc.getDocumentInfo());
-    console.log(`[WasmBridge] 문서 로드: ${info.pageCount}페이지`);
+    console.log(`[WasmBridge] 문서 로드 준비 (파일: ${this._fileName})`);
     return info;
+  }
+
+  startProgressivePaging(): void {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    this.doc.startProgressivePaging();
+  }
+
+  stepProgressivePaging(chunkSize: number): number {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return this.doc.stepProgressivePaging(chunkSize);
+  }
+
+  isPagingFinished(): boolean {
+    if (!this.doc) return true;
+    return this.doc.isPagingFinished();
   }
 
   createNewDocument(): DocumentInfo {

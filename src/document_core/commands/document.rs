@@ -65,7 +65,6 @@ impl DocumentCore {
             para_offset: Vec::new(),
         };
 
-        doc.paginate();
         Ok(doc)
     }
 

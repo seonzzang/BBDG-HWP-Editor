@@ -41,23 +41,24 @@ export class CanvasView {
     );
   }
 
-  /** 문서 로드 후 호출 — 페이지 정보 지연 로딩 및 가상 스크롤 초기화 */
-  loadDocument(): void {
+  /** 문서 로드 후 호출 — 증분 페이징 시작 및 레이아웃 초기화 */
+  public loadDocument(): void {
     this.reset();
-
-    const pageCount = this.wasm.pageCount;
     this.pages = [];
-    
-    // 1단계: 초기 렌더링에 필요한 페이지만 즉시 로드 (최대 20페이지)
-    const initialBatch = Math.min(pageCount, 20);
-    this.fetchPageInfos(0, initialBatch);
+    this.canvasPool.releaseAll();
+
+    // 1. 증분 페이징 시작
+    this.wasm.startProgressivePaging();
+
+    // 2. 초기 1단계 즉시 수행 (첫 화면을 위해 문단 200개 정도 미리 페이징)
+    const initialPages = this.wasm.stepProgressivePaging(200);
+    this.updateLayout(initialPages);
 
     if (this.pages.length === 0) {
-      console.error('[CanvasView] 로드된 페이지가 없습니다');
-      return;
+      console.warn('[CanvasView] 초기 페이징 결과가 없습니다. (빈 문서이거나 처리 중)');
     }
 
-    // 모바일: 문서 로드 시 폭 맞춤 줌 자동 적용
+    // 모바일/테블릿: 문서 로드 시 폭 맞춤 줌 자동 적용
     if (window.innerWidth < 1024 && this.pages.length > 0) {
       const containerWidth = this.container.clientWidth - 20;
       const firstPage = this.pages[0];
@@ -71,51 +72,49 @@ export class CanvasView {
     this.container.scrollTop = 0;
     this.updateVisiblePages();
 
-    // 2단계: 나머지 페이지는 백그라운드에서 지연 로딩 (UI 프리징 방지)
-    if (pageCount > initialBatch) {
-      this.deferredFetchPages(initialBatch, pageCount);
-    }
-
-    console.log(`[CanvasView] 초기 ${this.pages.length}/${pageCount}페이지 로드, 레이아웃 준비 완료`);
-  }
-
-  /** 특정 범위의 페이지 정보를 가져온다 */
-  private fetchPageInfos(start: number, end: number): void {
-    for (let i = start; i < end; i++) {
-      try {
-        this.pages[i] = this.wasm.getPageInfo(i);
-      } catch (e) {
-        console.error(`[CanvasView] 페이지 ${i} 정보 조회 실패:`, e);
+    // 3. 백그라운드에서 나머지 페이징 진행 (Idle 타임 활용)
+    const step = () => {
+      if (this.wasm.isPagingFinished()) {
+        console.log('[CanvasView] 모든 페이지 계산 완료.');
+        return;
       }
-    }
-  }
 
-  /** 백그라운드에서 페이지 정보를 나누어 수집한다 */
-  private deferredFetchPages(start: number, total: number): void {
-    const BATCH_SIZE = 50;
-    let current = start;
+      // 한 번에 문단 100개씩 분할 처리
+      const count = this.wasm.stepProgressivePaging(100);
+      this.updateLayout(count);
 
-    const fetchNext = () => {
-      const end = Math.min(current + BATCH_SIZE, total);
-      this.fetchPageInfos(current, end);
-      current = end;
-
-      // 레이아웃 정보 갱신 (스크롤바 크기 업데이트)
-      this.recalcLayout();
-      this.updateVisiblePages();
-
-      if (current < total) {
-        if ('requestIdleCallback' in window) {
-          (window as any).requestIdleCallback(fetchNext);
-        } else {
-          setTimeout(fetchNext, 10);
-        }
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => step());
       } else {
-        console.log(`[CanvasView] 총 ${total}페이지 전체 로드 완료`);
+        setTimeout(step, 10);
       }
     };
 
-    fetchNext();
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => step());
+    } else {
+      setTimeout(step, 10);
+    }
+  }
+
+  private updateLayout(pageCountNum: number): void {
+    // 이미 로드된 페이지 이후부터 새로운 페이지 정보 수집
+    for (let i = this.pages.length; i < pageCountNum; i++) {
+      try {
+        this.pages.push(this.wasm.getPageInfo(i));
+      } catch (e) {
+        console.error(`[CanvasView] 페이지 ${i} 정보 누락:`, e);
+      }
+    }
+
+    this.recalcLayout();
+    this.updateVisiblePages();
+    
+    // 페이지 수 변경 이벤트 전파 (스크롤바 등 UI 업데이트용)
+    const scrollY = this.viewportManager.getScrollY();
+    const vpCenter = scrollY + (this.container.clientHeight / 2);
+    const currentPage = this.virtualScroll.getPageAtY(vpCenter);
+    this.eventBus.emit('current-page-changed', currentPage, pageCountNum);
   }
 
   /** 레이아웃을 재계산한다 (줌/리사이즈 공통) */

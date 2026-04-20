@@ -6,12 +6,12 @@
 
 ## 🚦 전체 진행 현황
 
-| 단계 | 목표 | 상태 | 관련 파일 |
+| 단계 | 주요 작업 내용 | 상태 | 상세 비고 |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | GPU 메모리 누수 방지 (Canvas Level) | ✅ 구현 완료 (검증 대기) | `canvas-pool.ts` |
-| **Phase 2** | UI 반응성 개선 (Async Loading) | ✅ 구현 완료 (검증 대기) | `canvas-view.ts` |
-| **Phase 3** | 렌더링 파이프라인 가속 | 🏗️ 진행 중 | `viewport-manager.ts`, `page-renderer.ts` |
-| **Phase 4** | 엔진 최적화 (Rust/WASM) | ⏳ 대기 | `wasm_api.rs` |
+| **Phase 1** | GPU 메모리 누수 방지 (Canvas Level) | ✅ Done | `CanvasPool` 크기 제한(15) 및 강제 메모리 해제 구현 |
+| **Phase 2** | UI 반응성 개선 (Async Loading) | ✅ Done | 대형 문서 로드 시 비차단(Non-blocking) 지연 로딩 적용 |
+| **Phase 3** | 렌더링 파이프라인 가속 | ✅ Done | 스크롤 이벤트 스로틀링(rAF) 및 `IdleCallback` 재렌더링 최적화 |
+| **Phase 4** | 엔진 최적화 (WASM 증분 페이징) | ✅ Done | Rust 엔진 루프 분절화 및 백그라운드 증분 페이징 구현 |
 
 ---
 

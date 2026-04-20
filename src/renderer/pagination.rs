@@ -370,13 +370,6 @@ impl Paginator {
     }
 
     /// 구역의 문단 목록을 페이지로 분할한다.
-    ///
-    /// 2-패스 페이지네이션:
-    /// 1. HeightMeasurer로 모든 콘텐츠의 실제 렌더링 높이를 사전 측정
-    /// 2. 측정된 높이를 기반으로 정확한 페이지 분할 수행
-    ///
-    /// - 본문 영역 높이를 초과하면 새 페이지 시작
-    /// - ColumnBreakType::Page이면 강제 페이지 넘김
     pub fn paginate(
         &self,
         paragraphs: &[Paragraph],
@@ -393,6 +386,35 @@ impl Paginator {
         // === 2-패스: 측정된 높이로 페이지 분할 ===
         let result = self.paginate_with_measured(paragraphs, &measured, page_def, column_def, section_index, &styles.para_styles);
         (result, measured)
+    }
+}
+
+/// 증분 페이징을 위한 상태 유지 페이저
+pub struct IncrementalPagingContext {
+    pub state: state::PaginationState,
+    pub measured: MeasuredSection,
+    pub next_para_idx: usize,
+    pub is_finished: bool,
+}
+
+impl IncrementalPagingContext {
+    pub fn new(page_def: &PageDef, column_def: &ColumnDef, section_index: usize, dpi: f64) -> Self {
+        let layout = PageLayoutInfo::from_page_def(page_def, column_def, dpi);
+        let col_count = column_def.column_count.max(1);
+        
+        // 여기에 기본 여백/오버헤드 값 설정 (원래 Paginator에서 가져옴)
+        let footnote_separator_overhead = crate::renderer::hwpunit_to_px(400, dpi);
+        let footnote_safety_margin = crate::renderer::hwpunit_to_px(3000, dpi);
+
+        Self {
+            state: state::PaginationState::new(
+                layout, col_count, section_index,
+                footnote_separator_overhead, footnote_safety_margin,
+            ),
+            measured: MeasuredSection { paragraphs: Vec::new(), tables: Vec::new() },
+            next_para_idx: 0,
+            is_finished: false,
+        }
     }
 }
 
