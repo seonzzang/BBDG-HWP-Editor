@@ -163,10 +163,28 @@ impl HeightMeasurer {
         composed: &[ComposedParagraph],
         styles: &ResolvedStyleSet,
     ) -> MeasuredSection {
-        let mut measured_paras = Vec::with_capacity(paragraphs.len());
-        let mut measured_tables = Vec::new();
+        let mut section = MeasuredSection {
+            paragraphs: Vec::with_capacity(paragraphs.len()),
+            tables: Vec::new(),
+        };
+        self.measure_chunk(&mut section, paragraphs, composed, styles, 0, paragraphs.len());
+        section
+    }
 
-        for (para_idx, para) in paragraphs.iter().enumerate() {
+    /// 특정 범위의 문단들만 측정하여 MeasuredSection에 추가한다.
+    pub fn measure_chunk(
+        &self,
+        section: &mut MeasuredSection,
+        paragraphs: &[Paragraph],
+        composed: &[ComposedParagraph],
+        styles: &ResolvedStyleSet,
+        start_idx: usize,
+        count: usize,
+    ) {
+        let end_idx = (start_idx + count).min(paragraphs.len());
+
+        for para_idx in start_idx..end_idx {
+            let para = &paragraphs[para_idx];
             let comp = composed.get(para_idx);
 
             // 블록 표 컨트롤 감지 (일반 표 + treat_as_char 블록형)
@@ -182,20 +200,15 @@ impl HeightMeasurer {
 
             // 문단 높이 측정
             let measured = self.measure_paragraph(para, comp, styles, para_idx, has_table, has_picture, picture_height);
-            measured_paras.push(measured);
+            section.paragraphs.push(measured);
 
             // 표 높이 측정
             for (ctrl_idx, ctrl) in para.controls.iter().enumerate() {
                 if let Control::Table(table) = ctrl {
                     let measured_table = self.measure_table(table, para_idx, ctrl_idx, styles);
-                    measured_tables.push(measured_table);
+                    section.tables.push(measured_table);
                 }
             }
-        }
-
-        MeasuredSection {
-            paragraphs: measured_paras,
-            tables: measured_tables,
         }
     }
 

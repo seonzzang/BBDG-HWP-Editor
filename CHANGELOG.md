@@ -2,6 +2,16 @@
 
 
 
+## [0.7.16] ??2026-04-20
+
+### Automated Release Notes
+- Version bumped automatically by Version Agent.
+- Changed files included in this commit:
+- `src/renderer/height_measurer.rs`
+
+
+
+
 ## [0.7.15] ??2026-04-20
 
 ### Automated Release Notes
