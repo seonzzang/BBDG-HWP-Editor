@@ -171,12 +171,13 @@ impl HwpDocument {
         );
 
         let current_pages = ctx.state.pages.len() as u32;
+        self.core.pagination[section_idx] = PaginationResult {
+            pages: ctx.state.pages.clone(),
+            wrap_around_paras: Vec::new(),
+            hidden_empty_paras: std::collections::HashSet::new(),
+        };
+
         if ctx.is_finished {
-            self.core.pagination[section_idx] = PaginationResult {
-                pages: std::mem::take(&mut ctx.state.pages),
-                wrap_around_paras: Vec::new(),
-                hidden_empty_paras: std::collections::HashSet::new(),
-            };
             self.paging_ctx = None;
         } else {
             self.paging_ctx = Some(ctx);

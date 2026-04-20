@@ -18,7 +18,7 @@ use super::page_layout::PageLayoutInfo;
 use super::style_resolver::ResolvedStyleSet;
 
 /// 페이지 분할 결과: 페이지별 콘텐츠 참조
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PaginationResult {
     /// 페이지별 콘텐츠 목록
     pub pages: Vec<PageContent>,
@@ -29,7 +29,7 @@ pub struct PaginationResult {
 }
 
 /// 한 페이지에 배치될 콘텐츠
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PageContent {
     /// 페이지 인덱스 (0-based)
     pub page_index: u32,
@@ -112,7 +112,7 @@ pub struct FootnoteRef {
 }
 
 /// 한 단(Column)에 배치될 콘텐츠
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ColumnContent {
     /// 단 인덱스 (0-based)
     pub column_index: u16,
@@ -139,7 +139,7 @@ pub struct WrapAroundPara {
 }
 
 /// 페이지에 배치되는 개별 항목
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PageItem {
     /// 문단 전체가 배치됨
     FullParagraph {

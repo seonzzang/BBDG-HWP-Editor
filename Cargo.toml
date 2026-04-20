@@ -1,6 +1,6 @@
 [package]
 name = "rhwp"
-version = "0.7.19"
+version = "0.7.20"
 edition = "2021"
 description = "HWP file viewer and editor written in Rust, targeting WebAssembly"
 license = "MIT"
@@ -39,7 +39,7 @@ console_error_panic_hook = { version = "0.1", optional = true }
 [features]
 default = ["console_error_panic_hook"]
 
-# PDF ?대낫?닿린 (?ㅼ씠?곕툕 ?꾩슜, Task #21)
+# PDF ?????용┛ (??쇱뵠?怨뺥닏 ?袁⑹뒠, Task #21)
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 svg2pdf = "0.13"
 usvg = "0.45"
@@ -64,34 +64,34 @@ js-sys = "0.3"
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 
-# ?? Clippy 由고듃 ?뺤콉 ??
-# 由ы뙥?좊쭅(??ㅽ겕 142) 媛??④퀎 ?꾨즺 ??allow ??warn ??deny ?꾪솚
+# ???? Clippy ?깃퀬???類ㅼ퐠 ????
+# ?귐뗫솯?醫딆춦(????쎄쾿 142) 揶???ｍ??袁⑥┷ ??allow ??warn ??deny ?袁れ넎
 #
-# [Phase 0] 湲곗????ㅼ젙 ??湲곗〈 肄붾뱶??援ъ“??寃쎄퀬 ?덉슜
-# [Phase 1-3] wasm_api/renderer 遺꾪븷 ?꾨즺 ?? too_many_arguments, cognitive_complexity ??warn
-# [Phase 4-6] ?꾩껜 遺꾪븷 ?꾨즺 ?? ????ぉ warn ?먮뒗 deny
+# [Phase 0] 疫꿸퀣?????쇱젟 ??疫꿸퀣???꾨뗀諭???닌듼??野껋럡????됱뒠
+# [Phase 1-3] wasm_api/renderer ?브쑵釉??袁⑥┷ ?? too_many_arguments, cognitive_complexity ??warn
+# [Phase 4-6] ?袁⑷퍥 ?브쑵釉??袁⑥┷ ?? ??????warn ?癒?뮉 deny
 #
 [lints.clippy]
-# ?? 援ъ“??寃쎄퀬: 由ы뙥?좊쭅?먯꽌 ?닿껐 ?덉젙 ??
-too_many_arguments = "allow"        # Phase 1-3 ?꾨즺 ??warn
-type_complexity = "allow"           # Phase 1-3 ?꾨즺 ??warn
-cognitive_complexity = "allow"      # Phase 4 ?꾨즺 ??warn
-needless_pass_by_value = "allow"    # Phase 4 ?꾨즺 ??warn
-# ?? 肄붾뱶 ?ㅽ??? 由ы뙥?좊쭅 怨쇱젙?먯꽌 ?먯쭊 ?섏젙 ??
-redundant_closure = "allow"         # 媛??뚯씪 遺꾪븷 ???섏젙
-field_reassign_with_default = "allow"  # 媛??뚯씪 遺꾪븷 ???섏젙
-manual_div_ceil = "allow"           # 媛??뚯씪 遺꾪븷 ???섏젙
-manual_range_contains = "allow"     # 媛??뚯씪 遺꾪븷 ???섏젙
-unnecessary_cast = "allow"          # 媛??뚯씪 遺꾪븷 ???섏젙
-collapsible_if = "allow"            # 媛??뚯씪 遺꾪븷 ???섏젙
-unnecessary_map_or = "allow"         # 媛??뚯씪 遺꾪븷 ???섏젙
-needless_borrow = "allow"           # 媛??뚯씪 遺꾪븷 ???섏젙
-if_same_then_else = "allow"         # 媛??뚯씪 遺꾪븷 ???섏젙
-needless_range_loop = "allow"       # 媛??뚯씪 遺꾪븷 ???섏젙
-option_map_or_none = "allow"        # 媛??뚯씪 遺꾪븷 ???섏젙
-bool_comparison = "allow"           # 媛??뚯씪 遺꾪븷 ???섏젙
-collapsible_else_if = "allow"       # 媛??뚯씪 遺꾪븷 ???섏젙
-collapsible_match = "allow"         # 媛??뚯씪 遺꾪븷 ???섏젙
+# ???? ?닌듼??野껋럡?? ?귐뗫솯?醫딆춦?癒?퐣 ??욧퍙 ??됱젟 ????
+too_many_arguments = "allow"        # Phase 1-3 ?袁⑥┷ ??warn
+type_complexity = "allow"           # Phase 1-3 ?袁⑥┷ ??warn
+cognitive_complexity = "allow"      # Phase 4 ?袁⑥┷ ??warn
+needless_pass_by_value = "allow"    # Phase 4 ?袁⑥┷ ??warn
+# ???? ?꾨뗀諭?????? ?귐뗫솯?醫딆춦 ?⑥눘??癒?퐣 ?癒?춭 ??륁젟 ????
+redundant_closure = "allow"         # 揶????뵬 ?브쑵釉?????륁젟
+field_reassign_with_default = "allow"  # 揶????뵬 ?브쑵釉?????륁젟
+manual_div_ceil = "allow"           # 揶????뵬 ?브쑵釉?????륁젟
+manual_range_contains = "allow"     # 揶????뵬 ?브쑵釉?????륁젟
+unnecessary_cast = "allow"          # 揶????뵬 ?브쑵釉?????륁젟
+collapsible_if = "allow"            # 揶????뵬 ?브쑵釉?????륁젟
+unnecessary_map_or = "allow"         # 揶????뵬 ?브쑵釉?????륁젟
+needless_borrow = "allow"           # 揶????뵬 ?브쑵釉?????륁젟
+if_same_then_else = "allow"         # 揶????뵬 ?브쑵釉?????륁젟
+needless_range_loop = "allow"       # 揶????뵬 ?브쑵釉?????륁젟
+option_map_or_none = "allow"        # 揶????뵬 ?브쑵釉?????륁젟
+bool_comparison = "allow"           # 揶????뵬 ?브쑵釉?????륁젟
+collapsible_else_if = "allow"       # 揶????뵬 ?브쑵釉?????륁젟
+collapsible_match = "allow"         # 揶????뵬 ?브쑵釉?????륁젟
 needless_borrows_for_generic_args = "allow"
 vec_init_then_push = "allow"
 single_match = "allow"
@@ -124,18 +124,18 @@ implicit_saturating_sub = "allow"
 unused_enumerate_index = "allow"
 unnecessary_filter_map = "allow"
 manual_pattern_char_comparison = "allow"
-# ?? ??肄붾뱶 ?덉쭏 寃뚯씠?? 利됱떆 ?곸슜 ??
+# ???? ???꾨뗀諭???됱춳 野껊슣??? 筌앸맩???怨몄뒠 ????
 large_enum_variant = "warn"
 
 [lints.rust]
-# dead_code, unused 怨꾩뿴 ??由ы뙥?좊쭅 怨쇱젙?먯꽌 ?뺣━
+# dead_code, unused ?④쑴肉????귐뗫솯?醫딆춦 ?⑥눘??癒?퐣 ?類ｂ봺
 dead_code = "allow"
 unused_variables = "allow"
 unused_imports = "allow"
 unused_mut = "allow"
 unused_assignments = "allow"
 unused_macros = "allow"
-# wmf 紐⑤뱢??tracing feature cfg 寃쎄퀬 ?듭젣
+# wmf 筌뤴뫀諭??tracing feature cfg 野껋럡?????젫
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("tracing", "svg"))'] }
 
 
