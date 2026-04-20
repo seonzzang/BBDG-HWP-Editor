@@ -13,12 +13,12 @@
             --primary: #1d4ed8;
             --primary-dark: #1e40af;
             --accent: #7c3aed;
-            --bg: #f8fafc;
-            --card-bg: rgba(255, 255, 255, 0.7);
+            --bg: #f1f5f9; /* Slightly deeper background for more contrast with white cards */
+            --card-bg: #ffffff;
             --text: #0f172a;
             --text-muted: #475569;
-            --border: rgba(15, 23, 42, 0.08);
-            --glass: rgba(255, 255, 255, 0.4);
+            --border: rgba(15, 23, 42, 0.12); /* Increased from 0.08 for better visibility */
+            --glass: rgba(255, 255, 255, 0.8);
         }
 
         * {
@@ -178,7 +178,7 @@
             border-radius: 12px;
             font-weight: 700;
             font-size: 1.1rem;
-            border: 1px solid var(--border);
+            border: 1.5px solid var(--border); /* Slightly thicker border */
             transition: all 0.3s;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
@@ -383,8 +383,8 @@
         }
 
         .pw-card {
-            background: #ffffff;
-            border: 1px solid var(--border);
+            background: var(--card-bg);
+            border: 1.5px solid var(--border); /* Much clearer border */
             border-radius: 40px;
             padding: 3.5rem;
             display: flex;
@@ -394,7 +394,7 @@
             position: relative;
             z-index: 2;
             cursor: default;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08); /* Stronger shadow for separation */
         }
 
         .pw-card:hover {
@@ -427,13 +427,14 @@
 
         .pw-card .icon-wrap {
             width: 64px; height: 64px;
-            background: #f1f5f9;
-            border: 1px solid var(--border);
+            background: #eef2f7; /* Deeper background for icons */
+            border: 1px solid rgba(0,0,0,0.05);
             border-radius: 20px;
             display: flex; align-items: center; justify-content: center;
             margin-bottom: 2.5rem;
             color: var(--primary);
             transition: all 0.3s;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
         }
 
         .pw-card:hover .icon-wrap {
