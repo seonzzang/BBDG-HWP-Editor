@@ -419,7 +419,7 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
     console.log('[initDoc] 3. inputHandler deactivate');
     inputHandler?.deactivate();
     console.log('[initDoc] 4. canvasView loadDocument');
-    await canvasView?.loadDocument();
+    await canvasView?.loadDocument(docInfo.pageCount);
     console.log('[initDoc] 5. toolbar setEnabled');
     toolbar?.setEnabled(true);
     console.log('[initDoc] 6. toolbar initStyleDropdown');
@@ -439,7 +439,7 @@ async function initializeDocument(docInfo: DocumentInfo, displayName: string): P
           const n = wasm.reflowLinesegs();
           console.log(`[validation] reflowed ${n} paragraphs`);
           // 렌더 재계산
-          canvasView?.loadDocument();
+          canvasView?.loadDocument(docInfo.pageCount);
           msg.textContent = `${displayName} (비표준 lineseg ${n}건 자동 보정됨)`;
         }
       }

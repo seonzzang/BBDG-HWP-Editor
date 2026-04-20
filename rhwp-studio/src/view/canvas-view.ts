@@ -46,12 +46,12 @@ export class CanvasView {
   }
 
   /** 문서 로드 후 호출 — 페이지 정보 수집 및 가상 스크롤 초기화 */
-  async loadDocument(): Promise<void> {
+  async loadDocument(expectedPageCount?: number): Promise<void> {
     this.reset();
     const loadGeneration = this.loadGeneration;
 
     const traceId = `canvas-load:${Date.now()}`;
-    let pageCount = this.wasm.pageCount;
+    let pageCount = Math.max(expectedPageCount ?? 0, this.wasm.pageCount);
     const initialFullPageCount = pageCount;
     // 현재 Rust paginate_step()은 실제 partial page production이 아니라
     // 최종 단계에서만 pages를 확정한다. release 빌드에서 대용량 문서 blank screen과
@@ -108,7 +108,7 @@ export class CanvasView {
         }
       } catch (error) {
         console.error('[CanvasView] progressive paging bootstrap failed, fallback to full collection', error);
-        pageCount = this.wasm.pageCount;
+        pageCount = Math.max(expectedPageCount ?? 0, this.wasm.pageCount);
       }
     }
 
@@ -150,7 +150,11 @@ export class CanvasView {
     }
 
     if (this.pages.length === 0) {
-      console.error('[CanvasView] 로드된 페이지가 없습니다');
+      console.error('[CanvasView] 로드된 페이지가 없습니다', {
+        traceId,
+        expectedPageCount,
+        wasmPageCount: this.wasm.pageCount,
+      });
       return;
     }
 
