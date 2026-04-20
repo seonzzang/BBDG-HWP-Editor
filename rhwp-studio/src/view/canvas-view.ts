@@ -146,6 +146,7 @@ export class CanvasView {
     initialPageCount: number,
   ): Promise<void> {
     const progressiveChunkSize = 24;
+    const maxStepsPerTick = 4;
     let lastPageCount = initialPageCount;
     let steps = 0;
 
@@ -158,8 +159,16 @@ export class CanvasView {
     while (loadGeneration === this.loadGeneration && !this.wasm.isPagingFinished()) {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      const pageCount = this.wasm.stepProgressivePaging(progressiveChunkSize);
-      steps += 1;
+      let pageCount = lastPageCount;
+      let stepsThisTick = 0;
+      while (stepsThisTick < maxStepsPerTick && !this.wasm.isPagingFinished()) {
+        pageCount = this.wasm.stepProgressivePaging(progressiveChunkSize);
+        steps += 1;
+        stepsThisTick += 1;
+        if (pageCount > lastPageCount) {
+          break;
+        }
+      }
 
       if (pageCount > lastPageCount) {
         for (let i = lastPageCount; i < pageCount; i++) {
@@ -179,6 +188,7 @@ export class CanvasView {
           traceId,
           loadGeneration,
           steps,
+          stepsThisTick,
           pageCount,
           pagingFinished: this.wasm.isPagingFinished(),
         });
