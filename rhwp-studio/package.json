@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "rhwp-studio",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -14,5 +14,9 @@
     "puppeteer-core": "^24.40.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.8"
+  },
+  "dependencies": {
+    "@tauri-apps/plugin-shell": "^2.3.5"
   }
 }
+

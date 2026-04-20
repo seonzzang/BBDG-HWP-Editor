@@ -1,6 +1,7 @@
 # Rust
 /target/
 /target-local/
+/src-tauri/target/
 Cargo.lock
 
 # WebAssembly

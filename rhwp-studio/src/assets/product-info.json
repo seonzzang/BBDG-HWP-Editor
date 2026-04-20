@@ -1,0 +1,51 @@
+{
+  "productName": "BBDG HWP Editor",
+  "version": "2026.04.20.V.1.2.2",
+  "manufacturer": {
+    "nameKr": "비비디글로벌(주)",
+    "nameEn": "BBD Global Co., Ltd.",
+    "url": "https://www.bbdg.co.kr"
+  },
+  "copyright": "© 2026 BBD Global Co., Ltd. All rights reserved.",
+  "sections": {
+    "opensource": {
+      "title": "오픈소스 라이선스",
+      "rhwp": {
+        "kr": "본 제품은 오픈소스 프로젝트 rhwp를 기반으로 고도화되었습니다.",
+        "en": "This product has been advanced based on the open-source project rhwp.",
+        "author": "rhwp",
+        "url": "https://github.com/edwardkim/rhwp"
+      },
+      "mitNotice": {
+        "kr": "본 소프트웨어 및 원저작물은 MIT 라이선스를 준수하며, 상업적/비상업적 목적으로 무료로 자유롭게 사용 가능합니다.",
+        "en": "This software and original works comply with the MIT License and are free to use for both commercial and non-commercial purposes."
+      },
+      "libraries": [
+        { "name": "wasm-bindgen", "license": "MIT / Apache-2.0" },
+        { "name": "web-sys", "license": "MIT / Apache-2.0" },
+        { "name": "js-sys", "license": "MIT / Apache-2.0" },
+        { "name": "cfb", "license": "MIT" },
+        { "name": "flate2", "license": "MIT / Apache-2.0" },
+        { "name": "byteorder", "license": "MIT / Unlicense" },
+        { "name": "base64", "license": "MIT / Apache-2.0" },
+        { "name": "console_error_panic_hook", "license": "MIT / Apache-2.0" }
+      ]
+    },
+    "mitLicense": {
+      "title": "MIT 라이선스 전문",
+      "kr": "이 소프트웨어의 복제본과 관련된 문서 파일(이하 “소프트웨어”)을 획득하는 모든 사람에 대하여, 소프트웨어를 무상으로 제한 없이 다룰 수 있는 권한을 허용합니다 여기에는 소프트웨어의 복제본을 사용, 복제, 수정, 병합, 게시, 배포, 서브라이선스 부여 및/또는 판매할 수 있는 권한과 소프트웨어를 제공받는 사람에게 동일한 권한을 부여할 수 있는 권한이 포함되며, 다음 조건이 적용됩니다:\n\n위 저작권 고지 및 이 허가 고지는 소프트웨어의 모든 복제본 또는 상당 부분에 포함되어야 합니다.\n\n소프트웨어는 상품성, 특정 목적에의 적합성 및 비침해에 대한 보증을 포함하여(단, 이에 한정되지 않음) 명시적이든 묵시적이든 어떠한 종류의 보증 없이 “있는 그대로” 제공됩니다. 어떠한 경우에도 저작권자나 저작권 보유자는 계약상 조치, 불법 행위 또는 기타 행위로 인해 발생하는 청구, 손해 또는 기타 책임에 대해 책임을 지지 않습니다.",
+      "en": "Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
+    },
+    "trademark": {
+      "title": "상표권 및 권리 고지",
+      "hancomNotice": {
+        "kr": "본 제품은 주식회사 한글과컴퓨터의 한글 문서 파일(.hwp) 공개 문서를 참고하여 개발되었습니다.",
+        "en": "This product was developed by referring to the official HWP file format documentation provided by Hancom Inc."
+      },
+      "brandNotice": {
+        "kr": "\"한글\", \"한컴\", \"HWP\", \"HWPX\"는 주식회사 한글과컴퓨터의 등록 상표입니다. 본 소프트웨어는 해당 상표권자와 무관한 독립적 결과물임을 알립니다.",
+        "en": "Hangul, Hancom, HWP, and HWPX are registered trademarks of Hancom Inc. This software is an independent result and is not affiliated with the trademark holder."
+      }
+    }
+  }
+}

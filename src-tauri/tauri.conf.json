@@ -1,0 +1,38 @@
+﻿{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "BBDG HWP Editor",
+  "version": "0.7.4",
+  "identifier": "com.bbdg.hwp-editor",
+  "build": {
+    "devUrl": "http://localhost:7700",
+    "frontendDist": "../rhwp-studio/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "BBDG HWP Editor",
+        "width": 1200,
+        "height": 800,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.ico"],
+    "publisher": "BBD Global Co., Ltd.",
+    "windows": {
+      "wix": {
+        "language": ["ko-KR"]
+      },
+      "nsis": {
+        "languages": ["Korean"]
+      }
+    }
+  }
+}
+

@@ -1,6 +1,6 @@
-[package]
+﻿[package]
 name = "rhwp"
-version = "0.7.3"
+version = "0.7.4"
 edition = "2021"
 description = "HWP file viewer and editor written in Rust, targeting WebAssembly"
 license = "MIT"
@@ -39,7 +39,7 @@ console_error_panic_hook = { version = "0.1", optional = true }
 [features]
 default = ["console_error_panic_hook"]
 
-# PDF 내보내기 (네이티브 전용, Task #21)
+# PDF ?대낫?닿린 (?ㅼ씠?곕툕 ?꾩슜, Task #21)
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 svg2pdf = "0.13"
 usvg = "0.45"
@@ -64,34 +64,34 @@ js-sys = "0.3"
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 
-# ── Clippy 린트 정책 ──
-# 리팩토링(타스크 142) 각 단계 완료 시 allow → warn → deny 전환
+# ?? Clippy 由고듃 ?뺤콉 ??
+# 由ы뙥?좊쭅(??ㅽ겕 142) 媛??④퀎 ?꾨즺 ??allow ??warn ??deny ?꾪솚
 #
-# [Phase 0] 기준선 설정 — 기존 코드의 구조적 경고 허용
-# [Phase 1-3] wasm_api/renderer 분할 완료 후: too_many_arguments, cognitive_complexity → warn
-# [Phase 4-6] 전체 분할 완료 후: 전 항목 warn 또는 deny
+# [Phase 0] 湲곗????ㅼ젙 ??湲곗〈 肄붾뱶??援ъ“??寃쎄퀬 ?덉슜
+# [Phase 1-3] wasm_api/renderer 遺꾪븷 ?꾨즺 ?? too_many_arguments, cognitive_complexity ??warn
+# [Phase 4-6] ?꾩껜 遺꾪븷 ?꾨즺 ?? ????ぉ warn ?먮뒗 deny
 #
 [lints.clippy]
-# ── 구조적 경고: 리팩토링에서 해결 예정 ──
-too_many_arguments = "allow"        # Phase 1-3 완료 후 warn
-type_complexity = "allow"           # Phase 1-3 완료 후 warn
-cognitive_complexity = "allow"      # Phase 4 완료 후 warn
-needless_pass_by_value = "allow"    # Phase 4 완료 후 warn
-# ── 코드 스타일: 리팩토링 과정에서 점진 수정 ──
-redundant_closure = "allow"         # 각 파일 분할 시 수정
-field_reassign_with_default = "allow"  # 각 파일 분할 시 수정
-manual_div_ceil = "allow"           # 각 파일 분할 시 수정
-manual_range_contains = "allow"     # 각 파일 분할 시 수정
-unnecessary_cast = "allow"          # 각 파일 분할 시 수정
-collapsible_if = "allow"            # 각 파일 분할 시 수정
-unnecessary_map_or = "allow"         # 각 파일 분할 시 수정
-needless_borrow = "allow"           # 각 파일 분할 시 수정
-if_same_then_else = "allow"         # 각 파일 분할 시 수정
-needless_range_loop = "allow"       # 각 파일 분할 시 수정
-option_map_or_none = "allow"        # 각 파일 분할 시 수정
-bool_comparison = "allow"           # 각 파일 분할 시 수정
-collapsible_else_if = "allow"       # 각 파일 분할 시 수정
-collapsible_match = "allow"         # 각 파일 분할 시 수정
+# ?? 援ъ“??寃쎄퀬: 由ы뙥?좊쭅?먯꽌 ?닿껐 ?덉젙 ??
+too_many_arguments = "allow"        # Phase 1-3 ?꾨즺 ??warn
+type_complexity = "allow"           # Phase 1-3 ?꾨즺 ??warn
+cognitive_complexity = "allow"      # Phase 4 ?꾨즺 ??warn
+needless_pass_by_value = "allow"    # Phase 4 ?꾨즺 ??warn
+# ?? 肄붾뱶 ?ㅽ??? 由ы뙥?좊쭅 怨쇱젙?먯꽌 ?먯쭊 ?섏젙 ??
+redundant_closure = "allow"         # 媛??뚯씪 遺꾪븷 ???섏젙
+field_reassign_with_default = "allow"  # 媛??뚯씪 遺꾪븷 ???섏젙
+manual_div_ceil = "allow"           # 媛??뚯씪 遺꾪븷 ???섏젙
+manual_range_contains = "allow"     # 媛??뚯씪 遺꾪븷 ???섏젙
+unnecessary_cast = "allow"          # 媛??뚯씪 遺꾪븷 ???섏젙
+collapsible_if = "allow"            # 媛??뚯씪 遺꾪븷 ???섏젙
+unnecessary_map_or = "allow"         # 媛??뚯씪 遺꾪븷 ???섏젙
+needless_borrow = "allow"           # 媛??뚯씪 遺꾪븷 ???섏젙
+if_same_then_else = "allow"         # 媛??뚯씪 遺꾪븷 ???섏젙
+needless_range_loop = "allow"       # 媛??뚯씪 遺꾪븷 ???섏젙
+option_map_or_none = "allow"        # 媛??뚯씪 遺꾪븷 ???섏젙
+bool_comparison = "allow"           # 媛??뚯씪 遺꾪븷 ???섏젙
+collapsible_else_if = "allow"       # 媛??뚯씪 遺꾪븷 ???섏젙
+collapsible_match = "allow"         # 媛??뚯씪 遺꾪븷 ???섏젙
 needless_borrows_for_generic_args = "allow"
 vec_init_then_push = "allow"
 single_match = "allow"
@@ -124,16 +124,17 @@ implicit_saturating_sub = "allow"
 unused_enumerate_index = "allow"
 unnecessary_filter_map = "allow"
 manual_pattern_char_comparison = "allow"
-# ── 새 코드 품질 게이팅: 즉시 적용 ──
+# ?? ??肄붾뱶 ?덉쭏 寃뚯씠?? 利됱떆 ?곸슜 ??
 large_enum_variant = "warn"
 
 [lints.rust]
-# dead_code, unused 계열 — 리팩토링 과정에서 정리
+# dead_code, unused 怨꾩뿴 ??由ы뙥?좊쭅 怨쇱젙?먯꽌 ?뺣━
 dead_code = "allow"
 unused_variables = "allow"
 unused_imports = "allow"
 unused_mut = "allow"
 unused_assignments = "allow"
 unused_macros = "allow"
-# wmf 모듈의 tracing feature cfg 경고 억제
+# wmf 紐⑤뱢??tracing feature cfg 寃쎄퀬 ?듭젣
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("tracing", "svg"))'] }
+
