@@ -2,6 +2,16 @@
 
 
 
+## [0.7.13] ??2026-04-20
+
+### Automated Release Notes
+- Version bumped automatically by Version Agent.
+- Changed files included in this commit:
+- `rhwp-studio/src/core/wasm-bridge.ts`
+
+
+
+
 ## [0.7.12] ??2026-04-20
 
 ### Automated Release Notes

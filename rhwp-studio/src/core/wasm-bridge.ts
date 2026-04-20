@@ -159,6 +159,41 @@ export class WasmBridge {
     return this.doc?.pageCount() ?? 0;
   }
 
+  supportsProgressivePaging(): boolean {
+    const doc = this.doc as any;
+    return !!doc
+      && typeof doc.startProgressivePaging === 'function'
+      && typeof doc.stepProgressivePaging === 'function'
+      && typeof doc.isPagingFinished === 'function';
+  }
+
+  startProgressivePaging(): void {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    const doc = this.doc as any;
+    if (typeof doc.startProgressivePaging !== 'function') {
+      throw new Error('현재 WASM 빌드는 증분 페이징을 지원하지 않습니다');
+    }
+    doc.startProgressivePaging();
+  }
+
+  stepProgressivePaging(chunkSize: number): number {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    const doc = this.doc as any;
+    if (typeof doc.stepProgressivePaging !== 'function') {
+      throw new Error('현재 WASM 빌드는 증분 페이징을 지원하지 않습니다');
+    }
+    return doc.stepProgressivePaging(chunkSize);
+  }
+
+  isPagingFinished(): boolean {
+    if (!this.doc) return true;
+    const doc = this.doc as any;
+    if (typeof doc.isPagingFinished !== 'function') {
+      return true;
+    }
+    return doc.isPagingFinished();
+  }
+
   getPageInfo(pageNum: number): PageInfo {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse(this.doc.getPageInfo(pageNum));
