@@ -10,6 +10,96 @@ import {
   type FileSystemWindowLike,
 } from '@/command/file-system-access';
 
+function printSvgPages(
+  fileName: string,
+  pageCount: number,
+  widthMm: number,
+  heightMm: number,
+  svgPages: string[],
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.setAttribute('aria-hidden', 'true');
+
+    const cleanup = () => {
+      iframe.remove();
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+
+    const handleAfterPrint = () => {
+      cleanup();
+      resolve();
+    };
+
+    iframe.onload = () => {
+      try {
+        const printWindow = iframe.contentWindow;
+        if (!printWindow) {
+          cleanup();
+          reject(new Error('인쇄 프레임을 초기화하지 못했습니다.'));
+          return;
+        }
+
+        window.addEventListener('afterprint', handleAfterPrint, { once: true });
+        setTimeout(() => {
+          try {
+            printWindow.focus();
+            printWindow.print();
+            // 일부 환경에서는 afterprint가 오지 않으므로 안전하게 정리
+            setTimeout(() => {
+              if (document.body.contains(iframe)) {
+                cleanup();
+                resolve();
+              }
+            }, 1000);
+          } catch (error) {
+            cleanup();
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+        }, 150);
+      } catch (error) {
+        cleanup();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    };
+
+    document.body.appendChild(iframe);
+
+    const printDoc = iframe.contentDocument;
+    if (!printDoc) {
+      cleanup();
+      reject(new Error('인쇄 문서를 생성하지 못했습니다.'));
+      return;
+    }
+
+    printDoc.open();
+    printDoc.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${fileName} — 인쇄</title>
+<style>
+  @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  .page { page-break-after: always; width: ${widthMm}mm; height: ${heightMm}mm; overflow: hidden; }
+  .page:last-child { page-break-after: auto; }
+  .page svg { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+${svgPages.map(svg => `<div class="page">${svg}</div>`).join('\n')}
+</body>
+</html>`);
+    printDoc.close();
+  });
+}
+
 export const fileCommands: CommandDef[] = [
   {
     id: 'file:new-doc',
@@ -160,55 +250,7 @@ export const fileCommands: CommandDef[] = [
         const widthMm = Math.round(pageInfo.width * 25.4 / 96);
         const heightMm = Math.round(pageInfo.height * 25.4 / 96);
 
-        // 인쇄 전용 창 생성
-        const printWin = window.open('', '_blank');
-        if (!printWin) {
-          alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.');
-          return;
-        }
-
-        printWin.document.write(`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>${wasm.fileName} — 인쇄</title>
-<style>
-  @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
-  * { margin: 0; padding: 0; }
-  body { background: #fff; }
-  .page { page-break-after: always; width: ${widthMm}mm; height: ${heightMm}mm; overflow: hidden; }
-  .page:last-child { page-break-after: auto; }
-  .page svg { width: 100%; height: 100%; }
-  @media screen {
-    body { background: #e5e7eb; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 16px; }
-    .page { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-    .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #1e293b; color: #fff; padding: 8px 16px; display: flex; align-items: center; gap: 12px; font: 14px sans-serif; z-index: 100; }
-    .print-bar button { padding: 6px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-    .print-bar button:hover { background: #1d4ed8; }
-    body { padding-top: 56px; }
-  }
-  @media print { .print-bar { display: none; } }
-</style>
-</head>
-<body>
-<div class="print-bar">
-  <button id="print-btn">인쇄</button>
-  <button id="close-btn" style="background:#475569">닫기</button>
-  <span>${wasm.fileName} — ${pageCount}페이지</span>
-</div>
-${svgPages.map(svg => `<div class="page">${svg}</div>`).join('\n')}
-
-</body>
-</html>`);
-        printWin.document.close();
-
-        // CSP 안전: DOM API로 이벤트 바인딩 (인라인 스크립트 사용 안 함)
-        printWin.document.getElementById('print-btn')?.addEventListener('click', () => {
-          printWin.print();
-        });
-        printWin.document.getElementById('close-btn')?.addEventListener('click', () => {
-          printWin.close();
-        });
+        await printSvgPages(wasm.fileName, pageCount, widthMm, heightMm, svgPages);
 
         if (statusEl) statusEl.textContent = origStatus;
       } catch (err) {
