@@ -358,28 +358,184 @@
         </div>
     </header>
 
-    <section id="features" class="features">
-        <div class="feature-card">
-            <div class="feature-icon">🚀</div>
-            <h3>초고속 렌더링</h3>
-            <p>Rust 라이브러리를 WebAssembly로 컴파일하여 브라우저와 PC 환경에서 원어민 수준의 속도로 300페이지 이상의 대형 문서를 처리합니다.</p>
+    <style>
+        /* ... existing root and base styles ... */
+
+        .features-container {
+            padding: 10rem 10% 6rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            margin-bottom: 4rem;
+            text-align: left;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+        }
+
+        .feature-card {
+            position: relative;
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 32px;
+            padding: 3rem;
+            overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Asymmetric Layout */
+        .card-large { grid-column: span 7; }
+        .card-small { grid-column: span 5; }
+        .card-mid { grid-column: span 6; }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at top left, rgba(37, 99, 235, 0.1), transparent 70%);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            border-color: rgba(37, 99, 235, 0.3);
+            background: rgba(30, 41, 59, 0.6);
+            box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.5);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .icon-box {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+            color: var(--primary);
+            position: relative;
+            z-index: 2;
+        }
+
+        .icon-box svg {
+            width: 32px;
+            height: 32px;
+            stroke-width: 1.5px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #fff;
+            position: relative;
+            z-index: 2;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            line-height: 1.7;
+            position: relative;
+            z-index: 2;
+        }
+
+        .feature-tag {
+            display: inline-block;
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--primary);
+            opacity: 0.8;
+        }
+
+        @media (max-width: 1024px) {
+            .card-large, .card-small, .card-mid { grid-column: span 12; }
+        }
+    </style>
+
+    <div class="features-container" id="features">
+        <div class="section-header">
+            <h2>Core Technologies</h2>
+            <p class="subtitle" style="margin: 0; text-align: left;">BBDG 만의 독보적인 기술력으로 완성된 엔터프라이즈 환경입니다.</p>
         </div>
-        <div class="feature-card">
-            <div class="feature-icon">🔒</div>
-            <h3>폐쇄망 최적화</h3>
-            <p>모든 데이터 처리가 로컬 기기 내에서 이루어집니다. 외부 서버와의 통신이 원천 차단되어 기업의 보안 기밀을 안전하게 보호합니다.</p>
+
+        <div class="features-grid">
+            <!-- ⚡ High Performance -->
+            <div class="feature-card card-large">
+                <div>
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    </div>
+                    <h3>초고속 핵심 엔진</h3>
+                    <p>복잡한 HWP 구조를 Rust 언어로 직접 파싱하고 WebAssembly로 실행합니다. 자바스크립트 대비 최대 10배 빠른 속도로 수백 페이지의 문서를 레이턴시 없이 핸들링합니다.</p>
+                </div>
+                <div class="feature-tag">WASM & Rust Runtime</div>
+            </div>
+
+            <!-- 🔒 Security -->
+            <div class="feature-card card-small">
+                <div>
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <h3>폐쇄망 최적 보안</h3>
+                    <p>외부 서버와의 데이터 교환이 전혀 없는 Zero-Trust 환경을 지향합니다. 기업 내부망 내에서만 모든 연산이 완결됩니다.</p>
+                </div>
+                <div class="feature-tag">100% Offline Integrity</div>
+            </div>
+
+            <!-- 🖱️ Integration -->
+            <div class="feature-card card-mid">
+                <div>
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M7 7l10 10M17 7L7 17"/></svg>
+                    </div>
+                    <h3>완전한 네이티브 통합</h3>
+                    <p>Tauri 프레임워크를 통해 윈도우 파일 시스템과 직접 통신합니다. 드래그 앤 드롭뿐만 아니라 시스템 클립보드까지 완벽하게 연동됩니다.</p>
+                </div>
+                <div class="feature-tag">Tauri Shell Native API</div>
+            </div>
+
+            <!-- 📦 Deployment -->
+            <div class="feature-card card-mid">
+                <div>
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    </div>
+                    <h3>범용 배포 패키지</h3>
+                    <p>기업의 IT 관리 환경에 따라 선택 가능한 MSI/NSIS/Portable 빌드본을 실시간으로 관리하고 버저닝하여 제공합니다.</p>
+                </div>
+                <div class="feature-tag">Enterprise CI/CD Build</div>
+            </div>
         </div>
-        <div class="feature-card">
-            <div class="feature-icon">🖱️</div>
-            <h3>드래그 앤 드롭</h3>
-            <p>윈도우 네이티브 드래그 앤 드롭을 지원합니다. 탐색기에서 파일을 끌어다 놓는 것만으로 즉시 편집을 시작할 수 있습니다.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">📦</div>
-            <h3>다양한 배포 방식</h3>
-            <p>포터블 버전, MSI 설치형, NSIS 셋업 등 기업 환경에 맞는 다양한 설치 패키지를 원클릭으로 제공합니다.</p>
-        </div>
-    </section>
+    </div>
 
     <section id="download" class="download-section">
         <h2>최신 버전 다운로드</h2>
