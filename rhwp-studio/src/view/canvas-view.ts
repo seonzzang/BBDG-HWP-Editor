@@ -102,6 +102,8 @@ export class CanvasView {
     const currentPage = this.virtualScroll.getPageAtY(vpCenter);
     const windowPages = this.getPageWindow(currentPage);
     const retainedPages = Array.from(new Set([...prefetchPages, ...windowPages])).sort((a, b) => a - b);
+    const releasedPages: number[] = [];
+    const renderedPages: number[] = [];
 
     // 벗어난 페이지 해제
     const retainedSet = new Set(retainedPages);
@@ -109,6 +111,7 @@ export class CanvasView {
       if (!retainedSet.has(pageIdx)) {
         this.pageRenderer.cancelReRender(pageIdx);
         this.canvasPool.release(pageIdx);
+        releasedPages.push(pageIdx);
       }
     }
 
@@ -116,12 +119,13 @@ export class CanvasView {
     for (const pageIdx of retainedPages) {
       if (!this.canvasPool.has(pageIdx)) {
         this.renderPage(pageIdx);
+        renderedPages.push(pageIdx);
       }
     }
 
     // 현재 페이지 번호 갱신
     if (visiblePages.length > 0) {
-      this.logPageWindow(currentPage, prefetchPages, visiblePages, retainedPages);
+      this.logPageWindow(currentPage, prefetchPages, visiblePages, retainedPages, releasedPages, renderedPages);
       this.eventBus.emit(
         'current-page-changed',
         currentPage,
@@ -145,7 +149,14 @@ export class CanvasView {
     return pages;
   }
 
-  private logPageWindow(currentPage: number, prefetchPages: number[], visiblePages: number[], retainedPages: number[]): void {
+  private logPageWindow(
+    currentPage: number,
+    prefetchPages: number[],
+    visiblePages: number[],
+    retainedPages: number[],
+    releasedPages: number[],
+    renderedPages: number[],
+  ): void {
     const windowPages = this.getPageWindow(currentPage);
     const windowStart = windowPages[0] ?? 0;
     const windowEnd = windowPages[windowPages.length - 1] ?? 0;
@@ -156,6 +167,8 @@ export class CanvasView {
       visiblePages.join(','),
       prefetchPages.join(','),
       retainedPages.join(','),
+      releasedPages.join(','),
+      renderedPages.join(','),
     ].join('|');
 
     if (signature === this.lastWindowLogSignature) return;
@@ -168,6 +181,8 @@ export class CanvasView {
       visiblePages,
       prefetchPages,
       retainedPages,
+      releasedPages,
+      renderedPages,
       activeCanvasPages: Array.from(this.canvasPool.activePages).sort((a, b) => a - b),
     });
   }
