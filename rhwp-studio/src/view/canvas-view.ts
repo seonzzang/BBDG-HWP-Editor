@@ -1,7 +1,7 @@
 import { WasmBridge } from '@/core/wasm-bridge';
 import { EventBus } from '@/core/event-bus';
 import type { PageInfo } from '@/core/types';
-import { VirtualScroll } from './virtual-scroll';
+import { DEFAULT_PAGE_WINDOW_RADIUS, VirtualScroll } from './virtual-scroll';
 import { CanvasPool } from './canvas-pool';
 import { PageRenderer } from './page-renderer';
 import { ViewportManager } from './viewport-manager';
@@ -18,6 +18,7 @@ export class CanvasView {
   private pages: PageInfo[] = [];
   private currentVisiblePages: number[] = [];
   private unsubscribers: (() => void)[] = [];
+  private lastWindowLogSignature = '';
 
   constructor(
     private container: HTMLElement,
@@ -118,6 +119,7 @@ export class CanvasView {
     if (visiblePages.length > 0) {
       const vpCenter = scrollY + vpHeight / 2;
       const currentPage = this.virtualScroll.getPageAtY(vpCenter);
+      this.logPageWindow(currentPage, prefetchPages, visiblePages);
       this.eventBus.emit(
         'current-page-changed',
         currentPage,
@@ -126,6 +128,30 @@ export class CanvasView {
     }
 
     this.currentVisiblePages = visiblePages;
+  }
+
+  private logPageWindow(currentPage: number, prefetchPages: number[], visiblePages: number[]): void {
+    const windowStart = Math.max(0, currentPage - DEFAULT_PAGE_WINDOW_RADIUS);
+    const windowEnd = Math.min(this.virtualScroll.pageCount - 1, currentPage + DEFAULT_PAGE_WINDOW_RADIUS);
+    const signature = [
+      currentPage,
+      windowStart,
+      windowEnd,
+      visiblePages.join(','),
+      prefetchPages.join(','),
+    ].join('|');
+
+    if (signature === this.lastWindowLogSignature) return;
+    this.lastWindowLogSignature = signature;
+
+    console.log('[CanvasView] page window', {
+      currentPage,
+      windowRadius: DEFAULT_PAGE_WINDOW_RADIUS,
+      targetWindow: [windowStart, windowEnd],
+      visiblePages,
+      prefetchPages,
+      activeCanvasPages: Array.from(this.canvasPool.activePages).sort((a, b) => a - b),
+    });
   }
 
   /** 단일 페이지를 렌더링한다 */
@@ -257,6 +283,7 @@ export class CanvasView {
     this.pageRenderer.cancelAll();
     this.canvasPool.releaseAll();
     this.currentVisiblePages = [];
+    this.lastWindowLogSignature = '';
     this.pages = [];
     this.scrollContent.innerHTML = '';
   }

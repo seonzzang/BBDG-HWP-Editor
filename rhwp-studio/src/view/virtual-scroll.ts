@@ -2,6 +2,8 @@ import type { PageInfo } from '@/core/types';
 
 /** 그리드 모드 전환 줌 임계값 */
 const GRID_ZOOM_THRESHOLD = 0.5;
+/** 메모리 최적화용 기본 페이지 윈도우 반경 */
+export const DEFAULT_PAGE_WINDOW_RADIUS = 5;
 
 export class VirtualScroll {
   private pageOffsets: number[] = [];
