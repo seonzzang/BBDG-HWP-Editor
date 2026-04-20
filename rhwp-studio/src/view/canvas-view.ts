@@ -7,6 +7,8 @@ import { PageRenderer } from './page-renderer';
 import { ViewportManager } from './viewport-manager';
 import { CoordinateSystem } from './coordinate-system';
 
+const DEBUG_PROGRESSIVE_PAGING = import.meta.env.DEV;
+
 export class CanvasView {
   private virtualScroll: VirtualScroll;
   private canvasPool: CanvasPool;
@@ -53,29 +55,37 @@ export class CanvasView {
     const progressiveEnabled = this.wasm.supportsProgressivePaging();
     const progressiveChunkSize = 24;
     const maxBootstrapSteps = 256;
-    console.log('[CanvasView] paging capability', {
-      traceId,
-      supportsProgressivePaging: progressiveEnabled,
-      pageCount,
-    });
+    if (DEBUG_PROGRESSIVE_PAGING) {
+      console.log('[CanvasView] paging capability', {
+        traceId,
+        supportsProgressivePaging: progressiveEnabled,
+        pageCount,
+      });
+    }
 
     if (progressiveEnabled) {
       try {
-        console.time(`[${traceId}] progressive.firstStep`);
+        if (DEBUG_PROGRESSIVE_PAGING) {
+          console.time(`[${traceId}] progressive.firstStep`);
+        }
         this.wasm.startProgressivePaging();
         pageCount = this.wasm.stepProgressivePaging(progressiveChunkSize);
-        console.timeEnd(`[${traceId}] progressive.firstStep`);
-        console.log('[CanvasView] progressive first step complete', {
-          traceId,
-          pageCount,
-          pagingFinished: this.wasm.isPagingFinished(),
-        });
+        if (DEBUG_PROGRESSIVE_PAGING) {
+          console.timeEnd(`[${traceId}] progressive.firstStep`);
+          console.log('[CanvasView] progressive first step complete', {
+            traceId,
+            pageCount,
+            pagingFinished: this.wasm.isPagingFinished(),
+          });
+        }
 
         if (pageCount === 0 && !this.wasm.isPagingFinished()) {
-          console.warn('[CanvasView] no visible pages after first progressive step; continuing bootstrap steps', {
-            traceId,
-            progressiveChunkSize,
-          });
+          if (DEBUG_PROGRESSIVE_PAGING) {
+            console.warn('[CanvasView] no visible pages after first progressive step; continuing bootstrap steps', {
+              traceId,
+              progressiveChunkSize,
+            });
+          }
 
           let bootstrapSteps = 1;
           while (pageCount === 0 && !this.wasm.isPagingFinished() && bootstrapSteps < maxBootstrapSteps) {
@@ -84,12 +94,14 @@ export class CanvasView {
             bootstrapSteps += 1;
           }
 
-          console.log('[CanvasView] progressive bootstrap steps complete', {
-            traceId,
-            bootstrapSteps,
-            pageCount,
-            pagingFinished: this.wasm.isPagingFinished(),
-          });
+          if (DEBUG_PROGRESSIVE_PAGING) {
+            console.log('[CanvasView] progressive bootstrap steps complete', {
+              traceId,
+              bootstrapSteps,
+              pageCount,
+              pagingFinished: this.wasm.isPagingFinished(),
+            });
+          }
         }
       } catch (error) {
         console.error('[CanvasView] progressive paging bootstrap failed, fallback to full collection', error);
@@ -97,7 +109,9 @@ export class CanvasView {
       }
     }
 
-    console.time(`[${traceId}] collectPageInfo`);
+    if (DEBUG_PROGRESSIVE_PAGING) {
+      console.time(`[${traceId}] collectPageInfo`);
+    }
     this.pages = [];
     for (let i = 0; i < pageCount; i++) {
       try {
@@ -106,12 +120,14 @@ export class CanvasView {
         console.error(`[CanvasView] 페이지 ${i} 정보 조회 실패:`, e);
       }
     }
-    console.timeEnd(`[${traceId}] collectPageInfo`);
-    console.log('[CanvasView] page info collection summary', {
-      traceId,
-      requestedPageCount: pageCount,
-      collectedPageCount: this.pages.length,
-    });
+    if (DEBUG_PROGRESSIVE_PAGING) {
+      console.timeEnd(`[${traceId}] collectPageInfo`);
+      console.log('[CanvasView] page info collection summary', {
+        traceId,
+        requestedPageCount: pageCount,
+        collectedPageCount: this.pages.length,
+      });
+    }
 
     if (this.pages.length === 0) {
       console.error('[CanvasView] 로드된 페이지가 없습니다');
@@ -133,7 +149,9 @@ export class CanvasView {
     this.container.scrollTop = 0;
     this.updateVisiblePages();
 
-    console.log(`[CanvasView] ${this.pages.length}/${pageCount}페이지 로드, 총 높이: ${this.virtualScroll.getTotalHeight()}px`);
+    if (DEBUG_PROGRESSIVE_PAGING) {
+      console.log(`[CanvasView] ${this.pages.length}/${pageCount}페이지 로드, 총 높이: ${this.virtualScroll.getTotalHeight()}px`);
+    }
 
     if (progressiveEnabled && !this.wasm.isPagingFinished()) {
       void this.continueProgressivePagingInBackground(traceId, loadGeneration, pageCount);
@@ -150,11 +168,13 @@ export class CanvasView {
     let lastPageCount = initialPageCount;
     let steps = 0;
 
-    console.log('[CanvasView] progressive background paging start', {
-      traceId,
-      loadGeneration,
-      initialPageCount,
-    });
+    if (DEBUG_PROGRESSIVE_PAGING) {
+      console.log('[CanvasView] progressive background paging start', {
+        traceId,
+        loadGeneration,
+        initialPageCount,
+      });
+    }
 
     while (loadGeneration === this.loadGeneration && !this.wasm.isPagingFinished()) {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -184,25 +204,29 @@ export class CanvasView {
         this.recalcLayout();
         this.updateVisiblePages();
 
-        console.log('[CanvasView] progressive pages appended', {
-          traceId,
-          loadGeneration,
-          steps,
-          stepsThisTick,
-          pageCount,
-          pagingFinished: this.wasm.isPagingFinished(),
-        });
+        if (DEBUG_PROGRESSIVE_PAGING) {
+          console.log('[CanvasView] progressive pages appended', {
+            traceId,
+            loadGeneration,
+            steps,
+            stepsThisTick,
+            pageCount,
+            pagingFinished: this.wasm.isPagingFinished(),
+          });
+        }
       }
     }
 
-    console.log('[CanvasView] progressive background paging done', {
-      traceId,
-      loadGeneration,
-      steps,
-      finalPageCount: this.pages.length,
-      pagingFinished: this.wasm.isPagingFinished(),
-      aborted: loadGeneration !== this.loadGeneration,
-    });
+    if (DEBUG_PROGRESSIVE_PAGING) {
+      console.log('[CanvasView] progressive background paging done', {
+        traceId,
+        loadGeneration,
+        steps,
+        finalPageCount: this.pages.length,
+        pagingFinished: this.wasm.isPagingFinished(),
+        aborted: loadGeneration !== this.loadGeneration,
+      });
+    }
   }
 
   /** 레이아웃을 재계산한다 (줌/리사이즈 공통) */
@@ -300,17 +324,19 @@ export class CanvasView {
     if (signature === this.lastWindowLogSignature) return;
     this.lastWindowLogSignature = signature;
 
-    console.log('[CanvasView] page window', {
-      currentPage,
-      windowRadius: DEFAULT_PAGE_WINDOW_RADIUS,
-      targetWindow: [windowStart, windowEnd],
-      visiblePages,
-      prefetchPages,
-      retainedPages,
-      releasedPages,
-      renderedPages,
-      activeCanvasPages: Array.from(this.canvasPool.activePages).sort((a, b) => a - b),
-    });
+    if (DEBUG_PROGRESSIVE_PAGING) {
+      console.log('[CanvasView] page window', {
+        currentPage,
+        windowRadius: DEFAULT_PAGE_WINDOW_RADIUS,
+        targetWindow: [windowStart, windowEnd],
+        visiblePages,
+        prefetchPages,
+        retainedPages,
+        releasedPages,
+        renderedPages,
+        activeCanvasPages: Array.from(this.canvasPool.activePages).sort((a, b) => a - b),
+      });
+    }
   }
 
   /** 단일 페이지를 렌더링한다 */

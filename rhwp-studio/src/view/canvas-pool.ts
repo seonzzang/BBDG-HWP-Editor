@@ -2,7 +2,7 @@ export class CanvasPool {
   private static readonly MAX_POOLED_CANVASES = 12;
   private available: HTMLCanvasElement[] = [];
   private inUse = new Map<number, HTMLCanvasElement>();
-  private debugEnabled = true;
+  private debugEnabled = import.meta.env.DEV;
 
   private debugLog(action: string, pageIdx?: number): void {
     if (!this.debugEnabled) return;
