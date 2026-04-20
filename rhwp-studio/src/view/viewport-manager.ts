@@ -42,11 +42,20 @@ export class ViewportManager {
     this.container = null;
   }
 
+  private isScrolling = false;
+
   private onScroll(): void {
-    if (!this.container) return;
-    this.scrollY = this.container.scrollTop;
-    this.scrollX = this.container.scrollLeft;
-    this.eventBus.emit('viewport-scroll', this.scrollY, this.scrollX);
+    if (!this.container || this.isScrolling) return;
+
+    this.isScrolling = true;
+    requestAnimationFrame(() => {
+      if (this.container) {
+        this.scrollY = this.container.scrollTop;
+        this.scrollX = this.container.scrollLeft;
+        this.eventBus.emit('viewport-scroll', this.scrollY, this.scrollX);
+      }
+      this.isScrolling = false;
+    });
   }
 
   /** Ctrl+휠: 브라우저 줌 대신 문서 줌 */

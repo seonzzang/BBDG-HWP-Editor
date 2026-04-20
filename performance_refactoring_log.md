@@ -8,9 +8,9 @@
 
 | 단계 | 목표 | 상태 | 관련 파일 |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | GPU 메모리 누수 방지 (Canvas Level) | 🏗️ 진행 중 | `canvas-pool.ts` |
-| **Phase 2** | UI 반응성 개선 (Async Loading) | ⏳ 대기 | `canvas-view.ts` |
-| **Phase 3** | 렌더링 파이프라인 가속 | ⏳ 대기 | `page-renderer.ts` |
+| **Phase 1** | GPU 메모리 누수 방지 (Canvas Level) | ✅ 구현 완료 (검증 대기) | `canvas-pool.ts` |
+| **Phase 2** | UI 반응성 개선 (Async Loading) | ✅ 구현 완료 (검증 대기) | `canvas-view.ts` |
+| **Phase 3** | 렌더링 파이프라인 가속 | 🏗️ 진행 중 | `viewport-manager.ts`, `page-renderer.ts` |
 | **Phase 4** | 엔진 최적화 (Rust/WASM) | ⏳ 대기 | `wasm_api.rs` |
 
 ---
@@ -23,16 +23,15 @@
     - [x] `MAX_POOL_SIZE` (15개) 도입을 통한 메모리 상주 캔버스 수 제한.
     - [x] `disposeCanvas` (width=0, height=0)를 통한 GPU 자원 즉시 반환 로직 구현.
     - [x] `releaseAll` 호출 시 전체 대기 풀 비우기 로직 보강.
-- **결과 및 검증**:
-    - [ ] 브라우저 개발자 도구(Memory)에서 `HTMLCanvasElement` 개수가 일정하게 유지되는지 확인 필요.
-    - [ ] 수백 페이지 스크롤 시 '메모리 부족'으로 인한 탭 꺼짐 현상 해소 여부 확인.
+- **결과 및 검증**: (2026-04-20) 코드 푸시 완료. 빌드 후 메모리 추적 필요.
 
 ### [Phase 2] UI 반응성 개선 (Async Loading)
 - **목표**: $O(N)$ 동기 루프를 제거하여 대형 문서 로딩 시 메인 스레드 멈춤 현상 제거.
-- **세부 작업**: (예정)
-    - [ ] `loadDocument` 내 `getPageInfo` 호출을 Chunk 단위(50개)로 분할.
-    - [ ] `requestIdleCallback` 기반의 백그라운드 지연 로딩 엔진 구축.
-    - [ ] 페이지 수집 정도에 따른 동적 레이아웃/스크롤바 갱신.
+- **세부 작업**:
+    - [x] `loadDocument` 내 `getPageInfo` 호출을 Chunk 단위(50개)로 분할.
+    - [x] `requestIdleCallback` 기반의 백그라운드 지연 로딩 엔진 구축.
+    - [x] 페이지 수집 정도에 따른 동적 레이아웃/스크롤바 갱신.
+- **결과 및 검증**: (2026-04-20) 코드 푸시 완료. 2,000페이지 이상 문서 로딩 시 프리징 여부 확인 필요.
 
 ---
 

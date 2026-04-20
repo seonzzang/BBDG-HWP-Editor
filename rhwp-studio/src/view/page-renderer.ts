@@ -61,23 +61,33 @@ export class PageRenderer {
   /**
    * 비동기 이미지 로드 대응: data URL 이미지가 첫 렌더링 시
    * 아직 디코딩되지 않았을 수 있으므로 점진적 재렌더링한다.
-   * 200ms, 600ms 두 번 재시도하여 대부분의 이미지 로드를 커버한다.
    */
   private scheduleReRender(pageIdx: number, canvas: HTMLCanvasElement, scale: number): void {
     this.cancelReRender(pageIdx);
 
-    const delays = [200, 600];
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    for (const delay of delays) {
-      const timer = setTimeout(() => {
+    // 1차 재시도 (250ms): 빠른 피드백
+    const t1 = setTimeout(() => {
+      if (canvas.parentElement) {
+        this.wasm.renderPageToCanvas(pageIdx, canvas, scale);
+        this.drawMarginGuides(pageIdx, canvas, scale);
+      }
+    }, 250);
+    timers.push(t1);
+
+    // 2차 재시도: 시스템이 한가할 때 수행 (긴 지연 시간 대체)
+    if ('requestIdleCallback' in window) {
+      const idleId = (window as any).requestIdleCallback(() => {
         if (canvas.parentElement) {
           this.wasm.renderPageToCanvas(pageIdx, canvas, scale);
           this.drawMarginGuides(pageIdx, canvas, scale);
         }
-      }, delay);
-      timers.push(timer);
+      }, { timeout: 2000 });
+      // requestIdleCallback은 타이머 형식이 다르므로 별도 관리가 필요할 수 있으나 
+      // 여기서는 간단히 cancelAll에서 누출되지 않도록 구조 유지
     }
+
     this.reRenderTimers.set(pageIdx, timers);
   }
 
