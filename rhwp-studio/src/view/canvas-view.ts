@@ -53,7 +53,10 @@ export class CanvasView {
     const traceId = `canvas-load:${Date.now()}`;
     let pageCount = this.wasm.pageCount;
     const initialFullPageCount = pageCount;
-    const progressiveEnabled = this.wasm.supportsProgressivePaging();
+    // 현재 Rust paginate_step()은 실제 partial page production이 아니라
+    // 최종 단계에서만 pages를 확정한다. release 빌드에서 대용량 문서 blank screen과
+    // pageCount 불일치를 유발할 수 있어, 배포 경로에서는 안정적인 full pagination을 사용한다.
+    const progressiveEnabled = false && this.wasm.supportsProgressivePaging();
     const progressiveChunkSize = 24;
     if (DEBUG_PROGRESSIVE_PAGING) {
       console.log('[CanvasView] paging capability', {
