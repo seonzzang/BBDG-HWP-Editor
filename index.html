@@ -359,183 +359,256 @@
     </header>
 
     <style>
-        /* ... existing root and base styles ... */
+        /* ... existing root ... */
+        :root {
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.5);
+            --bg-darker: #020617;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+        }
 
-        .features-container {
-            padding: 10rem 10% 6rem;
-            max-width: 1400px;
+        .features-section {
+            padding: 12rem 10%;
+            background-color: var(--bg-darker);
+            position: relative;
+        }
+
+        .features-wrapper {
+            max-width: 1200px;
             margin: 0 auto;
         }
 
-        .section-header {
-            margin-bottom: 4rem;
-            text-align: left;
+        .section-intro {
+            max-width: 600px;
+            margin-bottom: 8rem;
         }
 
-        .section-header h2 {
-            font-size: 2.5rem;
+        .section-intro .label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            display: block;
+        }
+
+        .section-intro h2 {
+            font-size: 3.5rem;
             font-weight: 800;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            color: #fff;
         }
 
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(12, 1fr);
-            gap: 1.5rem;
-        }
-
-        .feature-card {
-            position: relative;
-            background: rgba(30, 41, 59, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 32px;
-            padding: 3rem;
-            overflow: hidden;
-            transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
-            backdrop-filter: blur(20px);
+        /* The "Anti-AI" Layout: Layered Technical Panels */
+        .feature-panels {
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            gap: 8rem;
         }
 
-        /* Asymmetric Layout */
-        .card-large { grid-column: span 7; }
-        .card-small { grid-column: span 5; }
-        .card-mid { grid-column: span 6; }
+        .panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
 
-        .feature-card::before {
+        .panel-reversed {
+            direction: rtl;
+        }
+        .panel-reversed .panel-content {
+            direction: ltr;
+        }
+
+        .panel-visual {
+            position: relative;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 1) 0%, rgba(15, 23, 42, 1) 100%);
+            border-radius: 40px;
+            aspect-ratio: 4/3;
+            border: 1px solid var(--border-subtle);
+            overflow: hidden;
+            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.8);
+        }
+
+        .panel-visual::after {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(circle at top left, rgba(37, 99, 235, 0.1), transparent 70%);
-            opacity: 0;
-            transition: opacity 0.5s;
+            inset: 0;
+            background: linear-gradient(to bottom right, rgba(59, 130, 246, 0.1), transparent);
+            pointer-events: none;
         }
 
-        .feature-card:hover {
-            transform: translateY(-8px) scale(1.02);
-            border-color: rgba(37, 99, 235, 0.3);
-            background: rgba(30, 41, 59, 0.6);
-            box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.5);
+        /* Abstract Visual decorations */
+        .abstract-line {
+            position: absolute;
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--primary), transparent);
+            width: 100%;
+            opacity: 0.3;
         }
 
-        .feature-card:hover::before {
-            opacity: 1;
-        }
-
-        .icon-box {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 2.5rem;
-            color: var(--primary);
-            position: relative;
-            z-index: 2;
-        }
-
-        .icon-box svg {
-            width: 32px;
-            height: 32px;
-            stroke-width: 1.5px;
-        }
-
-        .feature-card h3 {
-            font-size: 1.75rem;
+        .panel-content h3 {
+            font-size: 2.5rem;
             font-weight: 700;
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
             color: #fff;
-            position: relative;
-            z-index: 2;
+            letter-spacing: -0.02em;
         }
 
-        .feature-card p {
+        .panel-content p {
+            font-size: 1.2rem;
             color: var(--text-muted);
-            font-size: 1.1rem;
-            line-height: 1.7;
-            position: relative;
-            z-index: 2;
+            line-height: 1.8;
+            margin-bottom: 2.5rem;
+            font-weight: 400;
         }
 
-        .feature-tag {
-            display: inline-block;
-            margin-top: 2rem;
+        .panel-stats {
+            display: flex;
+            gap: 3rem;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-val {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .stat-label {
             font-size: 0.8rem;
-            font-weight: 600;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: var(--primary);
-            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        /* Floating decoration for 'Human' feel */
+        .floating-badge {
+            position: absolute;
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.8);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
         }
 
         @media (max-width: 1024px) {
-            .card-large, .card-small, .card-mid { grid-column: span 12; }
+            .panel { grid-template-columns: 1fr; gap: 3rem; }
+            .section-intro h2 { font-size: 2.5rem; }
         }
     </style>
 
-    <div class="features-container" id="features">
-        <div class="section-header">
-            <h2>Core Technologies</h2>
-            <p class="subtitle" style="margin: 0; text-align: left;">BBDG 만의 독보적인 기술력으로 완성된 엔터프라이즈 환경입니다.</p>
+    <section class="features-section" id="features">
+        <div class="features-wrapper">
+            <div class="section-intro">
+                <span class="label">Architecture & Security</span>
+                <h2>단순한 뷰어를 넘어선<br/>강력한 편집 시스템.</h2>
+            </div>
+
+            <div class="feature-panels">
+                <!-- Panel 1: Performance -->
+                <div class="panel">
+                    <div class="panel-visual">
+                        <div class="abstract-line" style="top: 20%; transform: rotate(-5deg);"></div>
+                        <div class="abstract-line" style="top: 50%; transform: rotate(1deg);"></div>
+                        <div class="abstract-line" style="top: 80%; transform: rotate(-2deg);"></div>
+                        <div class="floating-badge" style="top: 20%; left: 10%;">WASM Instance: Active</div>
+                        <div class="floating-badge" style="bottom: 15%; right: 10%;">Latency: < 2ms</div>
+                        <!-- Inner SVG Abstract visualization -->
+                        <svg style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:60%; opacity:0.4;" viewBox="0 0 200 200">
+                            <circle cx="100" cy="100" r="80" stroke="url(#g1)" stroke-width="0.5" fill="none" />
+                            <circle cx="100" cy="100" r="60" stroke="url(#g1)" stroke-width="0.5" fill="none" stroke-dasharray="10 5" />
+                            <defs>
+                                <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="transparent" />
+                                    <stop offset="50%" stop-color="#3b82f6" />
+                                    <stop offset="100%" stop-color="transparent" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <div class="panel-content">
+                        <h3>최대 10배 빠른<br/>Native급 렌더링.</h3>
+                        <p>컴파일된 Rust 코어 엔진은 브라우저의 한계를 돌파합니다. 수백 메가바이트의 HWPX 바이너리를 실시간으로 구조화하고 Canvas 엔진으로 직접 스트리밍합니다.</p>
+                        <div class="panel-stats">
+                            <div class="stat-item">
+                                <span class="stat-val">300+</span>
+                                <span class="stat-label">Pages Hanlding</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-val">WASM</span>
+                                <span class="stat-label">Instruction Set</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 2: Security & Offline -->
+                <div class="panel panel-reversed">
+                    <div class="panel-visual">
+                        <div class="floating-badge" style="top: 40%; left: 50%; transform:translateX(-50%); border-color: rgba(59, 130, 246, 0.5);">End-to-End Local Privacy</div>
+                        <svg style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:80%;" viewBox="0 0 24 24" fill="none" stroke="rgba(59, 130, 246, 0.2)" stroke-width="0.5">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                    </div>
+                    <div class="panel-content">
+                        <h3>네트워크가 필요 없는<br/>완전한 폐쇄망 사양.</h3>
+                        <p>데이터 유출의 위험으로부터 완벽하게 자유롭습니다. 기업 내부의 기밀 문서는 사용자의 로컬 메모리 안에서만 생존하며, 앱 종료 시 흔적 없이 소멸됩니다.</p>
+                        <div class="panel-stats">
+                            <div class="stat-item">
+                                <span class="stat-val">Zero</span>
+                                <span class="stat-label">External Calls</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-val">Local</span>
+                                <span class="stat-label">Memory Only</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 3: Native Drag & Drop -->
+                <div class="panel">
+                    <div class="panel-visual">
+                         <div class="floating-badge" style="top: 25%; left: 15%;">OS-Level Hook</div>
+                         <div class="floating-badge" style="bottom: 25%; right: 15%;">WebView2 Bridge</div>
+                         <svg style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:40%;" viewBox="0 0 24 24" fill="none" stroke="rgba(59, 130, 246, 0.3)" stroke-width="1">
+                            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+                            <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                            <path d="M12 12v6"/>
+                            <path d="m15 15-3-3-3 3"/>
+                         </svg>
+                    </div>
+                    <div class="panel-content">
+                        <h3>탐색기 그대로의<br/>드래그 앤 드롭.</h3>
+                        <p>Tauri 네이티브 API 하이재킹 기술로 브라우저의 드롭 제한을 해제했습니다. 윈도우 탐색기에서 파일을 끌어오는 즉시 네이티브 인스턴스가 반응합니다.</p>
+                        <div class="panel-stats">
+                            <div class="stat-item">
+                                <span class="stat-val">Native</span>
+                                <span class="stat-label">File Drop</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-val">64-bit</span>
+                                <span class="stat-label">Target Arch</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-
-        <div class="features-grid">
-            <!-- ⚡ High Performance -->
-            <div class="feature-card card-large">
-                <div>
-                    <div class="icon-box">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                    </div>
-                    <h3>초고속 핵심 엔진</h3>
-                    <p>복잡한 HWP 구조를 Rust 언어로 직접 파싱하고 WebAssembly로 실행합니다. 자바스크립트 대비 최대 10배 빠른 속도로 수백 페이지의 문서를 레이턴시 없이 핸들링합니다.</p>
-                </div>
-                <div class="feature-tag">WASM & Rust Runtime</div>
-            </div>
-
-            <!-- 🔒 Security -->
-            <div class="feature-card card-small">
-                <div>
-                    <div class="icon-box">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    </div>
-                    <h3>폐쇄망 최적 보안</h3>
-                    <p>외부 서버와의 데이터 교환이 전혀 없는 Zero-Trust 환경을 지향합니다. 기업 내부망 내에서만 모든 연산이 완결됩니다.</p>
-                </div>
-                <div class="feature-tag">100% Offline Integrity</div>
-            </div>
-
-            <!-- 🖱️ Integration -->
-            <div class="feature-card card-mid">
-                <div>
-                    <div class="icon-box">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M7 7l10 10M17 7L7 17"/></svg>
-                    </div>
-                    <h3>완전한 네이티브 통합</h3>
-                    <p>Tauri 프레임워크를 통해 윈도우 파일 시스템과 직접 통신합니다. 드래그 앤 드롭뿐만 아니라 시스템 클립보드까지 완벽하게 연동됩니다.</p>
-                </div>
-                <div class="feature-tag">Tauri Shell Native API</div>
-            </div>
-
-            <!-- 📦 Deployment -->
-            <div class="feature-card card-mid">
-                <div>
-                    <div class="icon-box">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                    </div>
-                    <h3>범용 배포 패키지</h3>
-                    <p>기업의 IT 관리 환경에 따라 선택 가능한 MSI/NSIS/Portable 빌드본을 실시간으로 관리하고 버저닝하여 제공합니다.</p>
-                </div>
-                <div class="feature-tag">Enterprise CI/CD Build</div>
-            </div>
-        </div>
-    </div>
+    </section>
 
     <section id="download" class="download-section">
         <h2>최신 버전 다운로드</h2>
