@@ -10,7 +10,7 @@ use super::{PageContent, ColumnContent, PageItem, WrapAroundPara};
 const DEFENSE_MAX_PER_PAGE: u32 = 100;
 
 /// paginate_with_measured의 12+ 가변 상태 변수를 구조체로 통합
-pub(super) struct PaginationState {
+pub(crate) struct PaginationState {
     pub pages: Vec<PageContent>,
     pub current_items: Vec<PageItem>,
     pub current_height: f64,

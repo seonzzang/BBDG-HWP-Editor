@@ -396,8 +396,41 @@ impl Paginator {
     }
 }
 
-mod engine;
-mod state;
+/// 증분 페이징을 위한 상태 유지 컨텍스트
+pub struct IncrementalPagingContext {
+    pub(crate) state: state::PaginationState,
+    pub measured: MeasuredSection,
+    pub next_para_idx: usize,
+    pub is_finished: bool,
+}
+
+impl IncrementalPagingContext {
+    pub fn new(page_def: &PageDef, column_def: &ColumnDef, section_index: usize, dpi: f64) -> Self {
+        let layout = PageLayoutInfo::from_page_def(page_def, column_def, dpi);
+        let col_count = column_def.column_count.max(1);
+        let footnote_separator_overhead = crate::renderer::hwpunit_to_px(400, dpi);
+        let footnote_safety_margin = crate::renderer::hwpunit_to_px(3000, dpi);
+
+        Self {
+            state: state::PaginationState::new(
+                layout,
+                col_count,
+                section_index,
+                footnote_separator_overhead,
+                footnote_safety_margin,
+            ),
+            measured: MeasuredSection {
+                paragraphs: Vec::new(),
+                tables: Vec::new(),
+            },
+            next_para_idx: 0,
+            is_finished: false,
+        }
+    }
+}
+
+pub(crate) mod engine;
+pub(crate) mod state;
 
 #[cfg(test)]
 mod tests;

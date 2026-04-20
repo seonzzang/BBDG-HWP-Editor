@@ -2,6 +2,17 @@
 
 
 
+## [0.7.15] ??2026-04-20
+
+### Automated Release Notes
+- Version bumped automatically by Version Agent.
+- Changed files included in this commit:
+- `src/renderer/pagination.rs`
+- `src/renderer/pagination/state.rs`
+
+
+
+
 ## [0.7.14] ??2026-04-20
 
 ### Automated Release Notes
