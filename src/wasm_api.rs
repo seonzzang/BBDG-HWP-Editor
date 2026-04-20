@@ -20,7 +20,7 @@ use crate::model::control::Control;
 use crate::model::paragraph::Paragraph;
 use crate::model::page::ColumnDef;
 use crate::model::path::{PathSegment, DocumentPath, path_from_flat};
-use crate::renderer::pagination::{Paginator, PaginationResult};
+use crate::renderer::pagination::{IncrementalPagingContext, Paginator, PaginationResult};
 use crate::renderer::height_measurer::{MeasuredTable, MeasuredSection, HeightMeasurer};
 use crate::renderer::layout::LayoutEngine;
 use crate::renderer::render_tree::PageRenderTree;
@@ -48,6 +48,8 @@ impl From<HwpError> for JsValue {
 #[wasm_bindgen]
 pub struct HwpDocument {
     core: DocumentCore,
+    styles: ResolvedStyleSet,
+    paging_ctx: Option<IncrementalPagingContext>,
 }
 
 impl std::ops::Deref for HwpDocument {
@@ -68,7 +70,14 @@ impl std::ops::DerefMut for HwpDocument {
 /// 테스트 및 CLI 환경에서 `HwpDocument::from_bytes()` 등을 직접 호출할 수 있도록 한다.
 impl HwpDocument {
     pub fn from_bytes(data: &[u8]) -> Result<HwpDocument, HwpError> {
-        DocumentCore::from_bytes(data).map(|core| HwpDocument { core })
+        DocumentCore::from_bytes(data).map(|core| {
+            let styles = resolve_styles(&core.document.doc_info, DEFAULT_DPI);
+            HwpDocument {
+                core,
+                styles,
+                paging_ctx: None,
+            }
+        })
     }
 
     pub fn find_initial_column_def(paragraphs: &[Paragraph]) -> ColumnDef {
@@ -86,7 +95,14 @@ impl HwpDocument {
     #[wasm_bindgen(constructor)]
     pub fn new(data: &[u8]) -> Result<HwpDocument, JsValue> {
         DocumentCore::from_bytes(data)
-            .map(|core| HwpDocument { core })
+            .map(|core| {
+                let styles = resolve_styles(&core.document.doc_info, DEFAULT_DPI);
+                HwpDocument {
+                    core,
+                    styles,
+                    paging_ctx: None,
+                }
+            })
             .map_err(|e| e.into())
     }
 
@@ -95,7 +111,84 @@ impl HwpDocument {
     pub fn create_empty() -> HwpDocument {
         let mut core = DocumentCore::new_empty();
         core.paginate();
-        HwpDocument { core }
+        let styles = resolve_styles(&core.document.doc_info, DEFAULT_DPI);
+        HwpDocument {
+            core,
+            styles,
+            paging_ctx: None,
+        }
+    }
+
+    /// 증분 페이징을 시작한다.
+    #[wasm_bindgen(js_name = startProgressivePaging)]
+    pub fn start_progressive_paging(&mut self) -> Result<(), JsValue> {
+        let section_idx = 0usize;
+        let section = self.document.sections.get(section_idx)
+            .ok_or_else(|| JsValue::from_str("Section not found"))?;
+        let page_def = &section.section_def.page_def;
+        let column_def = Self::find_initial_column_def(&section.paragraphs);
+
+        self.paging_ctx = Some(IncrementalPagingContext::new(
+            page_def,
+            &column_def,
+            section_idx,
+            DEFAULT_DPI,
+        ));
+        Ok(())
+    }
+
+    /// 증분 페이징을 한 단계 진행한다.
+    #[wasm_bindgen(js_name = stepProgressivePaging)]
+    pub fn step_progressive_paging(&mut self, chunk_size: usize) -> Result<u32, JsValue> {
+        let mut ctx = if let Some(ctx) = self.paging_ctx.take() {
+            ctx
+        } else {
+            return Ok(self.page_count());
+        };
+
+        let section_idx = ctx.state.section_index;
+        let section = match self.document.sections.get(section_idx) {
+            Some(section) => section,
+            None => {
+                self.paging_ctx = Some(ctx);
+                return Err(JsValue::from_str("Section not found"));
+            }
+        };
+
+        let composed: Vec<ComposedParagraph> = section.paragraphs.iter()
+            .map(compose_paragraph)
+            .collect();
+        let page_def = &section.section_def.page_def;
+        let paginator = Paginator::new(DEFAULT_DPI);
+        paginator.paginate_step(
+            &mut ctx,
+            &section.paragraphs,
+            &composed,
+            &self.styles,
+            &self.styles.para_styles,
+            page_def,
+            chunk_size,
+        );
+
+        let current_pages = ctx.state.pages.len() as u32;
+        if ctx.is_finished {
+            self.core.pagination[section_idx] = PaginationResult {
+                pages: std::mem::take(&mut ctx.state.pages),
+                wrap_around_paras: Vec::new(),
+                hidden_empty_paras: std::collections::HashSet::new(),
+            };
+            self.paging_ctx = None;
+        } else {
+            self.paging_ctx = Some(ctx);
+        }
+
+        Ok(current_pages)
+    }
+
+    /// 증분 페이징 완료 여부를 반환한다.
+    #[wasm_bindgen(js_name = isPagingFinished)]
+    pub fn is_paging_finished(&self) -> bool {
+        self.paging_ctx.is_none()
     }
 
     /// 내장 템플릿에서 빈 문서를 생성한다.
@@ -154,7 +247,11 @@ impl HwpDocument {
     /// 총 페이지 수를 반환한다.
     #[wasm_bindgen(js_name = pageCount)]
     pub fn page_count(&self) -> u32 {
-        self.core.page_count()
+        if let Some(ref ctx) = self.paging_ctx {
+            ctx.state.pages.len() as u32
+        } else {
+            self.core.page_count()
+        }
     }
 
     /// 특정 페이지를 SVG 문자열로 렌더링한다.

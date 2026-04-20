@@ -2,6 +2,16 @@
 
 
 
+## [0.7.18] ??2026-04-20
+
+### Automated Release Notes
+- Version bumped automatically by Version Agent.
+- Changed files included in this commit:
+- `src/wasm_api.rs`
+
+
+
+
 ## [0.7.17] ??2026-04-20
 
 ### Automated Release Notes
