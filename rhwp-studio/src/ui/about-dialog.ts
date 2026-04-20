@@ -27,17 +27,34 @@ export class AboutDialog extends ModalDialog {
     const body = document.createElement('div');
     body.className = 'about-body';
 
-    // 제품 영문명
-    const titleEn = document.createElement('div');
-    titleEn.className = 'about-product-name';
-    titleEn.textContent = 'HWP 5.0 Compatible Module for Rust';
-    body.appendChild(titleEn);
+    // 로고 추가 (BBDG Logo)
+    const logoContainer = document.createElement('div');
+    logoContainer.style.textAlign = 'center';
+    logoContainer.style.marginBottom = '1.5rem';
+    
+    const logoImg = document.createElement('img');
+    logoImg.src = 'C:\\Users\\BBDG\\Pictures\\bbdg_logo_only.png';
+    logoImg.style.width = '64px';
+    logoImg.style.height = 'auto';
+    logoContainer.appendChild(logoImg);
+    body.appendChild(logoContainer);
 
-    // 제품 한글명
+    // 제품명
     const titleKo = document.createElement('div');
     titleKo.className = 'about-product-name-ko';
-    titleKo.textContent = '한글 문서 호환 저장 도구';
+    titleKo.style.fontSize = '1.4rem';
+    titleKo.style.fontWeight = '800';
+    titleKo.style.marginBottom = '0.5rem';
+    titleKo.textContent = 'BBDG HWP Editor';
     body.appendChild(titleKo);
+
+    const titleEn = document.createElement('div');
+    titleEn.className = 'about-product-name';
+    titleEn.style.fontSize = '0.9rem';
+    titleEn.style.color = '#64748b';
+    titleEn.style.marginBottom = '1.5rem';
+    titleEn.textContent = 'Open Source HWP/HWPX Editor';
+    body.appendChild(titleEn);
 
     // 버전
     const version = document.createElement('div');
@@ -48,40 +65,46 @@ export class AboutDialog extends ModalDialog {
     // 기술 스택
     const tech = document.createElement('div');
     tech.className = 'about-tech';
-    tech.textContent = 'Rust + WebAssembly + TypeScript';
+    tech.textContent = 'Rust Core + WebAssembly Runtime';
     body.appendChild(tech);
 
-    // HWP 스펙 고지 문구 (필수)
+    // 라이선스 요약 명시
+    const licenseSummary = document.createElement('div');
+    licenseSummary.style.margin = '1.5rem 0';
+    licenseSummary.style.padding = '1rem';
+    licenseSummary.style.background = '#f8fafc';
+    licenseSummary.style.borderRadius = '8px';
+    licenseSummary.style.fontSize = '0.85rem';
+    licenseSummary.style.lineHeight = '1.6';
+    licenseSummary.style.textAlign = 'left';
+    licenseSummary.innerHTML = `
+      본 제품은 <strong>MIT 라이선스</strong>에 따라 상업적·비상업적 용도 제한 없이 자유롭게 사용 및 배포가 가능한 오픈소스 소프트웨어입니다.
+    `;
+    body.appendChild(licenseSummary);
+
+    // HWP 스펙 고지
     const notice = document.createElement('div');
     notice.className = 'about-notice';
-    notice.textContent =
-      '본 제품은 한글과컴퓨터의 한글 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다.';
+    notice.style.fontSize = '0.8rem';
+    notice.style.color = '#94a3b8';
+    notice.style.marginBottom = '1.5rem';
+    notice.textContent = '본 제품은 한글과컴퓨터의 HWP 공개 문서를 참고하여 개발되었습니다.';
     body.appendChild(notice);
 
-    // 오픈소스 라이선스
-    const licenseTitle = document.createElement('div');
-    licenseTitle.className = 'about-license-title';
-    licenseTitle.textContent = '오픈소스 라이선스';
-    body.appendChild(licenseTitle);
-
-    const licenseTable = document.createElement('table');
-    licenseTable.className = 'about-license-table';
-    for (const lib of THIRD_PARTY_LICENSES) {
-      const tr = document.createElement('tr');
-      const tdName = document.createElement('td');
-      tdName.textContent = lib.name;
-      const tdLicense = document.createElement('td');
-      tdLicense.textContent = lib.license;
-      tr.appendChild(tdName);
-      tr.appendChild(tdLicense);
-      licenseTable.appendChild(tr);
-    }
-    body.appendChild(licenseTable);
-
-    // 저작권
+    // 오픈소스 링크 및 저작권
     const copyright = document.createElement('div');
     copyright.className = 'about-copyright';
-    copyright.textContent = '\u00A9 2026';
+    copyright.style.marginTop = '2rem';
+    copyright.style.borderTop = '1px solid #e2e8f0';
+    copyright.style.paddingTop = '1rem';
+    copyright.innerHTML = `
+      <div style="font-family: monospace; font-size: 0.85rem; margin-bottom: 0.5rem;">
+        MIT License — Copyright &copy; 2025-2026 Edward Kim
+      </div>
+      <div style="font-size: 0.8rem; color: #64748b;">
+        Based on Source Project: <a href="https://github.com/edwardkim/rhwp" target="_blank" style="color: #2563eb; text-decoration: none;">rhwp</a>
+      </div>
+    `;
     body.appendChild(copyright);
 
     return body;

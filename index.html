@@ -13,11 +13,11 @@
             --primary: #1d4ed8;
             --primary-dark: #1e40af;
             --accent: #7c3aed;
-            --bg: #f1f5f9; /* Slightly deeper background for more contrast with white cards */
+            --bg: #f1f5f9;
             --card-bg: #ffffff;
             --text: #0f172a;
             --text-muted: #475569;
-            --border: rgba(15, 23, 42, 0.12); /* Increased from 0.08 for better visibility */
+            --border: rgba(15, 23, 42, 0.12);
             --glass: rgba(255, 255, 255, 0.8);
         }
 
@@ -35,7 +35,6 @@
             line-height: 1.6;
         }
 
-        /* Background Effects - Softer for Light Mode */
         .bg-blob {
             position: fixed;
             width: 60vw;
@@ -178,7 +177,7 @@
             border-radius: 12px;
             font-weight: 700;
             font-size: 1.1rem;
-            border: 1.5px solid var(--border); /* Slightly thicker border */
+            border: 1.5px solid var(--border);
             transition: all 0.3s;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
@@ -208,175 +207,7 @@
             display: block;
         }
 
-        .features {
-            padding: 8rem 10%;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .feature-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            padding: 2.5rem;
-            border-radius: 24px;
-            transition: all 0.4s;
-            backdrop-filter: blur(10px);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-10px);
-            border-color: var(--primary);
-            background: rgba(30, 41, 59, 0.9);
-            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.3);
-        }
-
-        .feature-icon {
-            width: 50px;
-            height: 50px;
-            background: rgba(37, 99, 235, 0.1);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.5rem;
-            font-size: 1.5rem;
-            color: var(--primary);
-        }
-
-        .feature-card h3 {
-            margin-bottom: 1rem;
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-
-        .feature-card p {
-            color: var(--text-muted);
-            font-size: 1rem;
-        }
-
-        .download-section {
-            padding: 6rem 10%;
-            background: linear-gradient(to bottom, transparent, rgba(37, 99, 235, 0.05), transparent);
-            text-align: center;
-        }
-
-        .download-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-            max-width: 1200px;
-            margin: 3rem auto 0;
-        }
-
-        @media (min-width: 1200px) {
-            .download-grid { grid-template-columns: repeat(5, 1fr); }
-        }
-
-        @media (max-width: 1199px) and (min-width: 850px) {
-            .download-grid { grid-template-columns: repeat(3, 1fr); }
-        }
-
-        .download-item {
-            background: #ffffff;
-            border: 1.5px solid var(--border);
-            padding: 1.5rem;
-            border-radius: 20px;
-            text-decoration: none;
-            color: var(--text);
-            transition: all 0.3s;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-height: 120px;
-        }
-
-        .download-item:hover {
-            border-color: var(--primary);
-            background: #f8fafc;
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-        }
-
-        .download-item h4 {
-            font-size: 1.2rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .download-item span {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-
-        footer {
-            padding: 4rem 10%;
-            text-align: center;
-            border-top: 1px solid var(--border);
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @media (max-width: 768px) {
-            h1 { font-size: 2.5rem; }
-            .cta-group { flex-direction: column; }
-            nav { padding: 1.5rem 5%; }
-        }
-    </style>
-</head>
-<body>
-    <div class="bg-blob blob-1"></div>
-    <div class="bg-blob blob-2"></div>
-
-    <nav>
-        <div class="logo">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="32" height="32" rx="8" fill="url(#paint0_linear)"/>
-                <path d="M8 10H24V22H8V10Z" stroke="white" stroke-width="2"/>
-                <path d="M12 14L20 18" stroke="white" stroke-width="2"/>
-                <path d="M12 18L20 14" stroke="white" stroke-width="2"/>
-                <defs>
-                    <linearGradient id="paint0_linear" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                        <stop stop-color="#2563EB"/>
-                        <stop offset="1" stop-color="#8B5CF6"/>
-                    </linearGradient>
-                </defs>
-            </svg>
-            BBDG HWP Editor
-        </div>
-        <div class="nav-links">
-            <a href="#features">기능</a>
-            <a href="#download">다운로드</a>
-            <a href="https://github.com/seonzzang/BBDG-HWP-Editor" class="btn-github">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                GitHub
-            </a>
-        </div>
-    </nav>
-
-    <header>
-        <div class="version-badge">v1.1.0 안정화 버전 출시</div>
-        <h1>로컬 프라이버시를 지키는<br/>오픈소스 HWP/HWPX 에디터</h1>
-        <p class="subtitle">데이터 유출 걱정 없는 로컬 환경, HWP 호환성의 새로운 기준. BBDG HWP Editor로 당신의 폐쇄망 워크플로우를 최적화하십시오.</p>
-        
-        <div class="cta-group">
-            <a href="#download" class="btn-primary">무료 다운로드</a>
-            <a href="https://github.com/seonzzang/BBDG-HWP-Editor" class="btn-secondary">소스코드 보기</a>
-        </div>
-
-        <div class="hero-image-container">
-            <img src="./assets/landing/hero.png" alt="BBDG HWP Editor Interface">
-        </div>
-    </header>
-
-    <style>
+        /* Pinwheel Grid System */
         .pinwheel-section {
             padding: 14rem 10%;
             background-color: #ffffff;
@@ -390,8 +221,8 @@
             position: relative;
             display: grid;
             grid-template-columns: repeat(20, 1fr);
-            grid-template-rows: repeat(24, 1fr); /* Increased rows for more granularity */
-            height: 1000px; /* Increased height for breathing room */
+            grid-template-rows: repeat(24, 1fr);
+            height: 1000px;
         }
 
         .pw-card {
@@ -416,31 +247,14 @@
             box-shadow: 0 40px 80px -15px rgba(0, 0, 0, 0.1);
         }
 
-        /* Re-engineered Asymmetric Pinwheel Logic */
-        .card-1 { 
-            grid-column: 1 / 11; grid-row: 1 / 14; 
-            border-bottom-right-radius: 0;
-            margin-right: -20px;
-        }
-        .card-2 { 
-            grid-column: 11 / 21; grid-row: 2 / 11; 
-            border-bottom-left-radius: 0;
-            margin-left: -20px;
-        }
-        .card-3 { 
-            grid-column: 1 / 9; grid-row: 14 / 24; 
-            border-top-right-radius: 0;
-            margin-top: -20px;
-        }
-        .card-4 { 
-            grid-column: 9 / 21; grid-row: 11 / 24; 
-            border-top-left-radius: 0;
-            margin-left: -40px; margin-top: -20px;
-        }
+        .card-1 { grid-column: 1 / 11; grid-row: 1 / 14; border-bottom-right-radius: 0; margin-right: -20px; }
+        .card-2 { grid-column: 11 / 21; grid-row: 2 / 11; border-bottom-left-radius: 0; margin-left: -20px; }
+        .card-3 { grid-column: 1 / 9; grid-row: 14 / 24; border-top-right-radius: 0; margin-top: -20px; }
+        .card-4 { grid-column: 9 / 21; grid-row: 11 / 24; border-top-left-radius: 0; margin-left: -40px; margin-top: -20px; }
 
         .pw-card .icon-wrap {
             width: 64px; height: 64px;
-            background: #eef2f7; /* Deeper background for icons */
+            background: #eef2f7;
             border: 1px solid rgba(0,0,0,0.05);
             border-radius: 20px;
             display: flex; align-items: center; justify-content: center;
@@ -450,39 +264,114 @@
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
         }
 
-        .pw-card:hover .icon-wrap {
-            background: var(--primary);
-            color: #fff;
-            transform: rotate(5deg);
+        .pw-card:hover .icon-wrap { background: var(--primary); color: #fff; transform: rotate(5deg); }
+
+        .pw-card h3 { font-size: 2.2rem; font-weight: 800; margin-bottom: 1.5rem; line-height: 1.2; color: var(--text); }
+        .pw-card p { font-size: 1.15rem; color: var(--text-muted); line-height: 1.8; }
+        .pw-tag { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.15em; color: var(--primary); text-transform: uppercase; margin-top: 2.5rem; opacity: 0.7; }
+
+        /* Download Grid CSS */
+        .download-section {
+            padding: 6rem 10%;
+            background: linear-gradient(to bottom, transparent, rgba(37, 99, 235, 0.05), transparent);
+            text-align: center;
         }
 
-        .pw-card h3 {
-            font-size: 2.2rem; font-weight: 800; margin-bottom: 1.5rem; line-height: 1.2; color: var(--text);
-        }
-        .pw-card p {
-            font-size: 1.15rem; color: var(--text-muted); line-height: 1.8;
-        }
-        .pw-tag {
-            font-size: 0.8rem; font-weight: 800; letter-spacing: 0.15em; color: var(--primary);
-            text-transform: uppercase; margin-top: 2.5rem;
-            opacity: 0.7;
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            max-width: 1200px;
+            margin: 3rem auto 0;
         }
 
-        @media (max-width: 1024px) {
-            .pinwheel-container { display: flex; flex-direction: column; height: auto; gap: 2rem; }
-            .pw-card { border-radius: 32px !important; margin: 0 !important; }
+        @media (min-width: 1200px) { .download-grid { grid-template-columns: repeat(5, 1fr); } }
+        @media (max-width: 1199px) and (min-width: 850px) { .download-grid { grid-template-columns: repeat(3, 1fr); } }
+
+        .download-item {
+            background: #ffffff;
+            border: 1.5px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 20px;
+            text-decoration: none;
+            color: var(--text);
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 120px;
         }
+
+        .download-item:hover {
+            border-color: var(--primary);
+            background: #f8fafc;
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .download-item h4 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+        .download-item span { font-size: 0.85rem; color: var(--text-muted); }
+
+        footer {
+            padding: 4rem 10%;
+            text-align: center;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 768px) { h1 { font-size: 2.5rem; } .cta-group { flex-direction: column; } nav { padding: 1.5rem 5%; } }
     </style>
+</head>
+<body>
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+
+    <nav>
+        <div class="logo">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" rx="8" fill="url(#paint0_linear)"/>
+                <path d="M8 10H24V22H8V10Z" stroke="white" stroke-width="2"/>
+                <path d="M12 14L20 18" stroke="white" stroke-width="2"/>
+                <path d="M12 18L20 14" stroke="white" stroke-width="2"/>
+                <defs>
+                    <linearGradient id="paint0_linear" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#2563EB"/><stop offset="1" stop-color="#8B5CF6"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+            BBDG HWP Editor
+        </div>
+        <div class="nav-links">
+            <a href="#features">기능</a>
+            <a href="#download">다운로드</a>
+            <a href="https://github.com/seonzzang/BBDG-HWP-Editor" class="btn-github">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                GitHub
+            </a>
+        </div>
+    </nav>
+
+    <header>
+        <div class="version-badge">최신 버전 출시</div>
+        <h1>로컬 프라이버시를 지키는<br/>오픈소스 HWP/HWPX 에디터</h1>
+        <p class="subtitle">데이터 유출 걱정 없는 로컬 환경, HWP 호환성의 새로운 기준. BBDG HWP Editor로 당신의 폐쇄망 워크플로우를 최적화하십시오.</p>
+        <div class="cta-group">
+            <a href="#download" class="btn-primary">무료 다운로드</a>
+            <a href="https://github.com/seonzzang/BBDG-HWP-Editor" class="btn-secondary">소스코드 보기</a>
+        </div>
+        <div class="hero-image-container">
+            <img src="./assets/landing/hero.png" alt="BBDG HWP Editor Interface">
+        </div>
+    </header>
 
     <section class="pinwheel-section" id="features">
-
-
         <div class="pinwheel-container">
-            <!-- Gear 1: Speed -->
             <div class="pw-card card-1">
                 <div>
                     <div class="icon-wrap">
-                        <!-- Abstract Waveform Icon for Performance -->
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
                             <path d="M2 12c.5-2 2-3.5 4-3.5 3 0 3 7 6 7s3-7 6-7 3.5 1.5 4 3.5" stroke-opacity="0.5"/>
                             <path d="M2 12c.5 2 2 3.5 4 3.5 3 0 3-7 6-7s3 7 6 7 3.5-1.5 4-3.5"/>
@@ -494,12 +383,9 @@
                 </div>
                 <div class="pw-tag">Low-Latency Rendering</div>
             </div>
-
-            <!-- Gear 2: Security -->
             <div class="pw-card card-2">
                 <div>
                     <div class="icon-wrap">
-                        <!-- Technical Node/Lock Icon for Security -->
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
                             <rect x="5" y="5" width="14" height="14" rx="2" stroke-opacity="0.3"/>
                             <circle cx="12" cy="12" r="3"/>
@@ -512,17 +398,12 @@
                 </div>
                 <div class="pw-tag">Zero-Leak Integrity</div>
             </div>
-
-            <!-- Gear 3: Drag & Drop -->
             <div class="pw-card card-3">
                 <div>
                     <div class="icon-wrap">
-                        <!-- Layered Bridge Icon for Seamless Flow -->
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
                             <path d="M4 12h16" stroke-dasharray="2 2" stroke-opacity="0.5"/>
-                            <path d="M8 8l4 4-4 4"/>
-                            <path d="M16 16l-4-4 4-4"/>
-                            <circle cx="12" cy="12" r="8" stroke-opacity="0.2"/>
+                            <path d="M8 8l4 4-4 4"/><path d="M16 16l-4-4 4-4"/><circle cx="12" cy="12" r="8" stroke-opacity="0.2"/>
                         </svg>
                     </div>
                     <h3>Seamless Flow</h3>
@@ -530,87 +411,85 @@
                 </div>
                 <div class="pw-tag">Native OS Hooks</div>
             </div>
-
-            <!-- Gear 4: Deployment -->
             <div class="pw-card card-4">
                 <div>
                     <div class="icon-wrap">
-                        <!-- Geometric Crystal/Package Icon for Deployment -->
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke-opacity="0.4"/>
-                            <path d="M2 17l10 5 10-5"/>
-                            <path d="M2 12l10 5 10-5"/>
-                            <path d="M12 22V12"/>
+                            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke-opacity="0.4"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/><path d="M12 22V12"/>
                         </svg>
                     </div>
                     <h3>Versatile Delivery</h3>
-                    <p>MSI, Portable, NSIS 등 엔터프라이즈 환경이 요구하는 다양한 배포 규격을 한 패키지에 담았습니다. 실시간 버저닝을 통해 관리의 편의성을 극대화하며 사내 어느 PC에서나 즉시 사용 가능한 수준 높은 호환성을 보장합니다.</p>
+                    <p>MSI, Portable, NSIS 등 엔터프라이즈 환경이 요구하는 다양한 배포 규격을 한 패키지에 담았습니다. 실시간 버저닝을 통해 호환성을 보장합니다.</p>
                 </div>
                 <div class="pw-tag">Multi-Target Builds</div>
             </div>
         </div>
     </section>
 
+    <section id="download" class="download-section" style="padding-top: 8rem;">
+        <div style="text-align: center; margin-bottom: 4rem;">
+            <img src="C:\Users\BBDG\Pictures\bbdg_logo_only.png" alt="BBDG Logo" style="width: 80px; height: auto; margin-bottom: 2rem;">
+            <h2 style="font-size: 2.5rem; margin-bottom: 1rem;">제품 정보 및 다운로드</h2>
+            <p class="subtitle" style="margin-bottom: 3rem;">개인·사내 폐쇄망 등 모든 환경에서 압도적인 호환성과 성능을 경험하십시오.</p>
+        </div>
 
-
-    <section id="download" class="download-section">
-        <h2>최신 버전 다운로드</h2>
-        <p class="subtitle">모든 파일은 한글 공식 메뉴와 멀티 플랫폼을 완벽하게 지원합니다.</p>
-        
-        <div class="download-grid" id="asset-container" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-            <!-- Windows Portable -->
+        <div class="download-grid" id="asset-container">
             <a href="#" class="download-item" id="win-portable" target="_blank">
                 <h4>Windows (Portable)</h4>
                 <span>무설치 단일 실행 파일</span>
             </a>
-            <!-- Windows Setup -->
             <a href="#" class="download-item" id="win-setup" target="_blank">
                 <h4>Windows (Setup)</h4>
                 <span>표준 설치 프로그램</span>
             </a>
-            <!-- Windows MSI -->
             <a href="#" class="download-item" id="win-msi" target="_blank">
                 <h4>Windows (MSI)</h4>
                 <span>기업 전용 배포 패키지</span>
             </a>
-            <!-- macOS DMG -->
             <a href="#" class="download-item" id="mac-dmg" target="_blank">
                 <h4>macOS (DMG)</h4>
                 <span>애플 실리콘 & 인텔 통합</span>
             </a>
-            <!-- Linux AppImage -->
             <a href="#" class="download-item" id="linux-app" target="_blank">
                 <h4>Linux (AppImage)</h4>
                 <span>범용 리눅스 배포판</span>
             </a>
         </div>
-        <p style="margin-top: 2rem; font-size: 0.9rem; color: var(--text-muted);">
-            전체 플랫폼 릴리즈 히스토리는 <a href="https://github.com/seonzzang/BBDG-HWP-Editor/releases" target="_blank" style="color: var(--primary); text-decoration: none;">GitHub Releases</a>에서 보실 수 있습니다.
-        </p>
+
+        <div style="max-width: 1000px; margin: 5rem auto 0; text-align: left; padding: 3rem; background: #ffffff; border: 1.5px solid var(--border); border-radius: 32px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem;">
+                <div>
+                    <h4 style="font-size: 1.1rem; margin-bottom: 1.5rem; color: var(--primary);">[정책 / 릴리즈 정보]</h4>
+                    <p style="font-size: 0.95rem; line-height: 1.8; color: var(--text-muted);">
+                        BBDG HWP 에디터는 모든 데이터 처리가 로컬 기기 내에서만 이루어집니다. 본 패키지는 상업적·비상업적 용도 제한 없는 <strong>MIT 라이선스</strong>를 기반으로 배포되어, 별도의 제약 없이 자유로운 수정 및 사용이 가능합니다.
+                    </p>
+                </div>
+                <div>
+                    <h4 style="font-size: 1.1rem; margin-bottom: 1.5rem; color: var(--primary);">[오픈소스 및 저작권]</h4>
+                    <p style="font-size: 0.9rem; line-height: 1.8; color: var(--text-muted); font-family: monospace;">
+                        MIT License — Copyright (c) 2025-2026 Edward Kim<br/>
+                        Based on Source Project: <a href="https://github.com/edwardkim/rhwp" target="_blank" style="color: var(--primary); text-decoration: none;">rhwp</a>
+                    </p>
+                    <p style="margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                        본 제품은 원저작자 Edward Kim의 rhwp 프로젝트를 기반으로 리패키징되었습니다.
+                    </p>
+                </div>
+            </div>
+        </div>
     </section>
 
     <footer>
-        <div style="margin-bottom: 2rem; opacity: 0.75;">
-            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.8; max-width: 1200px; margin: 0 auto;">
-                <strong>[정책/라이선스]</strong> 상업적·비상업적 용도 제한 없는 MIT 라이선스 기반 배포. 투명한 오픈소스 정책으로 기업 폐쇄망 환경에서도 안심하고 사용할 수 있습니다.
-            </p>
-        </div>
         <p>&copy; 2026 BBD Global Co., Ltd. All rights reserved.</p>
-        <p style="margin-top: 10px; font-size: 0.8rem;">본 프로젝트는 오픈소스 <a href="https://github.com/edwardkim/rhwp" target="_blank" style="color: var(--primary); text-decoration: none; border-bottom: 1px solid rgba(59, 130, 246, 0.3);">rhwp</a>를 기반으로 리패키징 되었습니다.</p>
     </footer>
 
     <script>
-        // Smooth Scroll
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
-                document.querySelector(this.getAttribute('href')).scrollIntoView({
-                    behavior: 'smooth'
-                });
+                document.querySelector(this.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
             });
         });
 
-        // GitHub Latest Release API Integration
         async function updateLatestAssets() {
             const repo = "seonzzang/BBDG-HWP-Editor";
             try {
@@ -618,40 +497,23 @@
                 const data = await response.json();
                 const version = data.tag_name;
                 const assets = data.assets;
-
                 const badge = document.querySelector('.version-badge');
                 if (badge) badge.innerText = `${version} 최신 버전 출시`;
-
                 assets.forEach(asset => {
                     const name = asset.name.toLowerCase();
                     const url = asset.browser_download_url;
-
-                    // Sophisticated Match Logic
                     if (name.endsWith('.exe')) {
-                        if (name.includes('portable')) {
-                            document.getElementById('win-portable').href = url;
-                        } else if (name.includes('setup') || name.includes('nsis')) {
-                            document.getElementById('win-setup').href = url;
-                        } else {
-                            // Default EXE to portable if undecided
-                            document.getElementById('win-portable').href = url;
-                        }
+                        if (name.includes('portable')) document.getElementById('win-portable').href = url;
+                        else if (name.includes('setup') || name.includes('nsis')) document.getElementById('win-setup').href = url;
                     }
                     if (name.endsWith('.msi')) document.getElementById('win-msi').href = url;
                     if (name.endsWith('.dmg')) document.getElementById('mac-dmg').href = url;
                     if (name.endsWith('.appimage')) document.getElementById('linux-app').href = url;
                 });
             } catch (error) {
-                console.error("Failed to fetch latest release:", error);
-                const items = document.querySelectorAll('.download-item');
-                items.forEach(item => {
-                    if (item.href === "#" || item.href === window.location.href) {
-                        item.href = `https://github.com/${repo}/releases/latest`;
-                    }
-                });
+                console.error("Link update failed:", error);
             }
         }
-
         updateLatestAssets();
     </script>
 </body>

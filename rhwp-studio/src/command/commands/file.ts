@@ -36,29 +36,8 @@ export const fileCommands: CommandDef[] = [
   {
     id: 'file:open',
     label: '열기',
-    async execute(services) {
-      // @ts-ignore
-      const isTauri = !!(window as any).__TAURI_INTERNALS__;
-      if (isTauri) {
-        try {
-          const { open } = await import('@tauri-apps/plugin-dialog');
-          const { readFile } = await import('@tauri-apps/plugin-fs');
-          const selected = await open({
-            multiple: false,
-            filters: [{ name: 'HWP 문서', extensions: ['hwp', 'hwpx'] }]
-          });
-          if (selected && typeof selected === 'string') {
-            const data = await readFile(selected);
-            const fileName = selected.split(/[\\/]/).pop() || 'document.hwp';
-            services.eventBus.emit('load-document-data', { data, fileName });
-          }
-        } catch (err) {
-            console.error('[file:open] Tauri dialog error:', err);
-            document.getElementById('file-input')?.click();
-        }
-      } else {
-        document.getElementById('file-input')?.click();
-      }
+    execute() {
+      document.getElementById('file-input')?.click();
     },
   },
   {

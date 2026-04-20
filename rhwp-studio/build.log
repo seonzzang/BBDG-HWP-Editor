@@ -1,0 +1,327 @@
+
+> rhwp-studio@2026.04.17.V.1.1.0 build
+> tsc && vite build
+
+src/command/commands/edit.ts(134,20): error TS2339: Property 'found' does not exist on type 'Promise<SearchResult>'.
+src/command/commands/edit.ts(136,34): error TS2339: Property 'sec' does not exist on type 'Promise<SearchResult>'.
+src/command/commands/edit.ts(137,36): error TS2339: Property 'para' does not exist on type 'Promise<SearchResult>'.
+src/command/commands/edit.ts(138,32): error TS2339: Property 'charOffset' does not exist on type 'Promise<SearchResult>'.
+src/command/commands/edit.ts(144,36): error TS2339: Property 'sec' does not exist on type 'Promise<SearchResult>'.
+src/command/commands/edit.ts(145,38): error TS2339: Property 'para' does not exist on type 'Promise<SearchResult>'.
+src/command/commands/edit.ts(146,34): error TS2339: Property 'charOffset' does not exist on type 'Promise<SearchResult>'.
+src/command/commands/edit.ts(146,55): error TS2339: Property 'length' does not exist on type 'Promise<SearchResult>'.
+src/command/commands/edit.ts(175,35): error TS2339: Property 'getClickHereProps' does not exist on type 'WasmBridge'.
+src/command/commands/edit.ts(182,38): error TS2339: Property 'updateClickHereProps' does not exist on type 'WasmBridge'.
+src/command/commands/file.ts(90,63): error TS2339: Property 'length' does not exist on type 'Promise<Uint8Array<ArrayBufferLike>>'.
+src/command/commands/file.ts(118,60): error TS2339: Property 'length' does not exist on type 'Promise<Uint8Array<ArrayBufferLike>>'.
+src/command/commands/file.ts(158,25): error TS2345: Argument of type 'Promise<string>' is not assignable to parameter of type 'string'.
+src/command/commands/file.ts(165,45): error TS2339: Property 'width' does not exist on type 'Promise<PageInfo>'.
+src/command/commands/file.ts(166,46): error TS2339: Property 'height' does not exist on type 'Promise<PageInfo>'.
+src/command/commands/format.ts(107,30): error TS2339: Property 'lineSpacing' does not exist on type 'Promise<ParaProperties>'.
+src/command/commands/format.ts(121,30): error TS2339: Property 'lineSpacing' does not exist on type 'Promise<ParaProperties>'.
+src/command/commands/format.ts(212,15): error TS2365: Operator '>=' cannot be applied to types 'Promise<number>' and 'number'.
+src/command/commands/format.ts(212,28): error TS2322: Type 'Promise<number>' is not assignable to type 'number'.
+src/command/commands/format.ts(215,43): error TS2339: Property 'start' does not exist on type 'Promise<{ start: DocumentPosition; end: DocumentPosition; } | null>'.
+src/command/commands/format.ts(215,59): error TS2339: Property 'end' does not exist on type 'Promise<{ start: DocumentPosition; end: DocumentPosition; } | null>'.
+src/command/commands/format.ts(218,19): error TS2559: Type 'Promise<CharProperties>' has no properties in common with type 'CharProperties'.
+src/command/commands/format.ts(236,40): error TS2339: Property 'start' does not exist on type 'Promise<{ start: DocumentPosition; end: DocumentPosition; } | null>'.
+src/command/commands/format.ts(236,53): error TS2339: Property 'end' does not exist on type 'Promise<{ start: DocumentPosition; end: DocumentPosition; } | null>'.
+src/command/commands/format.ts(239,19): error TS2559: Type 'Promise<ParaProperties>' has no properties in common with type 'ParaProperties'.
+src/command/commands/format.ts(289,38): error TS2339: Property 'headType' does not exist on type 'Promise<ParaProperties>'.
+src/command/commands/format.ts(290,41): error TS2339: Property 'numberingId' does not exist on type 'Promise<ParaProperties>'.
+src/command/commands/format.ts(293,17): error TS2339: Property 'headType' does not exist on type 'Promise<ParaProperties>'.
+src/command/commands/format.ts(293,48): error TS2339: Property 'numberingId' does not exist on type 'Promise<ParaProperties>'.
+src/command/commands/format.ts(293,69): error TS2339: Property 'numberingId' does not exist on type 'Promise<ParaProperties>'.
+src/command/commands/format.ts(295,41): error TS2339: Property 'getBulletList' does not exist on type 'WasmBridge'.
+src/command/commands/format.ts(296,67): error TS2339: Property 'numberingId' does not exist on type 'Promise<ParaProperties>'.
+src/command/commands/format.ts(373,30): error TS2339: Property 'find' does not exist on type 'Promise<any[]>'.
+src/command/commands/format.ts(398,32): error TS2345: Argument of type 'Promise<number>' is not assignable to parameter of type 'number'.
+src/command/commands/insert.ts(99,28): error TS2339: Property 'engine' does not exist on type 'CommandServices'.
+src/command/commands/insert.ts(139,28): error TS2339: Property 'engine' does not exist on type 'CommandServices'.
+src/command/commands/insert.ts(141,22): error TS2339: Property 'ui' does not exist on type 'CommandServices'.
+src/command/commands/insert.ts(149,28): error TS2339: Property 'engine' does not exist on type 'CommandServices'.
+src/command/commands/insert.ts(162,28): error TS2339: Property 'engine' does not exist on type 'CommandServices'.
+src/command/commands/insert.ts(185,28): error TS2339: Property 'engine' does not exist on type 'CommandServices'.
+src/command/commands/insert.ts(237,28): error TS2339: Property 'engine' does not exist on type 'CommandServices'.
+src/command/commands/insert.ts(263,44): error TS2339: Property 'paraIdx' does not exist on type 'Promise<{ paraIdx: number; controlIdx: number; }>'.
+src/command/commands/insert.ts(263,60): error TS2339: Property 'controlIdx' does not exist on type 'Promise<{ paraIdx: number; controlIdx: number; }>'.
+src/command/commands/insert.ts(274,28): error TS2339: Property 'engine' does not exist on type 'CommandServices'.
+src/command/commands/insert.ts(326,24): error TS2339: Property 'engine' does not exist on type 'CommandServices'.
+src/command/commands/insert.ts(339,24): error TS2339: Property 'engine' does not exist on type 'CommandServices'.
+src/command/commands/page.ts(31,36): error TS2339: Property 'navigateHeaderFooterByPage' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(36,34): error TS2339: Property 'navigateHeaderFooterByPage' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(40,34): error TS2339: Property 'navigateHeaderFooterByPage' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(54,19): error TS2339: Property 'createHeaderFooter' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(74,34): error TS2339: Property 'insertFieldInHf' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(101,32): error TS2339: Property 'navigateHeaderFooterByPage' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(136,19): error TS2339: Property 'applyHfTemplate' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(139,38): error TS2339: Property 'navigateHeaderFooterByPage' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(141,36): error TS2339: Property 'navigateHeaderFooterByPage' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(144,36): error TS2339: Property 'navigateHeaderFooterByPage' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(216,32): error TS2339: Property 'marginLeft' does not exist on type 'Promise<PageInfo>'.
+src/command/commands/page.ts(217,32): error TS2339: Property 'marginTop' does not exist on type 'Promise<PageInfo>'.
+src/command/commands/page.ts(217,53): error TS2339: Property 'marginHeader' does not exist on type 'Promise<PageInfo>'.
+src/command/commands/page.ts(218,58): error TS2554: Expected 2 arguments, but got 3.
+src/command/commands/page.ts(219,17): error TS2339: Property 'paragraphIndex' does not exist on type 'Promise<HitTestResult>'.
+src/command/commands/page.ts(245,23): error TS2339: Property 'deleteHeaderFooter' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(284,38): error TS2339: Property 'toggleHideHeaderFooter' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(334,49): error TS2339: Property 'insertPageBreak' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(384,49): error TS2339: Property 'insertColumnBreak' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(408,23): error TS2339: Property 'setColumnDef' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(423,23): error TS2339: Property 'setColumnDef' does not exist on type 'WasmBridge'.
+src/command/commands/page.ts(436,23): error TS2339: Property 'setColumnDef' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(33,40): error TS2551: Property 'createTable' does not exist on type 'WasmBridge'. Did you mean 'createStyle'?
+src/command/commands/table.ts(113,38): error TS2339: Property 'getCellInfo' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(115,23): error TS2339: Property 'insertTableRow' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(131,38): error TS2339: Property 'getCellInfo' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(133,23): error TS2339: Property 'insertTableRow' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(150,38): error TS2339: Property 'getCellInfo' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(152,23): error TS2339: Property 'insertTableColumn' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(168,38): error TS2339: Property 'getCellInfo' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(170,23): error TS2339: Property 'insertTableColumn' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(186,38): error TS2339: Property 'getCellInfo' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(188,23): error TS2339: Property 'deleteTableRow' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(205,38): error TS2339: Property 'getCellInfo' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(207,23): error TS2339: Property 'deleteTableColumn' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(231,38): error TS2339: Property 'getCellInfo' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(239,27): error TS2339: Property 'splitTableCellsInRange' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(247,27): error TS2339: Property 'splitTableCellInto' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(274,23): error TS2339: Property 'mergeTableCells' does not exist on type 'WasmBridge'.
+src/command/commands/table.ts(293,25): error TS2551: Property 'deleteTableControl' does not exist on type 'WasmBridge'. Did you mean 'deleteShapeControl'?
+src/command/commands/table.ts(304,23): error TS2551: Property 'deleteTableControl' does not exist on type 'WasmBridge'. Did you mean 'deleteShapeControl'?
+src/command/commands/table.ts(342,11): error TS2322: Type 'Promise<number>' is not assignable to type 'number'.
+src/command/commands/view.ts(47,57): error TS2339: Property 'width' does not exist on type 'Promise<PageInfo>'.
+src/command/commands/view.ts(47,80): error TS2339: Property 'height' does not exist on type 'Promise<PageInfo>'.
+src/command/commands/view.ts(60,57): error TS2339: Property 'width' does not exist on type 'Promise<PageInfo>'.
+src/command/commands/view.ts(82,21): error TS2339: Property 'setShowParagraphMarks' does not exist on type 'WasmBridge'.
+src/command/commands/view.ts(102,23): error TS2339: Property 'setShowParagraphMarks' does not exist on type 'WasmBridge'.
+src/command/commands/view.ts(116,35): error TS2339: Property 'getShowTransparentBorders' does not exist on type 'WasmBridge'.
+src/command/commands/view.ts(117,21): error TS2339: Property 'setShowTransparentBorders' does not exist on type 'WasmBridge'.
+src/command/commands/view.ts(133,23): error TS2339: Property 'setClipEnabled' does not exist on type 'WasmBridge'.
+src/command/extension-api.ts(34,5): error TS2322: Type 'Promise<boolean>' is not assignable to type 'boolean'.
+src/core/wasm-bridge.ts(179,127): error TS2304: Cannot find name 'SearchResult'.
+src/engine/command.ts(51,10): error TS2339: Property 'insertTextInCellByPath' does not exist on type 'WasmBridge'.
+src/engine/command.ts(53,10): error TS2339: Property 'insertTextInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(55,39): error TS2554: Expected 1 arguments, but got 4.
+src/engine/command.ts(61,10): error TS2339: Property 'deleteTextInCellByPath' does not exist on type 'WasmBridge'.
+src/engine/command.ts(63,10): error TS2339: Property 'deleteTextInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(65,59): error TS2554: Expected 1-2 arguments, but got 4.
+src/engine/command.ts(71,17): error TS2339: Property 'getTextInCellByPath' does not exist on type 'WasmBridge'.
+src/engine/command.ts(73,17): error TS2339: Property 'getTextInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(75,17): error TS2339: Property 'getTextRange' does not exist on type 'WasmBridge'.
+src/engine/command.ts(252,36): error TS2339: Property 'splitParagraph' does not exist on type 'WasmBridge'.
+src/engine/command.ts(261,10): error TS2339: Property 'mergeParagraph' does not exist on type 'WasmBridge'.
+src/engine/command.ts(282,34): error TS2551: Property 'getParagraphLength' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/command.ts(283,10): error TS2339: Property 'mergeParagraph' does not exist on type 'WasmBridge'.
+src/engine/command.ts(289,10): error TS2339: Property 'splitParagraph' does not exist on type 'WasmBridge'.
+src/engine/command.ts(329,13): error TS2365: Operator '>' cannot be applied to types 'number | Promise<number>' and 'number'.
+src/engine/command.ts(330,37): error TS2339: Property 'getTextInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(330,79): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/engine/command.ts(335,12): error TS2339: Property 'deleteRangeInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(340,27): error TS2551: Property 'getParagraphLength' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/command.ts(344,37): error TS2339: Property 'getTextRange' does not exist on type 'WasmBridge'.
+src/engine/command.ts(349,12): error TS2339: Property 'deleteRange' does not exist on type 'WasmBridge'.
+src/engine/command.ts(385,16): error TS2339: Property 'splitParagraph' does not exist on type 'WasmBridge'.
+src/engine/command.ts(390,34): error TS2554: Expected 1 arguments, but got 4.
+src/engine/command.ts(441,13): error TS2365: Operator '<=' cannot be applied to types 'number | Promise<number>' and 'number'.
+src/engine/command.ts(444,32): error TS2551: Property 'getCellCharPropertiesAt' does not exist on type 'WasmBridge'. Did you mean 'getCellParaPropertiesAt'?
+src/engine/command.ts(445,62): error TS2322: Type 'number | Promise<number>' is not assignable to type 'number'.
+  Type 'Promise<number>' is not assignable to type 'number'.
+src/engine/command.ts(447,14): error TS2551: Property 'applyCharFormatInCell' does not exist on type 'WasmBridge'. Did you mean 'applyParaFormatInCell'?
+src/engine/command.ts(457,58): error TS2551: Property 'getParagraphLength' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/command.ts(460,32): error TS2551: Property 'getCharPropertiesAt' does not exist on type 'WasmBridge'. Did you mean 'setCharProperties'?
+src/engine/command.ts(463,14): error TS2551: Property 'applyCharFormat' does not exist on type 'WasmBridge'. Did you mean 'applyParaFormat'?
+src/engine/command.ts(479,14): error TS2551: Property 'applyCharFormatInCell' does not exist on type 'WasmBridge'. Did you mean 'applyParaFormatInCell'?
+src/engine/command.ts(484,14): error TS2551: Property 'applyCharFormat' does not exist on type 'WasmBridge'. Did you mean 'applyParaFormat'?
+src/engine/command.ts(504,10): error TS2339: Property 'mergeParagraph' does not exist on type 'WasmBridge'.
+src/engine/command.ts(510,10): error TS2339: Property 'splitParagraph' does not exist on type 'WasmBridge'.
+src/engine/command.ts(531,12): error TS2339: Property 'splitParagraphInCellByPath' does not exist on type 'WasmBridge'.
+src/engine/command.ts(533,12): error TS2339: Property 'splitParagraphInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(551,12): error TS2339: Property 'mergeParagraphInCellByPath' does not exist on type 'WasmBridge'.
+src/engine/command.ts(553,12): error TS2339: Property 'mergeParagraphInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(577,5): error TS2322: Type 'Promise<number>' is not assignable to type 'number'.
+src/engine/command.ts(579,12): error TS2339: Property 'mergeParagraphInCellByPath' does not exist on type 'WasmBridge'.
+src/engine/command.ts(581,12): error TS2339: Property 'mergeParagraphInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(598,12): error TS2339: Property 'splitParagraphInCellByPath' does not exist on type 'WasmBridge'.
+src/engine/command.ts(600,12): error TS2339: Property 'splitParagraphInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(624,12): error TS2339: Property 'mergeParagraphInCellByPath' does not exist on type 'WasmBridge'.
+src/engine/command.ts(626,12): error TS2339: Property 'mergeParagraphInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(637,12): error TS2339: Property 'splitParagraphInCellByPath' does not exist on type 'WasmBridge'.
+src/engine/command.ts(639,12): error TS2339: Property 'splitParagraphInCell' does not exist on type 'WasmBridge'.
+src/engine/command.ts(672,25): error TS2339: Property 'moveTableOffset' does not exist on type 'WasmBridge'.
+src/engine/command.ts(679,10): error TS2339: Property 'moveTableOffset' does not exist on type 'WasmBridge'.
+src/engine/command.ts(722,27): error TS2339: Property 'horzOffset' does not exist on type 'Promise<any>'.
+src/engine/command.ts(723,27): error TS2339: Property 'vertOffset' does not exist on type 'Promise<any>'.
+src/engine/command.ts(772,27): error TS2339: Property 'horzOffset' does not exist on type 'Promise<any>'.
+src/engine/command.ts(773,27): error TS2339: Property 'vertOffset' does not exist on type 'Promise<any>'.
+src/engine/command.ts(837,12): error TS2339: Property 'restoreSnapshot' does not exist on type 'WasmBridge'.
+src/engine/command.ts(842,26): error TS2339: Property 'saveSnapshot' does not exist on type 'WasmBridge'.
+src/engine/command.ts(846,25): error TS2339: Property 'saveSnapshot' does not exist on type 'WasmBridge'.
+src/engine/command.ts(856,12): error TS2339: Property 'restoreSnapshot' does not exist on type 'WasmBridge'.
+src/engine/command.ts(865,12): error TS2339: Property 'discardSnapshot' does not exist on type 'WasmBridge'.
+src/engine/command.ts(869,12): error TS2339: Property 'discardSnapshot' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(166,31): error TS2339: Property 'getCellTextDirection' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(208,38): error TS2339: Property 'navigateNextEditable' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(294,11): error TS2561: Object literal may only specify known properties, but 'cellIdx' does not exist in type 'DocumentPosition'. Did you mean to write 'cellIndex'?
+src/engine/cursor.ts(316,32): error TS2551: Property 'getCellParagraphLengthByPath' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/cursor.ts(322,32): error TS2339: Property 'getCellParagraphCountByPath' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(324,30): error TS2551: Property 'getCellParagraphCount' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/cursor.ts(377,34): error TS2339: Property 'moveVerticalByPath' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(386,34): error TS2339: Property 'moveVertical' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(456,30): error TS2339: Property 'getLineInfoInCell' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(461,30): error TS2339: Property 'getLineInfo' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(480,41): error TS2339: Property 'getParagraphCount' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(483,41): error TS2551: Property 'getParagraphLength' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/cursor.ts(504,32): error TS2339: Property 'getTableCellBboxesByPath' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(506,32): error TS2339: Property 'getTableCellBboxes' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(587,43): error TS2339: Property 'getCellParagraphCountByPath' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(590,45): error TS2551: Property 'getCellParagraphLengthByPath' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/cursor.ts(605,43): error TS2551: Property 'getCellParagraphCount' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/cursor.ts(625,41): error TS2339: Property 'getParagraphCount' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(633,41): error TS2551: Property 'getParagraphLength' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/cursor.ts(650,37): error TS2339: Property 'getCursorRectInHeaderFooter' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(659,37): error TS2339: Property 'getCursorRectInFootnote' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(670,37): error TS2551: Property 'getCursorRectByPath' does not exist on type 'WasmBridge'. Did you mean 'getCursorRect'?
+src/engine/cursor.ts(673,37): error TS2551: Property 'getCursorRectInCell' does not exist on type 'WasmBridge'. Did you mean 'getCursorRect'?
+src/engine/cursor.ts(676,11): error TS2554: Expected 0 arguments, but got 3.
+src/engine/cursor.ts(723,32): error TS2339: Property 'getCellInfoByPath' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(724,32): error TS2551: Property 'getTableDimensionsByPath' does not exist on type 'WasmBridge'. Did you mean 'getTableDimensions'?
+src/engine/cursor.ts(726,32): error TS2339: Property 'getCellInfo' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(800,27): error TS2339: Property 'getTableCellBboxesByPath' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(801,27): error TS2339: Property 'getTableCellBboxes' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(956,41): error TS2339: Property 'getParagraphCount' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(960,41): error TS2551: Property 'getParagraphLength' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/cursor.ts(1032,39): error TS2339: Property 'getParagraphCount' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(1036,39): error TS2551: Property 'getParagraphLength' does not exist on type 'WasmBridge'. Did you mean 'getCellParagraphLength'?
+src/engine/cursor.ts(1125,38): error TS2339: Property 'getHeaderFooterParaInfo' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(1144,44): error TS2339: Property 'getHeaderFooterParaInfo' does not exist on type 'WasmBridge'.
+src/engine/cursor.ts(1216,36): error TS2339: Property 'getFootnoteInfo' does not exist on type 'WasmBridge'.
+src/engine/input-handler-keyboard.ts(36,26): error TS2339: Property 'getControlImageData' does not exist on type 'WasmBridge'.
+src/engine/input-handler-keyboard.ts(37,21): error TS2339: Property 'getControlImageMime' does not exist on type 'WasmBridge'.
+src/engine/input-handler-keyboard.ts(534,24): error TS2551: Property 'deleteTableControl' does not exist on type 'WasmBridge'. Did you mean 'deleteShapeControl'?
+src/engine/input-handler-keyboard.ts(572,22): error TS2551: Property 'deleteTableControl' does not exist on type 'WasmBridge'. Did you mean 'deleteShapeControl'?
+src/engine/input-handler-keyboard.ts(1068,29): error TS2339: Property 'pasteControl' does not exist on type 'WasmBridge'.
+src/engine/input-handler-keyboard.ts(1089,23): error TS2339: Property 'pasteInternalInCell' does not exist on type 'WasmBridge'.
+src/engine/input-handler-keyboard.ts(1094,23): error TS2339: Property 'pasteInternal' does not exist on type 'WasmBridge'.
+src/engine/input-handler-keyboard.ts(1139,23): error TS2339: Property 'pasteHtmlInCell' does not exist on type 'WasmBridge'.
+src/engine/input-handler-keyboard.ts(1144,23): error TS2339: Property 'pasteHtml' does not exist on type 'WasmBridge'.
+src/engine/input-handler-keyboard.ts(1224,27): error TS2339: Property 'insertPicture' does not exist on type 'WasmBridge'.
+src/engine/input-handler-mouse.ts(179,11): error TS2304: Cannot find name 'bboxPage'.
+src/engine/input-handler-mouse.ts(182,25): error TS2304: Cannot find name 'bboxPage'.
+src/engine/input-handler-mouse.ts(210,30): error TS2304: Cannot find name 'bboxPage'.
+src/engine/input-handler-mouse.ts(221,41): error TS2304: Cannot find name 'bboxPage'.
+src/engine/input-handler-mouse.ts(962,22): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(979,22): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(989,9): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(991,9): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(1003,7): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(1014,7): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(1025,7): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(1036,7): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(1047,7): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(1058,19): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(1060,9): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler-mouse.ts(1061,9): error TS1308: 'await' expressions are only allowed within async functions and at the top levels of modules.
+src/engine/input-handler.ts(569,32): error TS2551: Property 'createShapeControl' does not exist on type 'WasmBridge'. Did you mean 'deleteShapeControl'?
+src/engine/input-handler.ts(741,32): error TS2339: Property 'width' does not exist on type 'Promise<any>'.
+src/engine/input-handler.ts(741,48): error TS2339: Property 'marginLeft' does not exist on type 'Promise<any>'.
+src/engine/input-handler.ts(741,69): error TS2339: Property 'marginRight' does not exist on type 'Promise<any>'.
+src/engine/input-handler.ts(785,32): error TS2551: Property 'createShapeControl' does not exist on type 'WasmBridge'. Did you mean 'deleteShapeControl'?
+src/engine/input-handler.ts(866,7): error TS2739: Type 'Promise<HitTestResult>' is missing the following properties from type 'DocumentPosition': sectionIndex, paragraphIndex, charOffset
+src/engine/input-handler.ts(866,48): error TS2554: Expected 2 arguments, but got 3.
+src/engine/input-handler.ts(878,30): error TS2339: Property 'getTableBBox' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1079,31): error TS2339: Property 'emboss' does not exist on type 'Promise<CharProperties>'.
+src/engine/input-handler.ts(1084,31): error TS2339: Property 'engrave' does not exist on type 'Promise<CharProperties>'.
+src/engine/input-handler.ts(1089,34): error TS2339: Property 'outlineType' does not exist on type 'Promise<CharProperties>'.
+src/engine/input-handler.ts(1092,31): error TS2339: Property 'superscript' does not exist on type 'Promise<CharProperties>'.
+src/engine/input-handler.ts(1097,31): error TS2339: Property 'subscript' does not exist on type 'Promise<CharProperties>'.
+src/engine/input-handler.ts(1102,39): error TS7053: Element implicitly has an 'any' type because expression of type '"bold" | "italic" | "underline" | "strikethrough"' can't be used to index type 'Promise<CharProperties>'.
+  Property 'bold' does not exist on type 'Promise<CharProperties>'.
+src/engine/input-handler.ts(1112,30): error TS2551: Property 'getCellCharPropertiesAt' does not exist on type 'WasmBridge'. Did you mean 'getCellParaPropertiesAt'?
+src/engine/input-handler.ts(1117,28): error TS2551: Property 'getCharPropertiesAt' does not exist on type 'WasmBridge'. Did you mean 'setCharProperties'?
+src/engine/input-handler.ts(1203,44): error TS2339: Property 'getTableCellBboxes' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1204,38): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/engine/input-handler.ts(1348,41): error TS2339: Property 'getCursorRectInHeaderFooter' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1353,41): error TS2339: Property 'getCursorRectInFootnote' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1358,41): error TS2551: Property 'getCursorRectByPath' does not exist on type 'WasmBridge'. Did you mean 'getCursorRect'?
+src/engine/input-handler.ts(1363,41): error TS2551: Property 'getCursorRectInCell' does not exist on type 'WasmBridge'. Did you mean 'getCursorRect'?
+src/engine/input-handler.ts(1370,15): error TS2554: Expected 0 arguments, but got 3.
+src/engine/input-handler.ts(1406,17): error TS2393: Duplicate function implementation.
+src/engine/input-handler.ts(1427,33): error TS2339: Property 'getSelectionRectsInCell' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1434,33): error TS2339: Property 'getSelectionRects' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1444,37): error TS2345: Argument of type 'CursorRect[]' is not assignable to parameter of type 'SelectionRect[]'.
+  Property 'width' is missing in type 'CursorRect' but required in type 'SelectionRect'.
+src/engine/input-handler.ts(1467,53): error TS2554: Expected 2 arguments, but got 3.
+src/engine/input-handler.ts(1469,15): error TS2339: Property 'parentParaIndex' does not exist on type 'Promise<HitTestResult>'.
+src/engine/input-handler.ts(1469,50): error TS2339: Property 'controlIndex' does not exist on type 'Promise<HitTestResult>'.
+src/engine/input-handler.ts(1470,15): error TS2339: Property 'cellIndex' does not exist on type 'Promise<HitTestResult>'.
+src/engine/input-handler.ts(1471,58): error TS2339: Property 'cellPath' does not exist on type 'Promise<HitTestResult>'.
+src/engine/input-handler.ts(1473,45): error TS2339: Property 'cellPath' does not exist on type 'Promise<HitTestResult>'.
+src/engine/input-handler.ts(1474,32): error TS2339: Property 'getCellInfoByPath' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1477,30): error TS2339: Property 'getCellInfo' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1477,72): error TS2339: Property 'cellIndex' does not exist on type 'Promise<HitTestResult>'.
+src/engine/input-handler.ts(1498,34): error TS2339: Property 'getTableCellBboxesByPath' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1500,34): error TS2339: Property 'getTableCellBboxes' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1512,11): error TS2393: Duplicate function implementation.
+src/engine/input-handler.ts(1532,27): error TS2339: Property 'getSelectionRectsInCell' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1539,27): error TS2339: Property 'getSelectionRects' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1572,32): error TS2339: Property 'getTableCellBboxesByPath' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1575,32): error TS2339: Property 'getTableCellBboxes' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1610,5): error TS2739: Type 'Promise<{ sec: number; ppi: number; ci: number; type: "image" | "shape" | "equation" | "group" | "line"; cellIdx?: number | undefined; cellParaIdx?: number | undefined; x1?: number | undefined; y1?: number | undefined; x2?: number | undefined; y2?: number | undefined; } | null>' is missing the following properties from type '{ sec: number; ppi: number; ci: number; type: "image" | "shape" | "equation" | "group" | "line"; x1?: number | undefined; y1?: number | undefined; x2?: number | undefined; y2?: number | undefined; }': sec, ppi, ci, type
+src/engine/input-handler.ts(1617,5): error TS2739: Type 'Promise<{ pageIndex: number; x: number; y: number; w: number; h: number; x1?: number | undefined; y1?: number | undefined; x2?: number | undefined; y2?: number | undefined; } | null>' is missing the following properties from type '{ pageIndex: number; x: number; y: number; w: number; h: number; }': pageIndex, x, y, w, h
+src/engine/input-handler.ts(1650,5): error TS2322: Type 'Promise<boolean>' is not assignable to type 'boolean'.
+src/engine/input-handler.ts(1704,19): error TS2339: Property 'setShowTransparentBorders' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1714,19): error TS2339: Property 'setShowTransparentBorders' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1747,34): error TS2339: Property 'getCaretPosition' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1936,54): error TS2554: Expected 0 arguments, but got 3.
+src/engine/input-handler.ts(1961,38): error TS2339: Property 'removeFieldAt' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1976,28): error TS2339: Property 'getFieldInfoAt' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1979,40): error TS2339: Property 'setActiveField' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(1986,33): error TS2551: Property 'getCursorRectByPath' does not exist on type 'WasmBridge'. Did you mean 'getCursorRect'?
+src/engine/input-handler.ts(1989,31): error TS2551: Property 'getCursorRectByPath' does not exist on type 'WasmBridge'. Did you mean 'getCursorRect'?
+src/engine/input-handler.ts(1993,33): error TS2551: Property 'getCursorRectInCell' does not exist on type 'WasmBridge'. Did you mean 'getCursorRect'?
+src/engine/input-handler.ts(1997,31): error TS2551: Property 'getCursorRectInCell' does not exist on type 'WasmBridge'. Did you mean 'getCursorRect'?
+src/engine/input-handler.ts(2002,11): error TS2739: Type 'Promise<CursorRect>' is missing the following properties from type 'CursorRect': pageIndex, x, y, height
+src/engine/input-handler.ts(2002,47): error TS2554: Expected 0 arguments, but got 3.
+src/engine/input-handler.ts(2003,11): error TS2739: Type 'Promise<CursorRect>' is missing the following properties from type 'CursorRect': pageIndex, x, y, height
+src/engine/input-handler.ts(2003,45): error TS2554: Expected 0 arguments, but got 3.
+src/engine/input-handler.ts(2023,17): error TS2339: Property 'clearActiveField' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(2032,28): error TS2339: Property 'getFieldInfoAt' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(2040,28): error TS2339: Property 'getFieldInfoAt' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(2098,27): error TS2339: Property 'copyControl' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(2099,40): error TS2339: Property 'getClipboardText' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(2101,40): error TS2339: Property 'exportControlHtml' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(2117,27): error TS2339: Property 'copyControl' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(2118,40): error TS2339: Property 'getClipboardText' does not exist on type 'WasmBridge'.
+src/engine/input-handler.ts(2143,85): error TS2322: Type '(wasm: WasmBridge) => Promise<DocumentPosition>' is not assignable to type '(wasm: WasmBridge) => DocumentPosition'.
+  Type 'Promise<DocumentPosition>' is missing the following properties from type 'DocumentPosition': sectionIndex, paragraphIndex, charOffset
+src/engine/input-handler.ts(2160,84): error TS2322: Type '(wasm: WasmBridge) => Promise<DocumentPosition>' is not assignable to type '(wasm: WasmBridge) => DocumentPosition'.
+  Type 'Promise<DocumentPosition>' is missing the following properties from type 'DocumentPosition': sectionIndex, paragraphIndex, charOffset
+src/engine/input-handler.ts(2161,22): error TS2551: Property 'deleteTableControl' does not exist on type 'WasmBridge'. Did you mean 'deleteShapeControl'?
+src/engine/input-handler.ts(2203,25): error TS2551: Property 'applyCellStyle' does not exist on type 'WasmBridge'. Did you mean 'applyStyle'?
+src/engine/input-handler.ts(2208,25): error TS2554: Expected 4 arguments, but got 3.
+src/engine/input-handler.ts(2229,34): error TS2339: Property 'name' does not exist on type 'number'.
+src/engine/input-handler.ts(2281,57): error TS2554: Expected 0 arguments, but got 1.
+src/engine/input-handler.ts(2297,55): error TS2554: Expected 0 arguments, but got 1.
+src/engine/input-handler.ts(2330,11): error TS2451: Cannot redeclare block-scoped variable 'pos'.
+src/engine/input-handler.ts(2335,35): error TS2345: Argument of type 'boolean' is not assignable to parameter of type 'number'.
+src/engine/input-handler.ts(2338,11): error TS2451: Cannot redeclare block-scoped variable 'pos'.
+src/engine/input-handler.ts(2358,19): error TS2339: Property 'id' does not exist on type 'number'.
+src/engine/input-handler.ts(2391,37): error TS2345: Argument of type 'boolean' is not assignable to parameter of type 'number'.
+src/main.ts(66,3): error TS2322: Type '() => Promise<EditorContext>' is not assignable to type '() => EditorContext'.
+  Type 'Promise<EditorContext>' is missing the following properties from type 'EditorContext': hasDocument, hasSelection, inTable, inCellSelectionMode, and 8 more.
+src/ui/bookmark-dialog.ts(214,5): error TS2740: Type 'Promise<any[]>' is missing the following properties from type 'BookmarkInfo[]': length, pop, push, concat, and 29 more.
+src/ui/bookmark-dialog.ts(284,7): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+src/ui/bookmark-dialog.ts(287,16): error TS2339: Property 'ok' does not exist on type 'Promise<boolean>'.
+src/ui/bookmark-dialog.ts(292,45): error TS2339: Property 'error' does not exist on type 'Promise<boolean>'.
+src/ui/bookmark-dialog.ts(309,13): error TS2801: This condition will always return true since this 'Promise<boolean>' is always defined.
+src/ui/bookmark-dialog.ts(310,33): error TS2801: This condition will always return true since this 'Promise<boolean>' is always defined.
+src/ui/bookmark-dialog.ts(322,62): error TS2554: Expected 1 arguments, but got 3.
+src/ui/bookmark-dialog.ts(323,16): error TS2339: Property 'ok' does not exist on type 'Promise<boolean>'.
+src/ui/bookmark-dialog.ts(336,71): error TS2554: Expected 2 arguments, but got 4.
+src/ui/bookmark-dialog.ts(337,16): error TS2339: Property 'ok' does not exist on type 'Promise<boolean>'.
+src/ui/bookmark-dialog.ts(342,45): error TS2339: Property 'error' does not exist on type 'Promise<boolean>'.
+src/ui/cell-border-bg-dialog.ts(91,5): error TS2740: Type 'Promise<CellProperties>' is missing the following properties from type 'CellProperties': width, height, paddingLeft, paddingRight, and 5 more.
+src/ui/cell-border-bg-dialog.ts(638,32): error TS2339: Property 'cellCount' does not exist on type 'Promise<any>'.
+src/ui/picture-props-dialog.ts(228,26): error TS2531: Object is possibly 'null'.
+src/ui/picture-props-dialog.ts(229,27): error TS2531: Object is possibly 'null'.

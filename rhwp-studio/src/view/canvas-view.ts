@@ -16,7 +16,6 @@ export class CanvasView {
 
   private scrollContent: HTMLElement;
   private pages: PageInfo[] = [];
-  private isPageInfoReal: boolean[] = [];
   private currentVisiblePages: number[] = [];
   private unsubscribers: (() => void)[] = [];
 
@@ -43,24 +42,21 @@ export class CanvasView {
   }
 
   /** 문서 로드 후 호출 — 페이지 정보 수집 및 가상 스크롤 초기화 */
-  async loadDocument(): Promise<void> {
+  loadDocument(): void {
     this.reset();
 
     const pageCount = this.wasm.pageCount;
-    if (pageCount === 0) return;
+    this.pages = [];
+    for (let i = 0; i < pageCount; i++) {
+      try {
+        this.pages.push(this.wasm.getPageInfo(i));
+      } catch (e) {
+        console.error(`[CanvasView] 페이지 ${i} 정보 조회 실패:`, e);
+      }
+    }
 
-    // 첫 페이지 정보만 가져와서 가변 레이아웃 기초로 사용 (Lazy Loading)
-    try {
-      const firstPage = await this.wasm.getPageInfo(0);
-      this.pages = new Array(pageCount).fill(firstPage);
-      this.isPageInfoReal = new Array(pageCount).fill(false);
-      this.isPageInfoReal[0] = true;
-
-      const zoom = this.viewportManager.getZoom();
-      const { width: vpWidth } = this.viewportManager.getViewportSize();
-      this.virtualScroll.setLazyPageDimensions(pageCount, firstPage, zoom, vpWidth);
-    } catch (e) {
-      console.error('[CanvasView] 초기 페이지 정보 조회 실패:', e);
+    if (this.pages.length === 0) {
+      console.error('[CanvasView] 로드된 페이지가 없습니다');
       return;
     }
 
@@ -77,9 +73,9 @@ export class CanvasView {
     this.recalcLayout();
 
     this.container.scrollTop = 0;
-    await this.updateVisiblePages();
+    this.updateVisiblePages();
 
-    console.log(`[CanvasView] Lazy 로드 시작 (${pageCount}페이지)`);
+    console.log(`[CanvasView] ${this.pages.length}/${pageCount}페이지 로드, 총 높이: ${this.virtualScroll.getTotalHeight()}px`);
   }
 
   /** 레이아웃을 재계산한다 (줌/리사이즈 공통) */
@@ -111,24 +107,8 @@ export class CanvasView {
       }
     }
 
-    // 새로 보이는 페이지 데이터 확보 및 렌더링
-    const zoom = this.viewportManager.getZoom();
-    const { width: vpWidth } = this.viewportManager.getViewportSize();
-
+    // 새로 보이는 페이지 렌더링
     for (const pageIdx of prefetchPages) {
-      // 실시간 페이지 정보 업데이트 (실제 정보가 없는 경우)
-      if (!this.isPageInfoReal[pageIdx]) {
-        this.wasm.getPageInfo(pageIdx).then(info => {
-          this.pages[pageIdx] = info;
-          this.isPageInfoReal[pageIdx] = true;
-          // 크기가 다르면 레이아웃 갱신
-          if (this.virtualScroll.updatePageDimension(pageIdx, info, zoom, vpWidth)) {
-            this.recalcLayout();
-            this.updateVisiblePages(); // 레이아웃 변경 시 재귀 호출 (동일 프레임 내 처리)
-          }
-        });
-      }
-
       if (!this.canvasPool.has(pageIdx)) {
         this.renderPage(pageIdx);
       }
@@ -250,23 +230,18 @@ export class CanvasView {
   }
 
   /** 편집 후 보이는 페이지를 재렌더링한다 */
-  async refreshPages(): Promise<void> {
+  refreshPages(): void {
+    if (this.pages.length === 0) return;
+
+    // 페이지 정보 재수집 (페이지 수/크기가 변경될 수 있음)
     const pageCount = this.wasm.pageCount;
-    if (pageCount === 0) return;
-
-    // 현재 보이는 첫 번째 페이지를 기준으로 전체 구조 초기화 (Lazy)
-    const visibleIdx = this.currentVisiblePages[0] || 0;
-    try {
-      const info = await this.wasm.getPageInfo(visibleIdx);
-      this.pages = new Array(pageCount).fill(info);
-      this.isPageInfoReal = new Array(pageCount).fill(false);
-      this.isPageInfoReal[visibleIdx] = true;
-
-      const zoom = this.viewportManager.getZoom();
-      const { width: vpWidth } = this.viewportManager.getViewportSize();
-      this.virtualScroll.setLazyPageDimensions(pageCount, info, zoom, vpWidth);
-    } catch (e) {
-      console.error('[CanvasView] 페이지 갱신 실패:', e);
+    this.pages = [];
+    for (let i = 0; i < pageCount; i++) {
+      try {
+        this.pages.push(this.wasm.getPageInfo(i));
+      } catch (e) {
+        console.error(`[CanvasView] 페이지 ${i} 정보 조회 실패:`, e);
+      }
     }
 
     this.recalcLayout();
@@ -274,7 +249,7 @@ export class CanvasView {
     // 보이는 페이지 재렌더링
     this.canvasPool.releaseAll();
     this.pageRenderer.cancelAll();
-    await this.updateVisiblePages();
+    this.updateVisiblePages();
   }
 
   /** 리소스를 정리한다 */

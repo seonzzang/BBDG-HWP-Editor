@@ -23,42 +23,10 @@ export class VirtualScroll {
   setPageDimensions(pages: PageInfo[], zoom = 1.0, viewportWidth = 0): void {
     this.pageHeights = pages.map((p) => p.height * zoom);
     this.pageWidths = pages.map((p) => p.width * zoom);
-    this.recalcInternal(zoom, viewportWidth);
-  }
-
-  /**
-   * 지연 로딩용: 첫 페이지 정보만으로 전체 구조를 가설 설정한다.
-   */
-  setLazyPageDimensions(pageCount: number, firstPage: PageInfo, zoom = 1.0, viewportWidth = 0): void {
-    const h = firstPage.height * zoom;
-    const w = firstPage.width * zoom;
-    this.pageHeights = new Array(pageCount).fill(h);
-    this.pageWidths = new Array(pageCount).fill(w);
-    this.recalcInternal(zoom, viewportWidth);
-  }
-
-  /** 특정 페이지의 정보를 업데이트한다 (스크롤 시 실제 정보를 얻었을 때 호출) */
-  updatePageDimension(pageIdx: number, info: PageInfo, zoom = 1.0, viewportWidth = 0): boolean {
-    if (pageIdx < 0 || pageIdx >= this.pageHeights.length) return false;
-    
-    const newH = info.height * zoom;
-    const newW = info.width * zoom;
-    
-    if (this.pageHeights[pageIdx] === newH && this.pageWidths[pageIdx] === newW) {
-      return false; // 변경 없음
-    }
-
-    this.pageHeights[pageIdx] = newH;
-    this.pageWidths[pageIdx] = newW;
-    this.recalcInternal(zoom, viewportWidth);
-    return true;
-  }
-
-  private recalcInternal(zoom: number, viewportWidth: number): void {
     this.maxPageWidth = Math.max(...this.pageWidths, 0);
 
     // 그리드 모드 판정
-    this.gridMode = zoom <= GRID_ZOOM_THRESHOLD && viewportWidth > 0 && this.pageHeights.length > 1;
+    this.gridMode = zoom <= GRID_ZOOM_THRESHOLD && viewportWidth > 0 && pages.length > 1;
 
     if (this.gridMode) {
       this.layoutGrid(viewportWidth);
