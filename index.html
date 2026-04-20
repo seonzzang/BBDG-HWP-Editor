@@ -359,253 +359,146 @@
     </header>
 
     <style>
-        /* ... existing root ... */
-        :root {
-            --primary: #3b82f6;
-            --primary-glow: rgba(59, 130, 246, 0.5);
-            --bg-darker: #020617;
-            --border-subtle: rgba(255, 255, 255, 0.08);
-        }
-
-        .features-section {
-            padding: 12rem 10%;
+        .pinwheel-section {
+            padding: 14rem 10%;
             background-color: var(--bg-darker);
-            position: relative;
+            overflow: hidden;
         }
 
-        .features-wrapper {
+        .pinwheel-container {
             max-width: 1200px;
             margin: 0 auto;
-        }
-
-        .section-intro {
-            max-width: 600px;
-            margin-bottom: 8rem;
-        }
-
-        .section-intro .label {
-            font-size: 0.8rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            color: var(--primary);
-            margin-bottom: 1.5rem;
-            display: block;
-        }
-
-        .section-intro h2 {
-            font-size: 3.5rem;
-            font-weight: 800;
-            line-height: 1.1;
-            letter-spacing: -0.03em;
-            color: #fff;
-        }
-
-        /* The "Anti-AI" Layout: Layered Technical Panels */
-        .feature-panels {
-            display: flex;
-            flex-direction: column;
-            gap: 8rem;
-        }
-
-        .panel {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4rem;
-            align-items: center;
-        }
-
-        .panel-reversed {
-            direction: rtl;
-        }
-        .panel-reversed .panel-content {
-            direction: ltr;
-        }
-
-        .panel-visual {
             position: relative;
-            background: linear-gradient(135deg, rgba(30, 41, 59, 1) 0%, rgba(15, 23, 42, 1) 100%);
+            display: grid;
+            grid-template-columns: repeat(20, 1fr);
+            grid-template-rows: repeat(20, 1fr);
+            height: 900px;
+        }
+
+        .pw-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 40px;
-            aspect-ratio: 4/3;
-            border: 1px solid var(--border-subtle);
-            overflow: hidden;
-            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.8);
-        }
-
-        .panel-visual::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to bottom right, rgba(59, 130, 246, 0.1), transparent);
-            pointer-events: none;
-        }
-
-        /* Abstract Visual decorations */
-        .abstract-line {
-            position: absolute;
-            height: 1px;
-            background: linear-gradient(to right, transparent, var(--primary), transparent);
-            width: 100%;
-            opacity: 0.3;
-        }
-
-        .panel-content h3 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 2rem;
-            color: #fff;
-            letter-spacing: -0.02em;
-        }
-
-        .panel-content p {
-            font-size: 1.2rem;
-            color: var(--text-muted);
-            line-height: 1.8;
-            margin-bottom: 2.5rem;
-            font-weight: 400;
-        }
-
-        .panel-stats {
-            display: flex;
-            gap: 3rem;
-        }
-
-        .stat-item {
+            backdrop-filter: blur(25px);
+            padding: 3.5rem;
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            z-index: 2;
+            cursor: default;
         }
 
-        .stat-val {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #fff;
+        .pw-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            border-color: var(--primary);
+            background: rgba(30, 41, 59, 0.6);
+            z-index: 10;
+            box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.6);
         }
 
-        .stat-label {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-top: 5px;
+        /* Pinwheel Slotting Logic */
+        .card-1 { 
+            grid-column: 1 / 11; grid-row: 1 / 13; 
+            border-bottom-right-radius: 0;
+            margin-right: -20px; margin-bottom: -20px;
+        }
+        .card-2 { 
+            grid-column: 11 / 21; grid-row: 1 / 9; 
+            border-bottom-left-radius: 0;
+            margin-bottom: -40px;
+        }
+        .card-3 { 
+            grid-column: 1 / 9; grid-row: 13 / 21; 
+            margin-top: 40px;
+        }
+        .card-4 { 
+            grid-column: 9 / 21; grid-row: 9 / 21; 
+            border-top-left-radius: 0;
+            margin-left: -40px; margin-top: 20px;
         }
 
-        /* Floating decoration for 'Human' feel */
-        .floating-badge {
-            position: absolute;
-            padding: 1rem 1.5rem;
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: rgba(255,255,255,0.8);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        .pw-card .icon-wrap {
+            width: 56px; height: 56px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 2rem;
+            color: var(--primary);
+        }
+
+        .pw-card h3 {
+            font-size: 2rem; font-weight: 800; margin-bottom: 1.2rem; line-height: 1.2; color: #fff;
+        }
+        .pw-card p {
+            font-size: 1.1rem; color: var(--text-muted); line-height: 1.7;
+        }
+        .pw-tag {
+            font-size: 0.75rem; font-weight: 800; letter-spacing: 0.15em; color: var(--primary);
+            text-transform: uppercase; margin-top: 2rem;
         }
 
         @media (max-width: 1024px) {
-            .panel { grid-template-columns: 1fr; gap: 3rem; }
-            .section-intro h2 { font-size: 2.5rem; }
+            .pinwheel-container { display: flex; flex-direction: column; height: auto; gap: 2rem; }
+            .pw-card { border-radius: 32px !important; margin: 0 !important; }
         }
     </style>
 
-    <section class="features-section" id="features">
-        <div class="features-wrapper">
-            <div class="section-intro">
-                <span class="label">Architecture & Security</span>
-                <h2>단순한 뷰어를 넘어선<br/>강력한 편집 시스템.</h2>
+    <section class="pinwheel-section" id="features">
+        <div class="section-intro" style="max-width: 800px; margin-bottom: 6rem;">
+            <span class="label">Integrated Performance</span>
+            <h2 style="font-size: 3.8rem;">어긋남의 미학,<br/>완벽한 맞물림.</h2>
+        </div>
+
+        <div class="pinwheel-container">
+            <!-- Gear 1: Speed -->
+            <div class="pw-card card-1">
+                <div>
+                    <div class="icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    </div>
+                    <h3>Native-Grade<br/>Performance</h3>
+                    <p>Rust 코어와 WASM 런타임의 결합으로 브라우저 한계를 넘어서는 60fps 렌더링을 보장합니다. 대형 문서 로드 시에도 UI 프리징 없이 매끄러운 편집이 가능합니다.</p>
+                </div>
+                <div class="pw-tag">Low-Latency Rendering</div>
             </div>
 
-            <div class="feature-panels">
-                <!-- Panel 1: Performance -->
-                <div class="panel">
-                    <div class="panel-visual">
-                        <div class="abstract-line" style="top: 20%; transform: rotate(-5deg);"></div>
-                        <div class="abstract-line" style="top: 50%; transform: rotate(1deg);"></div>
-                        <div class="abstract-line" style="top: 80%; transform: rotate(-2deg);"></div>
-                        <div class="floating-badge" style="top: 20%; left: 10%;">WASM Instance: Active</div>
-                        <div class="floating-badge" style="bottom: 15%; right: 10%;">Latency: < 2ms</div>
-                        <!-- Inner SVG Abstract visualization -->
-                        <svg style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:60%; opacity:0.4;" viewBox="0 0 200 200">
-                            <circle cx="100" cy="100" r="80" stroke="url(#g1)" stroke-width="0.5" fill="none" />
-                            <circle cx="100" cy="100" r="60" stroke="url(#g1)" stroke-width="0.5" fill="none" stroke-dasharray="10 5" />
-                            <defs>
-                                <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="transparent" />
-                                    <stop offset="50%" stop-color="#3b82f6" />
-                                    <stop offset="100%" stop-color="transparent" />
-                                </linearGradient>
-                            </defs>
-                        </svg>
+            <!-- Gear 2: Security -->
+            <div class="pw-card card-2">
+                <div>
+                    <div class="icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     </div>
-                    <div class="panel-content">
-                        <h3>최대 10배 빠른<br/>Native급 렌더링.</h3>
-                        <p>컴파일된 Rust 코어 엔진은 브라우저의 한계를 돌파합니다. 수백 메가바이트의 HWPX 바이너리를 실시간으로 구조화하고 Canvas 엔진으로 직접 스트리밍합니다.</p>
-                        <div class="panel-stats">
-                            <div class="stat-item">
-                                <span class="stat-val">300+</span>
-                                <span class="stat-label">Pages Hanlding</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-val">WASM</span>
-                                <span class="stat-label">Instruction Set</span>
-                            </div>
-                        </div>
-                    </div>
+                    <h3>Air-Gapped Security</h3>
+                    <p>데이터가 로컬 샌드박스를 절대 벗어나지 않는 완전한 보안 환경을 제공합니다.</p>
                 </div>
+                <div class="pw-tag">Zero-Leak Integrity</div>
+            </div>
 
-                <!-- Panel 2: Security & Offline -->
-                <div class="panel panel-reversed">
-                    <div class="panel-visual">
-                        <div class="floating-badge" style="top: 40%; left: 50%; transform:translateX(-50%); border-color: rgba(59, 130, 246, 0.5);">End-to-End Local Privacy</div>
-                        <svg style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:80%;" viewBox="0 0 24 24" fill="none" stroke="rgba(59, 130, 246, 0.2)" stroke-width="0.5">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                        </svg>
+            <!-- Gear 3: Drag & Drop -->
+            <div class="pw-card card-3">
+                <div>
+                    <div class="icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>
                     </div>
-                    <div class="panel-content">
-                        <h3>네트워크가 필요 없는<br/>완전한 폐쇄망 사양.</h3>
-                        <p>데이터 유출의 위험으로부터 완벽하게 자유롭습니다. 기업 내부의 기밀 문서는 사용자의 로컬 메모리 안에서만 생존하며, 앱 종료 시 흔적 없이 소멸됩니다.</p>
-                        <div class="panel-stats">
-                            <div class="stat-item">
-                                <span class="stat-val">Zero</span>
-                                <span class="stat-label">External Calls</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-val">Local</span>
-                                <span class="stat-label">Memory Only</span>
-                            </div>
-                        </div>
-                    </div>
+                    <h3>Seamless Flow</h3>
+                    <p>운영체제와 직접 소통하는 드래그 앤 드롭 시스템으로 직관적인 워크플로우를 완성했습니다.</p>
                 </div>
+                <div class="pw-tag">Native OS Hooks</div>
+            </div>
 
-                <!-- Panel 3: Native Drag & Drop -->
-                <div class="panel">
-                    <div class="panel-visual">
-                         <div class="floating-badge" style="top: 25%; left: 15%;">OS-Level Hook</div>
-                         <div class="floating-badge" style="bottom: 25%; right: 15%;">WebView2 Bridge</div>
-                         <svg style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:40%;" viewBox="0 0 24 24" fill="none" stroke="rgba(59, 130, 246, 0.3)" stroke-width="1">
-                            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
-                            <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
-                            <path d="M12 12v6"/>
-                            <path d="m15 15-3-3-3 3"/>
-                         </svg>
+            <!-- Gear 4: Deployment -->
+            <div class="pw-card card-4">
+                <div>
+                    <div class="icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                     </div>
-                    <div class="panel-content">
-                        <h3>탐색기 그대로의<br/>드래그 앤 드롭.</h3>
-                        <p>Tauri 네이티브 API 하이재킹 기술로 브라우저의 드롭 제한을 해제했습니다. 윈도우 탐색기에서 파일을 끌어오는 즉시 네이티브 인스턴스가 반응합니다.</p>
-                        <div class="panel-stats">
-                            <div class="stat-item">
-                                <span class="stat-val">Native</span>
-                                <span class="stat-label">File Drop</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-val">64-bit</span>
-                                <span class="stat-label">Target Arch</span>
-                            </div>
-                        </div>
-                    </div>
+                    <h3>Versatile Delivery</h3>
+                    <p>MSI, Portable, NSIS 등 엔터프라이즈 환경이 요구하는 다양한 배포 규격을 한 패키지에 담았습니다. 실시간 버저닝을 통해 관리의 편의성을 극대화하며 사내 어느 PC에서나 즉시 사용 가능한 수준 높은 호환성을 보장합니다.</p>
                 </div>
+                <div class="pw-tag">Multi-Target Builds</div>
             </div>
         </div>
     </section>
