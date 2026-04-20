@@ -1,4 +1,5 @@
 import { WasmBridge } from '@/core/wasm-bridge';
+import type { PageInfo } from '@/core/types';
 
 export class PageRenderer {
   private reRenderTimers = new Map<number, ReturnType<typeof setTimeout>[]>();
@@ -6,19 +7,19 @@ export class PageRenderer {
   constructor(private wasm: WasmBridge) {}
 
   /** 페이지를 Canvas에 렌더링한다 (scale = zoom × DPR) */
-  renderPage(pageIdx: number, canvas: HTMLCanvasElement, scale: number): void {
+  renderPage(pageIdx: number, canvas: HTMLCanvasElement, scale: number, pageInfo?: PageInfo): void {
     this.wasm.renderPageToCanvas(pageIdx, canvas, scale);
-    this.drawMarginGuides(pageIdx, canvas, scale);
-    this.scheduleReRender(pageIdx, canvas, scale);
+    this.drawMarginGuides(pageIdx, canvas, scale, pageInfo);
+    this.scheduleReRender(pageIdx, canvas, scale, pageInfo);
   }
 
   /** 편집 용지 여백 가이드라인을 캔버스에 그린다 (4모서리 L자 표시) */
-  private drawMarginGuides(pageIdx: number, canvas: HTMLCanvasElement, scale: number): void {
-    const pageInfo = this.wasm.getPageInfo(pageIdx);
+  private drawMarginGuides(pageIdx: number, canvas: HTMLCanvasElement, scale: number, pageInfo?: PageInfo): void {
+    const info = pageInfo ?? this.wasm.getPageInfo(pageIdx);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const { width, height, marginLeft, marginRight, marginTop, marginBottom, marginHeader, marginFooter } = pageInfo;
+    const { width, height, marginLeft, marginRight, marginTop, marginBottom, marginHeader, marginFooter } = info;
     const left = marginLeft;
     // 한컴 HWP 기준: 본문 시작 = marginHeader + marginTop
     const top = marginHeader + marginTop;
@@ -63,7 +64,7 @@ export class PageRenderer {
    * 아직 디코딩되지 않았을 수 있으므로 점진적 재렌더링한다.
    * 200ms, 600ms 두 번 재시도하여 대부분의 이미지 로드를 커버한다.
    */
-  private scheduleReRender(pageIdx: number, canvas: HTMLCanvasElement, scale: number): void {
+  private scheduleReRender(pageIdx: number, canvas: HTMLCanvasElement, scale: number, pageInfo?: PageInfo): void {
     this.cancelReRender(pageIdx);
 
     const delays = [200, 600];
@@ -73,7 +74,7 @@ export class PageRenderer {
       const timer = setTimeout(() => {
         if (canvas.parentElement) {
           this.wasm.renderPageToCanvas(pageIdx, canvas, scale);
-          this.drawMarginGuides(pageIdx, canvas, scale);
+          this.drawMarginGuides(pageIdx, canvas, scale, pageInfo);
         }
       }, delay);
       timers.push(timer);
