@@ -49,6 +49,8 @@ export class CanvasView {
     const traceId = `canvas-load:${Date.now()}`;
     let pageCount = this.wasm.pageCount;
     const progressiveEnabled = this.wasm.supportsProgressivePaging();
+    const progressiveChunkSize = 24;
+    const maxBootstrapSteps = 256;
     console.log('[CanvasView] paging capability', {
       traceId,
       supportsProgressivePaging: progressiveEnabled,
@@ -59,13 +61,34 @@ export class CanvasView {
       try {
         console.time(`[${traceId}] progressive.firstStep`);
         this.wasm.startProgressivePaging();
-        pageCount = this.wasm.stepProgressivePaging(24);
+        pageCount = this.wasm.stepProgressivePaging(progressiveChunkSize);
         console.timeEnd(`[${traceId}] progressive.firstStep`);
         console.log('[CanvasView] progressive first step complete', {
           traceId,
           pageCount,
           pagingFinished: this.wasm.isPagingFinished(),
         });
+
+        if (pageCount === 0 && !this.wasm.isPagingFinished()) {
+          console.warn('[CanvasView] no visible pages after first progressive step; continuing bootstrap steps', {
+            traceId,
+            progressiveChunkSize,
+          });
+
+          let bootstrapSteps = 1;
+          while (pageCount === 0 && !this.wasm.isPagingFinished() && bootstrapSteps < maxBootstrapSteps) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            pageCount = this.wasm.stepProgressivePaging(progressiveChunkSize);
+            bootstrapSteps += 1;
+          }
+
+          console.log('[CanvasView] progressive bootstrap steps complete', {
+            traceId,
+            bootstrapSteps,
+            pageCount,
+            pagingFinished: this.wasm.isPagingFinished(),
+          });
+        }
       } catch (error) {
         console.error('[CanvasView] progressive paging bootstrap failed, fallback to full collection', error);
         pageCount = this.wasm.pageCount;
