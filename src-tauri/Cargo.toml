@@ -1,6 +1,6 @@
 [package]
 name = "rhwp-studio"
-version = "0.7.35"
+version = "0.7.36"
 description = "RHWP Studio Desktop"
 authors = ["Edward Kim"]
 license = "MIT"

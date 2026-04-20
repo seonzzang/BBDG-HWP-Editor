@@ -94,19 +94,21 @@ body[data-printing="true"] {
       window.addEventListener('afterprint', handleAfterPrint, { once: true });
 
       setTimeout(() => {
-        try {
+        void (async () => {
+          try {
           window.focus();
-          window.print();
+          await Promise.resolve(window.print());
           setTimeout(() => {
             if (document.body.contains(printRoot)) {
               cleanup();
               resolve();
             }
           }, cleanupDelayMs);
-        } catch (error) {
-          cleanup();
-          reject(error instanceof Error ? error : new Error(String(error)));
-        }
+          } catch (error) {
+            cleanup();
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+        })();
       }, 100);
     } catch (error) {
       cleanup();
