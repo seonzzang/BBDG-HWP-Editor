@@ -229,6 +229,7 @@ async function setupPdfDevtoolsApi(): Promise<void> {
 
 async function setupPrintWorkerDevtoolsApi(): Promise<void> {
   const { invoke } = await import('@tauri-apps/api/core');
+  const yieldToBrowser = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
   const extractOutputPdfPath = (messages: unknown): string | null => {
     if (!Array.isArray(messages)) return null;
@@ -344,6 +345,7 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       endPage?: number;
       inApp?: boolean;
       batchSize?: number;
+      svgBatchSize?: number;
     } = {},
   ) => {
     if (wasm.pageCount <= 0) {
@@ -357,9 +359,30 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       (_, index) => startPage - 1 + index,
     );
     const batchSize = Math.max(1, Math.round(params.batchSize ?? 5));
+    const svgBatchSize = Math.max(1, Math.round(params.svgBatchSize ?? 20));
     const startedAt = performance.now();
+    const svgExtractStartedAt = performance.now();
+    const svgPages: string[] = [];
 
-    const svgPages = pageIndexes.map((pageIndex) => wasm.renderPageSvg(pageIndex));
+    for (let startIndex = 0; startIndex < pageIndexes.length; startIndex += svgBatchSize) {
+      const batchPageIndexes = pageIndexes.slice(startIndex, startIndex + svgBatchSize);
+      for (const pageIndex of batchPageIndexes) {
+        svgPages.push(wasm.renderPageSvg(pageIndex));
+      }
+
+      const completedPages = Math.min(startIndex + batchPageIndexes.length, pageIndexes.length);
+      console.log('[print-worker-current-doc-pdf] svg extract progress', {
+        completedPages,
+        totalPages: pageIndexes.length,
+        svgBatchSize,
+      });
+
+      if (completedPages < pageIndexes.length) {
+        await yieldToBrowser();
+      }
+    }
+
+    const svgExtractElapsedMs = Math.round(performance.now() - svgExtractStartedAt);
     const firstPageInfo = wasm.getPageInfo(pageIndexes[0]);
     const widthPx = Math.max(1, Math.round(firstPageInfo.width));
     const heightPx = Math.max(1, Math.round(firstPageInfo.height));
@@ -412,8 +435,10 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       startPage,
       endPage,
       batchSize,
+      svgBatchSize,
       progressCount: progressMessages.length,
       elapsedMs,
+      svgExtractElapsedMs,
       workerDurationMs: result?.durationMs,
     });
     return {
@@ -423,7 +448,9 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
         endPage,
       },
       batchSize,
+      svgBatchSize,
       elapsedMs,
+      svgExtractElapsedMs,
       workerDurationMs: result?.durationMs,
       messages,
     };
