@@ -25,14 +25,27 @@ import { CellSelectionRenderer } from '@/engine/cell-selection-renderer';
 import { TableObjectRenderer } from '@/engine/table-object-renderer';
 import { TableResizeRenderer } from '@/engine/table-resize-renderer';
 import { Ruler } from '@/view/ruler';
+import {
+  createPdfDevtoolsApi,
+  createPdfPreviewRange,
+} from '@/pdf/pdf-devtools';
 
 const wasm = new WasmBridge();
 const eventBus = new EventBus();
+const pdfDevtoolsApi = import.meta.env.DEV ? createPdfDevtoolsApi(wasm) : null;
 
 // E2E 테스트용 전역 노출 (개발 모드 전용)
 if (import.meta.env.DEV) {
   (window as any).__wasm = wasm;
   (window as any).__eventBus = eventBus;
+  (window as any).__pdfExport = (params?: Record<string, unknown>) =>
+    pdfDevtoolsApi?.exportPdf(params);
+  (window as any).__pdfPreview = (params?: Record<string, unknown>) =>
+    pdfDevtoolsApi?.previewPdf(params);
+  (window as any).__pdfPreviewRange = (start: number, end: number) =>
+    pdfDevtoolsApi?.previewPdf({ range: createPdfPreviewRange(start, end) });
+  (window as any).__disposePdfPreview = () =>
+    pdfDevtoolsApi?.disposePreview();
 }
 let canvasView: CanvasView | null = null;
 let inputHandler: InputHandler | null = null;
@@ -183,11 +196,14 @@ async function initialize(): Promise<void> {
     loadFromUrlParam();
 
     // E2E 테스트용 전역 노출 (개발 모드 전용)
-    if (import.meta.env.DEV) {
-      (window as any).__inputHandler = inputHandler;
-      (window as any).__canvasView = canvasView;
-      (window as any).__printExtraction = () => dispatcher.dispatch('file:print', { usePrintExtraction: true });
-    }
+      if (import.meta.env.DEV) {
+        (window as any).__inputHandler = inputHandler;
+        (window as any).__canvasView = canvasView;
+        (window as any).__printExtraction = (params: Record<string, unknown> = {}) =>
+          dispatcher.dispatch('file:print', { usePrintExtraction: true, ...params });
+        (window as any).__printBaseline = (params: Record<string, unknown> = {}) =>
+          dispatcher.dispatch('file:print', { usePrintExtraction: false, ...params });
+      }
   } catch (error) {
     msg.textContent = `WASM 초기화 실패: ${error}`;
     console.error('[main] WASM 초기화 실패:', error);
