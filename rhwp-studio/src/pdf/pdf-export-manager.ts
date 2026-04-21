@@ -49,28 +49,11 @@ export class PdfExportManager {
   async exportRangeToPdf(options: PdfExportOptions = {}): Promise<PdfExportResult> {
     const targetPages = this.resolveTargetPages(options.range);
     const batchSize = Math.max(1, options.batchSize ?? 20);
-    const collectedPages: PdfPageRenderResult[] = [];
 
     try {
-      for (let start = 0; start < targetPages.length; start += batchSize) {
-        this.throwIfAborted(options.signal);
-
-        const batch = targetPages.slice(start, start + batchSize);
-        const batchResults = await this.generatePdfBatch(batch, options.signal);
-        collectedPages.push(...batchResults);
-
-        options.onProgress?.({
-          completedPages: Math.min(start + batch.length, targetPages.length),
-          totalPages: targetPages.length,
-          batchIndex: Math.floor(start / batchSize) + 1,
-          batchStartPage: batch[0] + 1,
-          batchEndPage: batch[batch.length - 1] + 1,
-        });
-      }
-
       return {
-        blob: await this.createPdfBlob(collectedPages, options.signal),
-        pageCount: collectedPages.length,
+        blob: await this.createPdfBlob(targetPages, batchSize, options),
+        pageCount: targetPages.length,
         mimeType: 'application/pdf',
         fileName: toPdfFileName(this.deps.getFileName()),
       };
@@ -126,8 +109,9 @@ export class PdfExportManager {
   }
 
   private async createPdfBlob(
-    pages: PdfPageRenderResult[],
-    signal?: AbortSignal,
+    targetPages: number[],
+    batchSize: number,
+    options: PdfExportOptions,
   ): Promise<Blob> {
     const { PDFDocument, SVGtoPDF } = getPdfRuntime();
     const doc = new PDFDocument({
@@ -148,7 +132,7 @@ export class PdfExportManager {
       };
 
       const cleanup = () => {
-        signal?.removeEventListener('abort', abortHandler);
+        options.signal?.removeEventListener('abort', abortHandler);
       };
 
       doc.on('data', (chunk: Uint8Array) => {
@@ -167,29 +151,58 @@ export class PdfExportManager {
         resolve(new Blob(chunks, { type: 'application/pdf' }));
       });
 
-      signal?.addEventListener('abort', abortHandler, { once: true });
+      options.signal?.addEventListener('abort', abortHandler, { once: true });
 
       try {
-        for (const page of pages) {
-          this.throwIfAborted(signal);
+        void (async () => {
+          for (let start = 0; start < targetPages.length; start += batchSize) {
+            this.throwIfAborted(options.signal);
 
-          const width = pxToPt(page.viewport.width);
-          const height = pxToPt(page.viewport.height);
+            const batch = targetPages.slice(start, start + batchSize);
+            const batchResults = await this.generatePdfBatch(batch, options.signal);
 
-          doc.addPage({
-            size: [width, height],
-            margin: 0,
-          });
+            for (const page of batchResults) {
+              this.throwIfAborted(options.signal);
 
-          SVGtoPDF(doc, page.svg, 0, 0, {
-            assumePt: false,
-            width,
-            height,
-            preserveAspectRatio: 'xMinYMin meet',
-          });
-        }
+              const width = pxToPt(page.viewport.width);
+              const height = pxToPt(page.viewport.height);
 
-        doc.end();
+              doc.addPage({
+                size: [width, height],
+                margin: 0,
+              });
+
+              SVGtoPDF(doc, page.svg, 0, 0, {
+                assumePt: false,
+                width,
+                height,
+                preserveAspectRatio: 'xMinYMin meet',
+              });
+            }
+
+            options.onProgress?.({
+              completedPages: Math.min(start + batch.length, targetPages.length),
+              totalPages: targetPages.length,
+              batchIndex: Math.floor(start / batchSize) + 1,
+              batchStartPage: batch[0] + 1,
+              batchEndPage: batch[batch.length - 1] + 1,
+            });
+
+            if (start + batch.length < targetPages.length) {
+              await yieldToBrowser();
+            }
+          }
+
+          doc.end();
+        })().catch((error) => {
+          cleanup();
+          try {
+            doc.destroy();
+          } catch {
+            // ignore cleanup failures during async error handling
+          }
+          reject(error);
+        });
       } catch (error) {
         cleanup();
         try {
@@ -231,4 +244,8 @@ function normalizePdfExportError(error: unknown): Error {
 
 function pxToPt(px: number): number {
   return (px * 72) / 96;
+}
+
+function yieldToBrowser(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, 0));
 }
