@@ -62,6 +62,51 @@ fn paragraph_to_print_blocks(
     blocks
 }
 
+fn table_to_print_html(table: &crate::model::table::Table) -> String {
+    let mut html = String::from("<table><tbody>");
+
+    for row in 0..table.row_count {
+        html.push_str("<tr>");
+        for col in 0..table.col_count {
+            let Some(cell) = table.cell_at(row, col) else {
+                continue;
+            };
+
+            if cell.row != row || cell.col != col {
+                continue;
+            }
+
+            html.push_str("<td");
+            if cell.col_span > 1 {
+                html.push_str(&format!(" colspan=\"{}\"", cell.col_span));
+            }
+            if cell.row_span > 1 {
+                html.push_str(&format!(" rowspan=\"{}\"", cell.row_span));
+            }
+            html.push('>');
+
+            let mut first_para = true;
+            for para in &cell.paragraphs {
+                let escaped = crate::document_core::helpers::clipboard_escape_html(&para.text);
+                if escaped.is_empty() {
+                    continue;
+                }
+                if !first_para {
+                    html.push_str("<br/>");
+                }
+                html.push_str(&escaped.replace('\n', "<br/>"));
+                first_para = false;
+            }
+
+            html.push_str("</td>");
+        }
+        html.push_str("</tr>");
+    }
+
+    html.push_str("</tbody></table>");
+    html
+}
+
 impl From<HwpError> for JsValue {
     fn from(err: HwpError) -> Self {
         JsValue::from_str(&err.to_string())
@@ -229,6 +274,23 @@ impl HwpDocument {
                         break;
                     }
                     blocks.push(block);
+                }
+
+                if blocks.len() < max_blocks {
+                    for (control_index, control) in para.controls.iter().enumerate() {
+                        if blocks.len() >= max_blocks {
+                            break;
+                        }
+
+                        if let Control::Table(table) = control {
+                            blocks.push(crate::print_module::PrintBlock::Table {
+                                html: table_to_print_html(table),
+                                section_index,
+                                paragraph_index,
+                                control_index,
+                            });
+                        }
+                    }
                 }
 
                 paragraph_index += 1;
