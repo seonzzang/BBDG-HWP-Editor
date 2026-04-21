@@ -1,4 +1,5 @@
 import type { PrintRangeRequest } from '@/core/types';
+import { getPdfRuntime } from './pdf-runtime';
 
 export interface PdfExportProgress {
   completedPages: number;
@@ -68,7 +69,7 @@ export class PdfExportManager {
       }
 
       return {
-        blob: this.createPlaceholderPdfBlob(collectedPages),
+        blob: await this.createPdfBlob(collectedPages, options.signal),
         pageCount: collectedPages.length,
         mimeType: 'application/pdf',
         fileName: toPdfFileName(this.deps.getFileName()),
@@ -124,9 +125,81 @@ export class PdfExportManager {
     );
   }
 
-  private createPlaceholderPdfBlob(_pages: PdfPageRenderResult[]): Blob {
-    // Step 1a 스캐폴드 단계: 실제 pdfkit 연동 전까지는 비어 있는 PDF Blob만 반환.
-    return new Blob([], { type: 'application/pdf' });
+  private async createPdfBlob(
+    pages: PdfPageRenderResult[],
+    signal?: AbortSignal,
+  ): Promise<Blob> {
+    const { PDFDocument, SVGtoPDF } = getPdfRuntime();
+    const doc = new PDFDocument({
+      autoFirstPage: false,
+      compress: true,
+      margin: 0,
+    });
+    const chunks: ArrayBuffer[] = [];
+
+    return await new Promise<Blob>((resolve, reject) => {
+      const abortHandler = () => {
+        try {
+          doc.destroy();
+        } catch {
+          // ignore cleanup failures during abort
+        }
+        reject(new DOMException('PDF export aborted', 'AbortError'));
+      };
+
+      const cleanup = () => {
+        signal?.removeEventListener('abort', abortHandler);
+      };
+
+      doc.on('data', (chunk: Uint8Array) => {
+        const copy = new Uint8Array(chunk.byteLength);
+        copy.set(chunk);
+        chunks.push(copy.buffer);
+      });
+
+      doc.once('error', (error: Error) => {
+        cleanup();
+        reject(error);
+      });
+
+      doc.once('end', () => {
+        cleanup();
+        resolve(new Blob(chunks, { type: 'application/pdf' }));
+      });
+
+      signal?.addEventListener('abort', abortHandler, { once: true });
+
+      try {
+        for (const page of pages) {
+          this.throwIfAborted(signal);
+
+          const width = pxToPt(page.viewport.width);
+          const height = pxToPt(page.viewport.height);
+
+          doc.addPage({
+            size: [width, height],
+            margin: 0,
+          });
+
+          SVGtoPDF(doc, page.svg, 0, 0, {
+            assumePt: false,
+            width,
+            height,
+            preserveAspectRatio: 'xMinYMin meet',
+          });
+        }
+
+        doc.end();
+      } catch (error) {
+        cleanup();
+        try {
+          doc.destroy();
+        } catch {
+          // ignore cleanup failures during error handling
+        }
+        reject(error);
+      }
+    });
   }
 
   private throwIfAborted(signal?: AbortSignal): void {
@@ -154,4 +227,8 @@ function normalizePdfExportError(error: unknown): Error {
   }
 
   return new Error(String(error));
+}
+
+function pxToPt(px: number): number {
+  return (px * 72) / 96;
 }
