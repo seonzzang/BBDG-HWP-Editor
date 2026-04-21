@@ -1,5 +1,5 @@
 import init, { HwpDocument, version } from '@wasm/rhwp.js';
-import type { DocumentInfo, PageInfo, PageDef, SectionDef, CursorRect, HitTestResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, NavContextEntry, FieldInfoResult, BookmarkInfo } from './types';
+import type { DocumentInfo, PageInfo, PageDef, SectionDef, CursorRect, HitTestResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, NavContextEntry, FieldInfoResult, BookmarkInfo, PrintCursor, PrintChunk } from './types';
 
 /** HWPX 비표준 감지 경고 리포트 (#177). */
 export interface ValidationReport {
@@ -194,22 +194,22 @@ export class WasmBridge {
     return doc.isPagingFinished();
   }
 
-  beginPrintTask(): string {
+  beginPrintTask(): PrintCursor {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     const doc = this.doc as any;
     if (typeof doc.beginPrintTask !== 'function') {
       throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
     }
-    return doc.beginPrintTask();
+    return JSON.parse(doc.beginPrintTask()) as PrintCursor;
   }
 
-  extractPrintChunk(cursorJson: string, maxBlocks: number): string {
+  extractPrintChunk(cursor: PrintCursor, maxBlocks: number): PrintChunk {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     const doc = this.doc as any;
     if (typeof doc.extractPrintChunk !== 'function') {
       throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
     }
-    return doc.extractPrintChunk(cursorJson, maxBlocks);
+    return JSON.parse(doc.extractPrintChunk(JSON.stringify(cursor), maxBlocks)) as PrintChunk;
   }
 
   endPrintTask(): void {

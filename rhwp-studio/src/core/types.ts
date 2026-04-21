@@ -613,3 +613,44 @@ export interface BookmarkInfo {
   ctrlIdx: number;
   charPos: number;
 }
+
+export interface PrintCursor {
+  sectionIndex: number;
+  paragraphIndex: number;
+  controlIndex: number | null;
+}
+
+export type PrintBlock =
+  | {
+      type: 'paragraph';
+      html: string;
+      sectionIndex: number;
+      paragraphIndex: number;
+    }
+  | {
+      type: 'table';
+      html: string;
+      sectionIndex: number;
+      paragraphIndex: number;
+      controlIndex: number;
+    }
+  | {
+      type: 'image';
+      src: string;
+      alt: string;
+      mime: string | null;
+      sectionIndex: number;
+      paragraphIndex: number;
+      controlIndex: number;
+    }
+  | {
+      type: 'pageBreak';
+      sectionIndex: number;
+      paragraphIndex: number;
+    };
+
+export interface PrintChunk {
+  done: boolean;
+  nextCursor: PrintCursor | null;
+  blocks: PrintBlock[];
+}
