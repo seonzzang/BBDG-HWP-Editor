@@ -194,6 +194,33 @@ export class WasmBridge {
     return doc.isPagingFinished();
   }
 
+  beginPrintTask(): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    const doc = this.doc as any;
+    if (typeof doc.beginPrintTask !== 'function') {
+      throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
+    }
+    return doc.beginPrintTask();
+  }
+
+  extractPrintChunk(cursorJson: string, maxBlocks: number): string {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    const doc = this.doc as any;
+    if (typeof doc.extractPrintChunk !== 'function') {
+      throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
+    }
+    return doc.extractPrintChunk(cursorJson, maxBlocks);
+  }
+
+  endPrintTask(): void {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    const doc = this.doc as any;
+    if (typeof doc.endPrintTask !== 'function') {
+      throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
+    }
+    doc.endPrintTask();
+  }
+
   getPageInfo(pageNum: number): PageInfo {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse(this.doc.getPageInfo(pageNum));

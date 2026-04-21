@@ -34,6 +34,7 @@ use crate::renderer::page_layout::PageLayoutInfo;
 use crate::renderer::DEFAULT_DPI;
 use crate::error::HwpError;
 use crate::document_core::{DocumentCore, DEFAULT_FALLBACK_FONT};
+use crate::print_module::{PrintChunk, PrintCursor, PrintTaskState};
 
 impl From<HwpError> for JsValue {
     fn from(err: HwpError) -> Self {
@@ -50,6 +51,7 @@ pub struct HwpDocument {
     core: DocumentCore,
     styles: ResolvedStyleSet,
     paging_ctx: Option<IncrementalPagingContext>,
+    print_task: Option<PrintTaskState>,
 }
 
 impl std::ops::Deref for HwpDocument {
@@ -76,6 +78,7 @@ impl HwpDocument {
                 core,
                 styles,
                 paging_ctx: None,
+                print_task: None,
             }
         })
     }
@@ -101,6 +104,7 @@ impl HwpDocument {
                     core,
                     styles,
                     paging_ctx: None,
+                    print_task: None,
                 }
             })
             .map_err(|e| e.into())
@@ -116,7 +120,57 @@ impl HwpDocument {
             core,
             styles,
             paging_ctx: None,
+            print_task: None,
         }
+    }
+
+    /// 인쇄 전용 데이터 추출 세션을 시작한다.
+    ///
+    /// Step 1에서는 인쇄 상태 초기화와 커서 시그니처만 제공한다.
+    #[wasm_bindgen(js_name = beginPrintTask)]
+    pub fn begin_print_task(&mut self) -> Result<String, JsValue> {
+        let state = PrintTaskState::new();
+        let cursor = state.cursor.clone();
+        self.print_task = Some(state);
+        serde_json::to_string(&cursor)
+            .map_err(|e| JsValue::from_str(&format!("begin_print_task serialize failed: {e}")))
+    }
+
+    /// 인쇄 전용 데이터 추출 세션에서 다음 chunk를 꺼낸다.
+    ///
+    /// Step 1에서는 JSON 직렬화 가능한 빈 chunk 시그니처만 제공한다.
+    #[wasm_bindgen(js_name = extractPrintChunk)]
+    pub fn extract_print_chunk(
+        &mut self,
+        cursor_json: &str,
+        _max_blocks: usize,
+    ) -> Result<String, JsValue> {
+        if self.print_task.is_none() {
+            return Err(JsValue::from_str("print task is not active"));
+        }
+
+        let cursor: PrintCursor = serde_json::from_str(cursor_json)
+            .map_err(|e| JsValue::from_str(&format!("extract_print_chunk cursor parse failed: {e}")))?;
+
+        if let Some(state) = self.print_task.as_mut() {
+            state.cursor = cursor;
+        }
+
+        let chunk = PrintChunk {
+            done: true,
+            next_cursor: None,
+            blocks: Vec::new(),
+        };
+
+        serde_json::to_string(&chunk)
+            .map_err(|e| JsValue::from_str(&format!("extract_print_chunk serialize failed: {e}")))
+    }
+
+    /// 인쇄 전용 데이터 추출 세션을 종료한다.
+    #[wasm_bindgen(js_name = endPrintTask)]
+    pub fn end_print_task(&mut self) -> Result<(), JsValue> {
+        self.print_task = None;
+        Ok(())
     }
 
     /// 증분 페이징을 시작한다.
