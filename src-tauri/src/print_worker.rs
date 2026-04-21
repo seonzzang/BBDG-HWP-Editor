@@ -172,6 +172,62 @@ pub fn run_print_worker_manifest_echo(
     run_print_worker_with_timeout(request, Duration::from_secs(5), WorkerRequestMode::Manifest)
 }
 
+pub fn run_print_worker_runtime_probe() -> Result<Vec<PrintWorkerMessage>, String> {
+    let script_path = print_worker_script_path()?;
+    if !script_path.exists() {
+        return Err(format!("print worker script not found: {}", script_path.display()));
+    }
+
+    let started_at = Instant::now();
+    let mut child = Command::new("node")
+        .arg("--experimental-strip-types")
+        .arg(script_path)
+        .arg("--probe-browser")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("print worker probe spawn failed: {error}"))?;
+
+    let status = child
+        .wait()
+        .map_err(|error| format!("print worker probe wait failed: {error}"))?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "print worker probe stdout pipe is missing".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "print worker probe stderr pipe is missing".to_string())?;
+
+    let mut stdout_output = String::new();
+    BufReader::new(stdout)
+        .read_to_string(&mut stdout_output)
+        .map_err(|error| format!("print worker probe stdout read failed: {error}"))?;
+
+    let mut stderr_output = String::new();
+    BufReader::new(stderr)
+        .read_to_string(&mut stderr_output)
+        .map_err(|error| format!("print worker probe stderr read failed: {error}"))?;
+
+    if !status.success() {
+        return Err(format!(
+            "print worker probe exited with status {:?} after {}ms{}",
+            status.code(),
+            started_at.elapsed().as_millis(),
+            if stderr_output.is_empty() {
+                String::new()
+            } else {
+                format!(": {stderr_output}")
+            }
+        ));
+    }
+
+    parse_worker_messages(&stdout_output)
+}
+
 #[tauri::command]
 pub fn debug_run_print_worker_echo() -> Result<Vec<PrintWorkerMessage>, String> {
     let request = create_debug_print_job_request("debug-print-worker-echo", 12, None)?;
@@ -189,6 +245,11 @@ pub fn debug_run_print_worker_timeout_echo() -> Result<Vec<PrintWorkerMessage>, 
 pub fn debug_run_print_worker_manifest_echo() -> Result<Vec<PrintWorkerMessage>, String> {
     let request = create_debug_print_job_request("debug-print-worker-manifest-echo", 12, None)?;
     run_print_worker_manifest_echo(&request)
+}
+
+#[tauri::command]
+pub fn debug_probe_print_worker_runtime() -> Result<Vec<PrintWorkerMessage>, String> {
+    run_print_worker_runtime_probe()
 }
 
 #[cfg(test)]
@@ -223,6 +284,14 @@ mod tests {
 
         let messages =
             run_print_worker_manifest_echo(&request).expect("manifest echo worker should respond");
+        assert!(messages.len() >= 2);
+        assert!(matches!(messages.first(), Some(PrintWorkerMessage::Progress { .. })));
+        assert!(matches!(messages.last(), Some(PrintWorkerMessage::Result { .. })));
+    }
+
+    #[test]
+    fn probe_worker_returns_progress_and_result_messages() {
+        let messages = run_print_worker_runtime_probe().expect("probe worker should respond");
         assert!(messages.len() >= 2);
         assert!(matches!(messages.first(), Some(PrintWorkerMessage::Progress { .. })));
         assert!(matches!(messages.last(), Some(PrintWorkerMessage::Result { .. })));

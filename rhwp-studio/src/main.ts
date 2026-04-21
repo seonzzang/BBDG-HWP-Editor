@@ -240,6 +240,12 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
     console.log('[print-worker-manifest-echo] messages', messages);
     return messages;
   };
+
+  (window as any).__probePrintWorkerRuntime = async () => {
+    const messages = await invoke('debug_probe_print_worker_runtime') as unknown;
+    console.log('[print-worker-probe] messages', messages);
+    return messages;
+  };
 }
 
 /**

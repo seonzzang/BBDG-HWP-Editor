@@ -14,7 +14,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             print_worker::debug_run_print_worker_echo,
             print_worker::debug_run_print_worker_timeout_echo,
-            print_worker::debug_run_print_worker_manifest_echo
+            print_worker::debug_run_print_worker_manifest_echo,
+            print_worker::debug_probe_print_worker_runtime
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
