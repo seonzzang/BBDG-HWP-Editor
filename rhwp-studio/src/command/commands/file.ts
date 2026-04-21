@@ -255,17 +255,24 @@ export const fileCommands: CommandDef[] = [
 
       try {
         if (usePrintExtraction) {
-          const controller = new PrintController(wasm);
-          await controller.run({
-            title: wasm.fileName,
-            onProgress: (processedBlocks) => {
-              if (statusEl) {
-                statusEl.textContent = `인쇄 데이터 준비 중... (${processedBlocks} blocks)`;
-              }
-            },
-          });
-          if (statusEl) statusEl.textContent = origStatus;
-          return;
+          try {
+            const controller = new PrintController(wasm);
+            await controller.run({
+              title: wasm.fileName,
+              onProgress: (processedBlocks) => {
+                if (statusEl) {
+                  statusEl.textContent = `인쇄 데이터 준비 중... (${processedBlocks} blocks)`;
+                }
+              },
+            });
+            if (statusEl) statusEl.textContent = origStatus;
+            return;
+          } catch (extractionError) {
+            console.warn('[file:print] print extraction failed, falling back to svg print', extractionError);
+            if (statusEl) {
+              statusEl.textContent = '인쇄 추출 경로 실패, 기본 인쇄로 전환 중...';
+            }
+          }
         }
 
         // SVG 페이지 생성
