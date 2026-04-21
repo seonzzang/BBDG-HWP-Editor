@@ -133,7 +133,7 @@ impl HwpDocument {
         web_sys::console::log_1(&"[print-api] begin_print_task start".into());
 
         let state = PrintTaskState::new();
-        let cursor = state.cursor.clone();
+        let cursor = PrintCursor::default();
         self.print_task = Some(state);
         let json = serde_json::to_string(&cursor)
             .map_err(|e| JsValue::from_str(&format!("begin_print_task serialize failed: {e}")))?;
@@ -176,20 +176,9 @@ impl HwpDocument {
         let cursor: PrintCursor = serde_json::from_str(cursor_json)
             .map_err(|e| JsValue::from_str(&format!("extract_print_chunk cursor parse failed: {e}")))?;
 
-        if let Some(state) = self.print_task.as_mut() {
-            state.cursor = cursor;
-        }
-
-        let state_cursor = self
-            .print_task
-            .as_ref()
-            .ok_or_else(|| JsValue::from_str("print task is not active"))?
-            .cursor
-            .clone();
-
         let mut blocks = Vec::new();
-        let mut section_index = state_cursor.section_index;
-        let mut paragraph_index = state_cursor.paragraph_index;
+        let mut section_index = cursor.section_index;
+        let mut paragraph_index = cursor.paragraph_index;
 
         while section_index < self.document.sections.len() && blocks.len() < max_blocks {
             let section = &self.document.sections[section_index];
@@ -271,11 +260,7 @@ impl HwpDocument {
         };
 
         if let Some(state) = self.print_task.as_mut() {
-            state.cursor = next_cursor.clone().unwrap_or(PrintCursor {
-                section_index,
-                paragraph_index,
-                control_index: None,
-            });
+            state.current_entry_index = state.entries.len().min(blocks.len());
         }
 
         let chunk = PrintChunk {
