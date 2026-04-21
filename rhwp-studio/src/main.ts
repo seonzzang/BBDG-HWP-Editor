@@ -246,6 +246,12 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
     console.log('[print-worker-probe] messages', messages);
     return messages;
   };
+
+  (window as any).__testPrintWorkerPdfExport = async () => {
+    const messages = await invoke('debug_run_print_worker_pdf_export') as unknown;
+    console.log('[print-worker-pdf-export] messages', messages);
+    return messages;
+  };
 }
 
 /**

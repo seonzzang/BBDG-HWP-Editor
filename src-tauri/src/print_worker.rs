@@ -228,6 +228,103 @@ pub fn run_print_worker_runtime_probe() -> Result<Vec<PrintWorkerMessage>, Strin
     parse_worker_messages(&stdout_output)
 }
 
+pub fn run_print_worker_pdf_export(
+    request: &PrintJobRequest,
+    timeout: Duration,
+) -> Result<Vec<PrintWorkerMessage>, String> {
+    let script_path = print_worker_script_path()?;
+    if !script_path.exists() {
+        return Err(format!("print worker script not found: {}", script_path.display()));
+    }
+
+    let manifest_path = write_print_job_manifest(request)?;
+    let started_at = Instant::now();
+    let mut child = Command::new("node")
+        .arg("--experimental-strip-types")
+        .arg(script_path)
+        .arg("--generate-pdf")
+        .arg(&manifest_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("print worker pdf spawn failed: {error}"))?;
+
+    let status = loop {
+        match child
+            .try_wait()
+            .map_err(|error| format!("print worker pdf try_wait failed: {error}"))?
+        {
+            Some(status) => break status,
+            None => {
+                if started_at.elapsed() >= timeout {
+                    child
+                        .kill()
+                        .map_err(|error| format!("print worker pdf kill failed: {error}"))?;
+                    let _ = child.wait();
+                    let _ = std::fs::remove_file(&manifest_path);
+                    return Err(format!(
+                        "print worker pdf timed out after {}ms and was terminated",
+                        timeout.as_millis()
+                    ));
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+        }
+    };
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "print worker pdf stdout pipe is missing".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "print worker pdf stderr pipe is missing".to_string())?;
+
+    let mut stdout_output = String::new();
+    BufReader::new(stdout)
+        .read_to_string(&mut stdout_output)
+        .map_err(|error| format!("print worker pdf stdout read failed: {error}"))?;
+
+    let mut stderr_output = String::new();
+    BufReader::new(stderr)
+        .read_to_string(&mut stderr_output)
+        .map_err(|error| format!("print worker pdf stderr read failed: {error}"))?;
+
+    let _ = std::fs::remove_file(&manifest_path);
+
+    if !status.success() {
+        return Err(format!(
+            "print worker pdf exited with status {:?} after {}ms{}",
+            status.code(),
+            started_at.elapsed().as_millis(),
+            if stderr_output.is_empty() {
+                String::new()
+            } else {
+                format!(": {stderr_output}")
+            }
+        ));
+    }
+
+    let messages = parse_worker_messages(&stdout_output)?;
+    if let Some(PrintWorkerMessage::Result { result }) = messages.last() {
+        if result.ok {
+            if let Some(output_pdf_path) = &result.output_pdf_path {
+                if !PathBuf::from(output_pdf_path).exists() {
+                    return Err(format!(
+                        "print worker pdf reported success but output file is missing: {output_pdf_path}"
+                    ));
+                }
+            } else {
+                return Err("print worker pdf reported success without output path".to_string());
+            }
+        }
+    }
+
+    Ok(messages)
+}
+
 #[tauri::command]
 pub fn debug_run_print_worker_echo() -> Result<Vec<PrintWorkerMessage>, String> {
     let request = create_debug_print_job_request("debug-print-worker-echo", 12, None)?;
@@ -250,6 +347,12 @@ pub fn debug_run_print_worker_manifest_echo() -> Result<Vec<PrintWorkerMessage>,
 #[tauri::command]
 pub fn debug_probe_print_worker_runtime() -> Result<Vec<PrintWorkerMessage>, String> {
     run_print_worker_runtime_probe()
+}
+
+#[tauri::command]
+pub fn debug_run_print_worker_pdf_export() -> Result<Vec<PrintWorkerMessage>, String> {
+    let request = create_debug_print_job_request("debug-print-worker-pdf-export", 3, None)?;
+    run_print_worker_pdf_export(&request, Duration::from_secs(20))
 }
 
 #[cfg(test)]

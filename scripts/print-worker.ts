@@ -110,6 +110,180 @@ async function handleJob(request: PrintJobRequest): Promise<void> {
   });
 }
 
+function buildPdfHtmlDocument(
+  request: PrintJobRequest,
+  svgMarkupPages: string[],
+): string {
+  const pageWidth = request.pageSize.widthPx;
+  const pageHeight = request.pageSize.heightPx;
+  const pageSections = svgMarkupPages
+    .map((svgMarkup) => `<section class="page">${svgMarkup}</section>`)
+    .join('\n');
+
+  return `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @page {
+        size: ${pageWidth}px ${pageHeight}px;
+        margin: 0;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: white;
+      }
+      body {
+        width: ${pageWidth}px;
+      }
+      .page {
+        width: ${pageWidth}px;
+        height: ${pageHeight}px;
+        break-after: page;
+        page-break-after: always;
+        overflow: hidden;
+      }
+      .page:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+      .page > svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    ${pageSections}
+  </body>
+</html>`;
+}
+
+async function launchBrowserForJob(): Promise<{
+  browser: import('puppeteer-core').Browser;
+  executablePath: string;
+}> {
+  const executablePath = await detectBrowserExecutablePath();
+  if (!executablePath) {
+    throw new Error('사용 가능한 Chromium/Edge/Chrome 실행 파일을 찾지 못했습니다.');
+  }
+
+  const puppeteer = await loadPuppeteerCore();
+  const browser = await puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: ['--disable-gpu', '--no-first-run', '--no-default-browser-check'],
+  });
+
+  return { browser, executablePath };
+}
+
+async function handlePdfJob(request: PrintJobRequest): Promise<void> {
+  const startedAt = Date.now();
+  const totalPages = request.svgPagePaths.length;
+  const batchSize = Math.max(1, request.batchSize);
+  const svgMarkupPages: string[] = [];
+
+  writeProgress({
+    jobId: request.jobId,
+    phase: 'spawned',
+    completedPages: 0,
+    totalPages,
+    batchIndex: 0,
+    message: `PDF worker spawned for ${request.sourceFileName}`,
+  });
+
+  const { browser, executablePath } = await launchBrowserForJob();
+  try {
+    writeProgress({
+      jobId: request.jobId,
+      phase: 'loading',
+      completedPages: 0,
+      totalPages,
+      batchIndex: 0,
+      message: `Browser ready: ${executablePath}`,
+    });
+
+    for (let start = 0; start < totalPages; start += batchSize) {
+      const batchPaths = request.svgPagePaths.slice(start, start + batchSize);
+      const batchSvgMarkup = await Promise.all(
+        batchPaths.map((path) => readFile(path, 'utf8')),
+      );
+      svgMarkupPages.push(...batchSvgMarkup);
+
+      const completedPages = Math.min(start + batchPaths.length, totalPages);
+      writeProgress({
+        jobId: request.jobId,
+        phase: 'rendering-batch',
+        completedPages,
+        totalPages,
+        batchIndex: Math.floor(start / batchSize) + 1,
+        message: `Loaded ${completedPages}/${totalPages} SVG pages`,
+      });
+
+      if (request.debugDelayMs && request.debugDelayMs > 0) {
+        await sleep(request.debugDelayMs);
+      }
+    }
+
+    const page = await browser.newPage();
+    await page.setViewport({
+      width: request.pageSize.widthPx,
+      height: request.pageSize.heightPx,
+      deviceScaleFactor: 1,
+    });
+    await page.setContent(buildPdfHtmlDocument(request, svgMarkupPages), {
+      waitUntil: 'load',
+    });
+
+    writeProgress({
+      jobId: request.jobId,
+      phase: 'writing-pdf',
+      completedPages: totalPages,
+      totalPages,
+      batchIndex: Math.ceil(totalPages / batchSize),
+      message: `Writing PDF to ${request.outputPdfPath}`,
+    });
+
+    await page.pdf({
+      path: request.outputPdfPath,
+      width: `${request.pageSize.widthPx}px`,
+      height: `${request.pageSize.heightPx}px`,
+      margin: {
+        top: '0px',
+        right: '0px',
+        bottom: '0px',
+        left: '0px',
+      },
+      printBackground: true,
+      preferCSSPageSize: true,
+    });
+    await page.close();
+
+    writeResult({
+      jobId: request.jobId,
+      ok: true,
+      outputPdfPath: request.outputPdfPath,
+      durationMs: Date.now() - startedAt,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    writeResult({
+      jobId: request.jobId,
+      ok: false,
+      outputPdfPath: request.outputPdfPath,
+      durationMs: Date.now() - startedAt,
+      errorCode: 'PDF_EXPORT_FAILED',
+      errorMessage: message,
+    });
+  } finally {
+    await browser.close().catch(() => undefined);
+  }
+}
+
 async function handleProbeJob(): Promise<void> {
   const startedAt = Date.now();
   const jobId = 'puppeteer-runtime-probe';
@@ -197,6 +371,37 @@ async function main(): Promise<void> {
   if (mode === '--probe-browser') {
     await handleProbeJob();
     return;
+  }
+
+  if (mode === '--generate-pdf') {
+    const manifestPath = process.argv[3];
+    if (!manifestPath) {
+      writeResult({
+        jobId: 'unknown',
+        ok: false,
+        durationMs: 0,
+        errorCode: 'WORKER_MANIFEST_ERROR',
+        errorMessage: 'PDF mode requires a manifest path argument.',
+      });
+      return;
+    }
+
+    try {
+      const request = await loadRequestFromManifest(manifestPath);
+      await handlePdfJob(request);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      stderr.write(`[print-worker] ${message}\n`);
+      writeResult({
+        jobId: 'unknown',
+        ok: false,
+        durationMs: 0,
+        errorCode: 'WORKER_MANIFEST_ERROR',
+        errorMessage: message,
+      });
+      return;
+    }
   }
 
   const manifestPath = mode;
