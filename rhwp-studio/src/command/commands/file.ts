@@ -45,6 +45,39 @@ function getCurrentPageFromStatusBar(): number {
   return Number.isFinite(currentPage) && currentPage > 0 ? currentPage : 1;
 }
 
+function parsePageRangeInput(
+  value: string,
+  maxPage: number,
+): { startPage: number; endPage: number } | null {
+  const normalized = value.trim().replace(/\s+/g, '');
+  if (!normalized) return null;
+
+  const rangeMatch = normalized.match(/^(\d+)-(\d+)$/);
+  if (rangeMatch) {
+    const startPage = Number.parseInt(rangeMatch[1], 10);
+    const endPage = Number.parseInt(rangeMatch[2], 10);
+    if (!Number.isFinite(startPage) || !Number.isFinite(endPage)) return null;
+    if (startPage < 1 || endPage < startPage) return null;
+    return {
+      startPage: Math.min(startPage, maxPage),
+      endPage: Math.min(endPage, maxPage),
+    };
+  }
+
+  const singleMatch = normalized.match(/^(\d+)$/);
+  if (singleMatch) {
+    const page = Number.parseInt(singleMatch[1], 10);
+    if (!Number.isFinite(page) || page < 1) return null;
+    const clampedPage = Math.min(page, maxPage);
+    return {
+      startPage: clampedPage,
+      endPage: clampedPage,
+    };
+  }
+
+  return null;
+}
+
 async function previewCurrentDocPdfChunk(
   services: Parameters<NonNullable<CommandDef['execute']>>[0],
   params: {
@@ -514,6 +547,39 @@ export const fileCommands: CommandDef[] = [
         const message = error instanceof Error ? error.message : String(error);
         console.error('[file:pdf-preview-current-chunk]', message);
         alert(`현재 위치 PDF 미리보기에 실패했습니다.\n${message}`);
+      }
+    },
+  },
+  {
+    id: 'file:pdf-preview-range',
+    label: '페이지 범위 PDF 미리보기',
+    canExecute: (ctx) => ctx.hasDocument,
+    async execute(services) {
+      const maxPage = services.wasm.pageCount;
+      const defaultStartPage = getCurrentPageFromStatusBar();
+      const suggestedEndPage = Math.min(maxPage, defaultStartPage + DEFAULT_PDF_PREVIEW_CHUNK_SIZE - 1);
+      const input = window.prompt(
+        `PDF 미리보기할 페이지 범위를 입력하세요.\n예: ${defaultStartPage}-${suggestedEndPage} 또는 ${defaultStartPage}`,
+        `${defaultStartPage}-${suggestedEndPage}`,
+      );
+
+      if (!input) return;
+
+      const parsed = parsePageRangeInput(input, maxPage);
+      if (!parsed) {
+        alert('페이지 범위를 올바르게 입력해주세요. 예: 21-40 또는 35');
+        return;
+      }
+
+      try {
+        await previewCurrentDocPdfChunk(services, {
+          startPage: parsed.startPage,
+          chunkSize: parsed.endPage - parsed.startPage + 1,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('[file:pdf-preview-range]', message);
+        alert(`페이지 범위 PDF 미리보기에 실패했습니다.\n${message}`);
       }
     },
   },
