@@ -207,6 +207,68 @@ async function previewCurrentDocPdfChunk(
   }
 }
 
+async function runLegacyPrintPreview(
+  services: Parameters<NonNullable<CommandDef['execute']>>[0],
+  params?: Record<string, unknown>,
+): Promise<void> {
+  const wasm = services.wasm;
+  const pageCount = wasm.pageCount;
+  const samplePageLimit = typeof params?.samplePageLimit === 'number'
+    ? Math.max(1, Math.min(pageCount, Math.floor(params.samplePageLimit)))
+    : undefined;
+  const renderPageCount = samplePageLimit ?? pageCount;
+  const traceId = `print-svg:${Date.now()}`;
+
+  if (pageCount === 0) return;
+
+  const statusEl = document.getElementById('sb-message');
+  const origStatus = statusEl?.innerHTML || '';
+  const printOverlay = new PrintProgressOverlay();
+  const abortSignal = printOverlay.show('인쇄 준비 중');
+
+  try {
+    console.time(`[${traceId}] svg.generate`);
+    console.log('[Print Baseline] start', {
+      totalPageCount: pageCount,
+      renderPageCount,
+      sampled: samplePageLimit !== undefined,
+      batchSize: DEFAULT_SVG_BATCH_SIZE,
+    });
+    const svgPages = await generateSvgPagesInBatches({
+      wasm,
+      pageCount: renderPageCount,
+      batchSize: DEFAULT_SVG_BATCH_SIZE,
+      abortSignal,
+      onProgress: (processedPages, totalPages, batchIndex, batchStart, batchEnd) => {
+        if (statusEl) {
+          statusEl.textContent = `인쇄 준비 중... (${processedPages}/${totalPages})`;
+        }
+        printOverlay.updateProgress(
+          processedPages,
+          totalPages,
+          `정확한 인쇄 미리보기를 위해 SVG 페이지를 생성하고 있습니다... (배치 ${batchIndex}, ${batchStart}-${batchEnd}페이지)`,
+        );
+      },
+    });
+    console.timeEnd(`[${traceId}] svg.generate`);
+
+    const pageInfo = wasm.getPageInfo(0);
+    const widthMm = Math.round(pageInfo.width * 25.4 / 96);
+    const heightMm = Math.round(pageInfo.height * 25.4 / 96);
+
+    await printSvgPages(wasm.fileName, widthMm, heightMm, svgPages, traceId);
+
+    if (statusEl) statusEl.innerHTML = origStatus;
+    printOverlay.hide();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[file:print:legacy]', msg);
+    if (statusEl) statusEl.textContent = `인쇄 실패: ${msg}`;
+    printOverlay.hide();
+    throw err;
+  }
+}
+
 async function printSvgPages(
   fileName: string,
   widthMm: number,
@@ -470,64 +532,30 @@ export const fileCommands: CommandDef[] = [
     icon: 'icon-print',
     shortcutLabel: 'Ctrl+P',
     canExecute: (ctx) => ctx.hasDocument,
-    async execute(services, params) {
-      const wasm = services.wasm;
-      const pageCount = wasm.pageCount;
-      const samplePageLimit = typeof params?.samplePageLimit === 'number'
-        ? Math.max(1, Math.min(pageCount, Math.floor(params.samplePageLimit)))
-        : undefined;
-      const renderPageCount = samplePageLimit ?? pageCount;
-      const traceId = `print-svg:${Date.now()}`;
-
-      if (pageCount === 0) return;
-
-      // 진행률 표시
-      const statusEl = document.getElementById('sb-message');
-      const origStatus = statusEl?.innerHTML || '';
-      const printOverlay = new PrintProgressOverlay();
-      const abortSignal = printOverlay.show('인쇄 준비 중');
-
+    async execute(services) {
+      const currentPage = getCurrentPageFromStatusBar();
       try {
-        // SVG 페이지 생성
-        console.time(`[${traceId}] svg.generate`);
-        console.log('[Print Baseline] start', {
-          totalPageCount: pageCount,
-          renderPageCount,
-          sampled: samplePageLimit !== undefined,
-          batchSize: DEFAULT_SVG_BATCH_SIZE,
+        await previewCurrentDocPdfChunk(services, {
+          startPage: currentPage,
         });
-        const svgPages = await generateSvgPagesInBatches({
-          wasm,
-          pageCount: renderPageCount,
-          batchSize: DEFAULT_SVG_BATCH_SIZE,
-          abortSignal,
-          onProgress: (processedPages, totalPages, batchIndex, batchStart, batchEnd) => {
-            if (statusEl) {
-              statusEl.textContent = `인쇄 준비 중... (${processedPages}/${totalPages})`;
-            }
-            printOverlay.updateProgress(
-              processedPages,
-              totalPages,
-              `정확한 인쇄 미리보기를 위해 SVG 페이지를 생성하고 있습니다... (배치 ${batchIndex}, ${batchStart}-${batchEnd}페이지)`,
-            );
-          },
-        });
-        console.timeEnd(`[${traceId}] svg.generate`);
-
-        // 첫 페이지 정보로 용지 크기 결정
-        const pageInfo = wasm.getPageInfo(0);
-        const widthMm = Math.round(pageInfo.width * 25.4 / 96);
-        const heightMm = Math.round(pageInfo.height * 25.4 / 96);
-
-        await printSvgPages(wasm.fileName, widthMm, heightMm, svgPages, traceId);
-
-        if (statusEl) statusEl.innerHTML = origStatus;
-        printOverlay.hide();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error('[file:print]', msg);
-        if (statusEl) statusEl.textContent = `인쇄 실패: ${msg}`;
-        printOverlay.hide();
+        alert(`PDF 인쇄 미리보기에 실패했습니다.\n${msg}`);
+      }
+    },
+  },
+  {
+    id: 'file:print-legacy',
+    label: '기존 인쇄 미리보기',
+    icon: 'icon-print',
+    canExecute: (ctx) => ctx.hasDocument,
+    async execute(services, params) {
+      try {
+        await runLegacyPrintPreview(services, params);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        alert(`기존 인쇄 미리보기에 실패했습니다.\n${msg}`);
       }
     },
   },
