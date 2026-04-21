@@ -248,6 +248,38 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
     return null;
   };
 
+  const extractWorkerResult = (messages: unknown): {
+    ok: boolean;
+    outputPdfPath?: string;
+    errorCode?: string;
+    errorMessage?: string;
+  } | null => {
+    if (!Array.isArray(messages)) return null;
+
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const item = messages[index] as {
+        type?: string;
+        result?: {
+          ok?: boolean;
+          outputPdfPath?: string;
+          errorCode?: string;
+          errorMessage?: string;
+        };
+      };
+
+      if (item?.type === 'result' && item.result) {
+        return {
+          ok: item.result.ok === true,
+          outputPdfPath: item.result.outputPdfPath,
+          errorCode: item.result.errorCode,
+          errorMessage: item.result.errorMessage,
+        };
+      }
+    }
+
+    return null;
+  };
+
   (window as any).__testPrintWorkerEcho = async () => {
     const messages = await invoke('debug_run_print_worker_echo') as unknown;
     console.log('[print-worker-echo] messages', messages);
@@ -285,11 +317,16 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
 
   (window as any).__previewPrintWorkerPdfExport = async () => {
     const messages = await invoke('debug_run_print_worker_pdf_export') as unknown;
+    const result = extractWorkerResult(messages);
     const outputPdfPath = extractOutputPdfPath(messages);
     console.log('[print-worker-pdf-preview] messages', messages);
 
     if (!outputPdfPath) {
-      throw new Error('PDF export did not return an output path.');
+      throw new Error(
+        result?.errorMessage
+          ? `PDF export failed (${result.errorCode ?? 'UNKNOWN'}): ${result.errorMessage}`
+          : 'PDF export did not return an output path.',
+      );
     }
 
     await open(outputPdfPath);
@@ -332,11 +369,16 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       },
     }) as unknown;
 
+    const result = extractWorkerResult(messages);
     const outputPdfPath = extractOutputPdfPath(messages);
     console.log('[print-worker-current-doc-pdf] messages', messages);
 
     if (!outputPdfPath) {
-      throw new Error('Current document PDF export did not return an output path.');
+      throw new Error(
+        result?.errorMessage
+          ? `Current document PDF export failed (${result.errorCode ?? 'UNKNOWN'}): ${result.errorMessage}`
+          : 'Current document PDF export did not return an output path.',
+      );
     }
 
     if (params.inApp) {
