@@ -255,7 +255,7 @@ export const fileCommands: CommandDef[] = [
 
       // 진행률 표시
       const statusEl = document.getElementById('sb-message');
-      const origStatus = statusEl?.textContent || '';
+      const origStatus = statusEl?.innerHTML || '';
 
       try {
         if (usePrintExtraction) {
@@ -264,13 +264,14 @@ export const fileCommands: CommandDef[] = [
             await controller.run({
               title: wasm.fileName,
               range: requestedPrintRange,
-              onProgress: (processedBlocks) => {
+              totalPages: getRequestedPrintPageCount(requestedPrintRange, pageCount),
+              onProgress: ({ processedPages, totalPages }) => {
                 if (statusEl) {
-                  statusEl.textContent = `인쇄 데이터 준비 중... (${processedBlocks} blocks)`;
+                  renderPrintProgress(statusEl, processedPages, totalPages);
                 }
               },
             });
-            if (statusEl) statusEl.textContent = origStatus;
+            if (statusEl) statusEl.innerHTML = origStatus;
             return;
           } catch (extractionError) {
             console.warn('[file:print] print extraction failed, falling back to svg print', extractionError);
@@ -297,7 +298,7 @@ export const fileCommands: CommandDef[] = [
 
         await printSvgPages(wasm.fileName, widthMm, heightMm, svgPages);
 
-        if (statusEl) statusEl.textContent = origStatus;
+        if (statusEl) statusEl.innerHTML = origStatus;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error('[file:print]', msg);
@@ -333,4 +334,42 @@ function isPrintRangeRequest(value: unknown): value is PrintRangeRequest {
   }
 
   return false;
+}
+
+function getRequestedPrintPageCount(
+  range: PrintRangeRequest | undefined,
+  totalPageCount: number,
+): number {
+  if (!range || range.type === 'all') {
+    return totalPageCount;
+  }
+
+  if (range.type === 'currentPage') {
+    return 1;
+  }
+
+  return Math.max(0, range.end - range.start + 1);
+}
+
+function renderPrintProgress(
+  statusEl: HTMLElement,
+  processedPages: number,
+  totalPages?: number,
+): void {
+  const safeTotalPages = totalPages && totalPages > 0 ? totalPages : undefined;
+  const clampedProcessedPages = safeTotalPages
+    ? Math.min(processedPages, safeTotalPages)
+    : processedPages;
+  const percent = safeTotalPages
+    ? Math.max(0, Math.min(100, Math.round((clampedProcessedPages / safeTotalPages) * 100)))
+    : 0;
+
+  statusEl.innerHTML = `
+<div style="display:flex; align-items:center; gap:8px; min-width:280px;">
+  <span style="white-space:nowrap;">인쇄 준비 중... (${clampedProcessedPages}${safeTotalPages ? `/${safeTotalPages}` : ''}페이지)</span>
+  <div style="flex:1; min-width:120px; height:8px; background:#d6dce5; border-radius:999px; overflow:hidden;">
+    <div style="width:${percent}%; height:100%; background:linear-gradient(90deg, #2a6cf0 0%, #58a6ff 100%); border-radius:999px;"></div>
+  </div>
+  <span style="font-variant-numeric:tabular-nums; min-width:40px; text-align:right;">${percent}%</span>
+</div>`;
 }
