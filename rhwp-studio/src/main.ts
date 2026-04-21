@@ -250,6 +250,7 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
   const extractWorkerResult = (messages: unknown): {
     ok: boolean;
     outputPdfPath?: string;
+    durationMs?: number;
     errorCode?: string;
     errorMessage?: string;
   } | null => {
@@ -261,6 +262,7 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
         result?: {
           ok?: boolean;
           outputPdfPath?: string;
+          durationMs?: number;
           errorCode?: string;
           errorMessage?: string;
         };
@@ -270,6 +272,7 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
         return {
           ok: item.result.ok === true,
           outputPdfPath: item.result.outputPdfPath,
+          durationMs: item.result.durationMs,
           errorCode: item.result.errorCode,
           errorMessage: item.result.errorMessage,
         };
@@ -340,6 +343,7 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       startPage?: number;
       endPage?: number;
       inApp?: boolean;
+      batchSize?: number;
     } = {},
   ) => {
     if (wasm.pageCount <= 0) {
@@ -352,6 +356,8 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       { length: endPage - startPage + 1 },
       (_, index) => startPage - 1 + index,
     );
+    const batchSize = Math.max(1, Math.round(params.batchSize ?? 5));
+    const startedAt = performance.now();
 
     const svgPages = pageIndexes.map((pageIndex) => wasm.renderPageSvg(pageIndex));
     const firstPageInfo = wasm.getPageInfo(pageIndexes[0]);
@@ -364,6 +370,7 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
         sourceFileName: wasm.fileName,
         widthPx,
         heightPx,
+        batchSize,
         svgPages,
       },
     }) as unknown;
@@ -379,6 +386,11 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
           : 'Current document PDF export did not return an output path.',
       );
     }
+
+    const elapsedMs = Math.round(performance.now() - startedAt);
+    const progressMessages = Array.isArray(messages)
+      ? messages.filter((item) => (item as { type?: string }).type === 'progress')
+      : [];
 
     if (params.inApp) {
       const { invoke } = await import('@tauri-apps/api/core');
@@ -399,6 +411,10 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       inApp: params.inApp === true,
       startPage,
       endPage,
+      batchSize,
+      progressCount: progressMessages.length,
+      elapsedMs,
+      workerDurationMs: result?.durationMs,
     });
     return {
       outputPdfPath,
@@ -406,6 +422,9 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
         startPage,
         endPage,
       },
+      batchSize,
+      elapsedMs,
+      workerDurationMs: result?.durationMs,
       messages,
     };
   };

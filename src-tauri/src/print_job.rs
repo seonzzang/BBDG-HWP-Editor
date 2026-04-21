@@ -103,6 +103,7 @@ pub fn create_print_job_request_from_svg_pages(
     page_count: u32,
     width_px: u32,
     height_px: u32,
+    batch_size: Option<u32>,
     svg_pages: &[String],
 ) -> Result<PrintJobRequest, String> {
     let temp_dir = std::env::temp_dir().join(job_id);
@@ -116,7 +117,7 @@ pub fn create_print_job_request_from_svg_pages(
         source_file_name: source_file_name.to_string(),
         output_mode: "preview".to_string(),
         page_range: PrintJobRange::All,
-        batch_size: 5,
+        batch_size: batch_size.unwrap_or(5).max(1),
         temp_dir: temp_dir.display().to_string(),
         output_pdf_path: temp_dir.join("output.pdf").display().to_string(),
         page_count,

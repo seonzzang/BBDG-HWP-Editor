@@ -16,7 +16,13 @@ pub struct FrontendPdfExportRequest {
     pub source_file_name: String,
     pub width_px: u32,
     pub height_px: u32,
+    pub batch_size: Option<u32>,
     pub svg_pages: Vec<String>,
+}
+
+fn pdf_export_timeout_for_page_count(page_count: u32) -> Duration {
+    let scaled_seconds = 30 + u64::from(page_count).saturating_mul(2);
+    Duration::from_secs(scaled_seconds.clamp(60, 1800))
 }
 
 fn workspace_root() -> Result<PathBuf, String> {
@@ -377,10 +383,11 @@ pub fn debug_run_print_worker_pdf_export_for_current_doc(
         page_count,
         payload.width_px,
         payload.height_px,
+        payload.batch_size,
         &payload.svg_pages,
     )?;
 
-    run_print_worker_pdf_export(&request, Duration::from_secs(60))
+    run_print_worker_pdf_export(&request, pdf_export_timeout_for_page_count(page_count))
 }
 
 #[tauri::command]
