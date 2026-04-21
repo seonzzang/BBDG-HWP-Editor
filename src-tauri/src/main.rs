@@ -4,6 +4,7 @@
 )]
 
 mod print_worker;
+mod print_job;
 
 fn main() {
     tauri::Builder::default()

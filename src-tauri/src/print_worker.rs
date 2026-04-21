@@ -4,68 +4,9 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintPageSize {
-    pub width_px: u32,
-    pub height_px: u32,
-    pub dpi: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum PrintJobRange {
-    All,
-    CurrentPage { current_page: u32 },
-    PageRange { start_page: u32, end_page: u32 },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintJobRequest {
-    pub job_id: String,
-    pub source_file_name: String,
-    pub output_mode: String,
-    pub page_range: PrintJobRange,
-    pub batch_size: u32,
-    pub temp_dir: String,
-    pub output_pdf_path: String,
-    pub page_count: u32,
-    pub page_size: PrintPageSize,
-    pub svg_page_paths: Vec<String>,
-    pub debug_delay_ms: Option<u64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintJobProgress {
-    pub job_id: String,
-    pub phase: String,
-    pub completed_pages: u32,
-    pub total_pages: u32,
-    pub batch_index: Option<u32>,
-    pub message: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintJobResult {
-    pub job_id: String,
-    pub ok: bool,
-    pub output_pdf_path: Option<String>,
-    pub duration_ms: u64,
-    pub error_code: Option<String>,
-    pub error_message: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum PrintWorkerMessage {
-    Progress { progress: PrintJobProgress },
-    Result { result: PrintJobResult },
-}
+use crate::print_job::{
+    create_debug_print_job_request, PrintJobRequest, PrintWorkerMessage,
+};
 
 fn workspace_root() -> Result<PathBuf, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -186,55 +127,14 @@ pub fn run_print_worker_echo(request: &PrintJobRequest) -> Result<Vec<PrintWorke
 
 #[tauri::command]
 pub fn debug_run_print_worker_echo() -> Result<Vec<PrintWorkerMessage>, String> {
-    let temp_dir = std::env::temp_dir().join("bbdg-hwp-editor-print-test");
-    std::fs::create_dir_all(&temp_dir)
-        .map_err(|error| format!("print worker temp dir create failed: {error}"))?;
-
-    let request = PrintJobRequest {
-        job_id: "debug-print-worker-echo".to_string(),
-        source_file_name: "sample.hwp".to_string(),
-        output_mode: "preview".to_string(),
-        page_range: PrintJobRange::All,
-        batch_size: 5,
-        temp_dir: temp_dir.display().to_string(),
-        output_pdf_path: temp_dir.join("sample.pdf").display().to_string(),
-        page_count: 12,
-        page_size: PrintPageSize {
-            width_px: 794,
-            height_px: 1123,
-            dpi: 96,
-        },
-        svg_page_paths: Vec::new(),
-        debug_delay_ms: None,
-    };
-
+    let request = create_debug_print_job_request("debug-print-worker-echo", 12, None)?;
     run_print_worker_echo(&request)
 }
 
 #[tauri::command]
 pub fn debug_run_print_worker_timeout_echo() -> Result<Vec<PrintWorkerMessage>, String> {
-    let temp_dir = std::env::temp_dir().join("bbdg-hwp-editor-print-test");
-    std::fs::create_dir_all(&temp_dir)
-        .map_err(|error| format!("print worker temp dir create failed: {error}"))?;
-
-    let request = PrintJobRequest {
-        job_id: "debug-print-worker-timeout-echo".to_string(),
-        source_file_name: "sample.hwp".to_string(),
-        output_mode: "preview".to_string(),
-        page_range: PrintJobRange::All,
-        batch_size: 5,
-        temp_dir: temp_dir.display().to_string(),
-        output_pdf_path: temp_dir.join("sample.pdf").display().to_string(),
-        page_count: 12,
-        page_size: PrintPageSize {
-            width_px: 794,
-            height_px: 1123,
-            dpi: 96,
-        },
-        svg_page_paths: Vec::new(),
-        debug_delay_ms: Some(250),
-    };
-
+    let request =
+        create_debug_print_job_request("debug-print-worker-timeout-echo", 12, Some(250))?;
     run_print_worker_echo_with_timeout(&request, Duration::from_millis(100))
 }
 
@@ -244,23 +144,8 @@ mod tests {
 
     #[test]
     fn echo_worker_returns_progress_and_result_messages() {
-        let request = PrintJobRequest {
-            job_id: "unit-test-job".to_string(),
-            source_file_name: "sample.hwp".to_string(),
-            output_mode: "preview".to_string(),
-            page_range: PrintJobRange::All,
-            batch_size: 5,
-            temp_dir: std::env::temp_dir().display().to_string(),
-            output_pdf_path: std::env::temp_dir().join("unit-test.pdf").display().to_string(),
-            page_count: 10,
-            page_size: PrintPageSize {
-                width_px: 794,
-                height_px: 1123,
-                dpi: 96,
-            },
-            svg_page_paths: Vec::new(),
-            debug_delay_ms: None,
-        };
+        let request =
+            create_debug_print_job_request("unit-test-job", 10, None).expect("debug request");
 
         let messages = run_print_worker_echo(&request).expect("echo worker should respond");
         assert!(messages.len() >= 2);
@@ -270,23 +155,8 @@ mod tests {
 
     #[test]
     fn echo_worker_times_out_and_reports_termination() {
-        let request = PrintJobRequest {
-            job_id: "unit-test-timeout-job".to_string(),
-            source_file_name: "sample.hwp".to_string(),
-            output_mode: "preview".to_string(),
-            page_range: PrintJobRange::All,
-            batch_size: 5,
-            temp_dir: std::env::temp_dir().display().to_string(),
-            output_pdf_path: std::env::temp_dir().join("unit-timeout-test.pdf").display().to_string(),
-            page_count: 10,
-            page_size: PrintPageSize {
-                width_px: 794,
-                height_px: 1123,
-                dpi: 96,
-            },
-            svg_page_paths: Vec::new(),
-            debug_delay_ms: Some(250),
-        };
+        let request = create_debug_print_job_request("unit-test-timeout-job", 10, Some(250))
+            .expect("debug timeout request");
 
         let error = run_print_worker_echo_with_timeout(&request, Duration::from_millis(100))
             .expect_err("echo worker should time out");
