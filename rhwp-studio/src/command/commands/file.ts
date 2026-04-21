@@ -21,6 +21,8 @@ const DEFAULT_PDF_WORKER_BATCH_SIZE = 30;
 const DEFAULT_PDF_WORKER_SVG_BATCH_SIZE = 30;
 
 type PdfChunkPreviewCursor = {
+  startPage: number;
+  endPage: number;
   nextStartPage: number;
   chunkSize: number;
   batchSize: number;
@@ -33,6 +35,14 @@ let currentPdfChunkCursor: PdfChunkPreviewCursor | null = null;
 
 async function yieldToBrowser(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
+function getCurrentPageFromStatusBar(): number {
+  const statusText = document.getElementById('sb-page')?.textContent ?? '';
+  const match = statusText.match(/^\s*(\d+)\s*\/\s*\d+\s*쪽/);
+  if (!match) return 1;
+  const currentPage = Number.parseInt(match[1], 10);
+  return Number.isFinite(currentPage) && currentPage > 0 ? currentPage : 1;
 }
 
 async function previewCurrentDocPdfChunk(
@@ -129,6 +139,8 @@ async function previewCurrentDocPdfChunk(
     });
 
     currentPdfChunkCursor = {
+      startPage,
+      endPage,
       nextStartPage: endPage + 1,
       chunkSize,
       batchSize,
@@ -488,6 +500,24 @@ export const fileCommands: CommandDef[] = [
     },
   },
   {
+    id: 'file:pdf-preview-current-chunk',
+    label: '현재 20쪽 PDF 미리보기',
+    canExecute: (ctx) => ctx.hasDocument,
+    async execute(services) {
+      const currentPage = getCurrentPageFromStatusBar();
+
+      try {
+        await previewCurrentDocPdfChunk(services, {
+          startPage: currentPage,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('[file:pdf-preview-current-chunk]', message);
+        alert(`현재 위치 PDF 미리보기에 실패했습니다.\n${message}`);
+      }
+    },
+  },
+  {
     id: 'file:pdf-preview-next-chunk',
     label: '다음 20쪽 PDF 미리보기',
     canExecute: (ctx) => ctx.hasDocument,
@@ -513,6 +543,30 @@ export const fileCommands: CommandDef[] = [
         const message = error instanceof Error ? error.message : String(error);
         console.error('[file:pdf-preview-next-chunk]', message);
         alert(`다음 PDF 미리보기에 실패했습니다.\n${message}`);
+      }
+    },
+  },
+  {
+    id: 'file:pdf-preview-prev-chunk',
+    label: '이전 20쪽 PDF 미리보기',
+    canExecute: (ctx) => ctx.hasDocument,
+    async execute(services) {
+      const chunkSize = currentPdfChunkCursor?.chunkSize ?? DEFAULT_PDF_PREVIEW_CHUNK_SIZE;
+      const startPage = currentPdfChunkCursor
+        ? Math.max(1, currentPdfChunkCursor.startPage - chunkSize)
+        : Math.max(1, getCurrentPageFromStatusBar() - chunkSize);
+
+      try {
+        await previewCurrentDocPdfChunk(services, {
+          startPage,
+          chunkSize,
+          batchSize: currentPdfChunkCursor?.batchSize ?? DEFAULT_PDF_WORKER_BATCH_SIZE,
+          svgBatchSize: currentPdfChunkCursor?.svgBatchSize ?? DEFAULT_PDF_WORKER_SVG_BATCH_SIZE,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('[file:pdf-preview-prev-chunk]', message);
+        alert(`이전 PDF 미리보기에 실패했습니다.\n${message}`);
       }
     },
   },
