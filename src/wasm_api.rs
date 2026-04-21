@@ -34,7 +34,7 @@ use crate::renderer::page_layout::PageLayoutInfo;
 use crate::renderer::DEFAULT_DPI;
 use crate::error::HwpError;
 use crate::document_core::{DocumentCore, DEFAULT_FALLBACK_FONT};
-use crate::print_module::{PrintChunk, PrintCursor, PrintTaskState};
+use crate::print_module::{PrintChunk, PrintCursor, PrintRangeRequest, PrintTargetEntry, PrintTaskState};
 
 impl From<HwpError> for JsValue {
     fn from(err: HwpError) -> Self {
@@ -71,6 +71,58 @@ impl std::ops::DerefMut for HwpDocument {
 ///
 /// 테스트 및 CLI 환경에서 `HwpDocument::from_bytes()` 등을 직접 호출할 수 있도록 한다.
 impl HwpDocument {
+    fn total_page_count_usize(&self) -> usize {
+        self.pagination.iter().map(|pr| pr.pages.len()).sum()
+    }
+
+    fn build_print_plan(
+        &self,
+        range: &PrintRangeRequest,
+    ) -> Result<Vec<PrintTargetEntry>, JsValue> {
+        let total_pages = self.total_page_count_usize();
+        let selected_pages: Vec<usize> = match range {
+            PrintRangeRequest::All => (0..total_pages).collect(),
+            PrintRangeRequest::CurrentPage { page } => {
+                if *page == 0 || *page > total_pages {
+                    return Err(JsValue::from_str(&format!(
+                        "print page {} is out of range 1..={}",
+                        page, total_pages
+                    )));
+                }
+                vec![page - 1]
+            }
+            PrintRangeRequest::PageRange { start, end } => {
+                if *start == 0 || *end == 0 || start > end || *end > total_pages {
+                    return Err(JsValue::from_str(&format!(
+                        "print range {}-{} is out of range 1..={}",
+                        start, end, total_pages
+                    )));
+                }
+                ((*start - 1)..=(*end - 1)).collect()
+            }
+        };
+
+        let mut entries = Vec::new();
+        for page_index in selected_pages {
+            let (page_content, _, _) = self
+                .find_page(page_index as u32)
+                .map_err(JsValue::from)?;
+
+            for column in &page_content.column_contents {
+                for item in &column.items {
+                    entries.push(PrintTargetEntry::from_page_item(
+                        page_index,
+                        page_content.section_index,
+                        column.column_index as usize,
+                        item,
+                    ));
+                }
+            }
+        }
+
+        Ok(entries)
+    }
+
     pub fn from_bytes(data: &[u8]) -> Result<HwpDocument, HwpError> {
         DocumentCore::from_bytes(data).map(|core| {
             let styles = resolve_styles(&core.document.doc_info, DEFAULT_DPI);
@@ -128,11 +180,20 @@ impl HwpDocument {
     ///
     /// Step 1에서는 인쇄 상태 초기화와 커서 시그니처만 제공한다.
     #[wasm_bindgen(js_name = beginPrintTask)]
-    pub fn begin_print_task(&mut self) -> Result<String, JsValue> {
+    pub fn begin_print_task(&mut self, options_json: Option<String>) -> Result<String, JsValue> {
         #[cfg(target_arch = "wasm32")]
         web_sys::console::log_1(&"[print-api] begin_print_task start".into());
 
-        let state = PrintTaskState::new();
+        let range = if let Some(json) = options_json {
+            serde_json::from_str::<PrintRangeRequest>(&json)
+                .map_err(|e| JsValue::from_str(&format!("begin_print_task range parse failed: {e}")))?
+        } else {
+            PrintRangeRequest::All
+        };
+        let mut state = PrintTaskState::new();
+        state.range = range;
+        state.entries = self.build_print_plan(&state.range)?;
+        state.current_entry_index = 0;
         let cursor = PrintCursor::default();
         self.print_task = Some(state);
         let json = serde_json::to_string(&cursor)
@@ -141,9 +202,10 @@ impl HwpDocument {
         #[cfg(target_arch = "wasm32")]
         web_sys::console::log_1(
             &format!(
-                "[print-api] begin_print_task done bytes={} task_active={}",
+                "[print-api] begin_print_task done bytes={} task_active={} planned_entries={}",
                 json.len(),
-                self.print_task.is_some()
+                self.print_task.is_some(),
+                self.print_task.as_ref().map(|s| s.entries.len()).unwrap_or(0)
             ).into()
         );
 

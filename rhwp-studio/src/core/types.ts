@@ -614,6 +614,11 @@ export interface BookmarkInfo {
   charPos: number;
 }
 
+export type PrintRangeRequest =
+  | { type: 'all' }
+  | { type: 'currentPage'; page: number }
+  | { type: 'pageRange'; start: number; end: number };
+
 export interface PrintCursor {
   sectionIndex: number;
   paragraphIndex: number;

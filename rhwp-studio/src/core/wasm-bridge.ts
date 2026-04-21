@@ -1,5 +1,5 @@
 import init, { HwpDocument, version } from '@wasm/rhwp.js';
-import type { DocumentInfo, PageInfo, PageDef, SectionDef, CursorRect, HitTestResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, NavContextEntry, FieldInfoResult, BookmarkInfo, PrintCursor, PrintChunk } from './types';
+import type { DocumentInfo, PageInfo, PageDef, SectionDef, CursorRect, HitTestResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, NavContextEntry, FieldInfoResult, BookmarkInfo, PrintCursor, PrintChunk, PrintRangeRequest } from './types';
 
 /** HWPX 비표준 감지 경고 리포트 (#177). */
 export interface ValidationReport {
@@ -194,7 +194,7 @@ export class WasmBridge {
     return doc.isPagingFinished();
   }
 
-  beginPrintTask(): PrintCursor {
+  beginPrintTask(options?: PrintRangeRequest): PrintCursor {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     const doc = this.doc as any;
     if (typeof doc.beginPrintTask !== 'function') {
@@ -202,7 +202,8 @@ export class WasmBridge {
     }
     const traceId = `print-api:${Date.now()}`;
     console.log(`[${traceId}] beginPrintTask start`);
-    const raw = doc.beginPrintTask();
+    const optionsJson = options ? JSON.stringify(options) : undefined;
+    const raw = doc.beginPrintTask(optionsJson);
     console.log(`[${traceId}] beginPrintTask raw bytes=${raw.length}`);
     const parsed = JSON.parse(raw) as PrintCursor;
     console.log(`[${traceId}] beginPrintTask parsed`, parsed);
