@@ -1,6 +1,6 @@
 {
   "name": "rhwp-studio",
-  "version": "0.7.59",
+  "version": "0.7.60",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -11,11 +11,15 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.1.40",
+    "@types/pdfkit": "^0.17.6",
+    "@types/svg-to-pdfkit": "^0.1.4",
     "puppeteer-core": "^24.40.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.8"
   },
   "dependencies": {
-    "@tauri-apps/plugin-shell": "^2.3.5"
+    "@tauri-apps/plugin-shell": "^2.3.5",
+    "pdfkit": "^0.18.0",
+    "svg-to-pdfkit": "^0.1.8"
   }
 }
