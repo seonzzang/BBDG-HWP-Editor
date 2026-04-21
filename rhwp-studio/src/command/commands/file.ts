@@ -11,44 +11,8 @@ import {
 } from '@/command/file-system-access';
 import { PrintController } from '@/print/print-controller';
 
-type MemorySnapshot = {
-  usedJSHeapSize?: number;
-  totalJSHeapSize?: number;
-  jsHeapSizeLimit?: number;
-};
-
-function getMemorySnapshot(): MemorySnapshot | null {
-  const memory = (performance as Performance & { memory?: MemorySnapshot }).memory;
-  return memory
-    ? {
-        usedJSHeapSize: memory.usedJSHeapSize,
-        totalJSHeapSize: memory.totalJSHeapSize,
-        jsHeapSizeLimit: memory.jsHeapSizeLimit,
-      }
-    : null;
-}
-
-function logMemorySnapshot(traceId: string, phase: string): void {
-  const snapshot = getMemorySnapshot();
-  if (!snapshot) {
-    console.log(`[${traceId}] memory snapshot (${phase}) unsupported`);
-    return;
-  }
-
-  const toMb = (value?: number) =>
-    typeof value === 'number' ? `${(value / 1024 / 1024).toFixed(2)} MB` : 'n/a';
-
-  console.log(`[${traceId}] memory snapshot (${phase})`, {
-    usedJSHeapSize: toMb(snapshot.usedJSHeapSize),
-    totalJSHeapSize: toMb(snapshot.totalJSHeapSize),
-    jsHeapSizeLimit: toMb(snapshot.jsHeapSizeLimit),
-  });
-}
-
 function printSvgPages(
-  traceId: string,
   fileName: string,
-  pageCount: number,
   widthMm: number,
   heightMm: number,
   svgPages: string[],
@@ -66,7 +30,6 @@ function printSvgPages(
     };
 
     const handleAfterPrint = () => {
-      console.log(`[${traceId}] 7. afterprint 이벤트 수신`);
       cleanup();
       resolve();
     };
@@ -133,25 +96,15 @@ body[data-printing="true"] {
       setTimeout(() => {
         void (async () => {
           try {
-            logMemorySnapshot(traceId, 'before-window-print');
-            console.log(`[${traceId}] 5. Tauri/브라우저 print 호출 직전`, {
-              pageCount,
-              fileName,
-              widthMm,
-              heightMm,
-            });
             window.focus();
             await Promise.resolve(window.print());
-            console.log(`[${traceId}] 6. Tauri/브라우저 print 호출 성공 반환`);
             setTimeout(() => {
               if (document.body.contains(printRoot)) {
-                console.warn(`[${traceId}] 8. afterprint 미수신 fallback 정리`);
                 cleanup();
                 resolve();
               }
             }, cleanupDelayMs);
           } catch (error) {
-            console.error(`[${traceId}] 6E. Tauri/브라우저 print 호출 실패`, error);
             cleanup();
             reject(error instanceof Error ? error : new Error(String(error)));
           }
@@ -290,40 +243,18 @@ export const fileCommands: CommandDef[] = [
     shortcutLabel: 'Ctrl+P',
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services, params) {
-      const traceId = typeof params?.__traceId === 'string'
-        ? params.__traceId
-        : `print:${Date.now()}`;
       const usePrintExtraction = params?.usePrintExtraction === true;
-      const convertTimer = `[${traceId}] [1] convertToPrintable`;
-      const layoutTimer = `[${traceId}] [2] printLayoutRender`;
-      const printTimer = `[${traceId}] [3] window.print`;
       const wasm = services.wasm;
       const pageCount = wasm.pageCount;
-      const runtimeDebugState = services.getRuntimeDebugState?.() ?? {
-        isInitializingDocumentDefined: false,
-        isInitializingDocument: undefined,
-      };
-
-      console.log(`[${traceId}] 4. file:print execute 진입`, {
-        pageCount,
-        fileName: wasm.fileName,
-        usePrintExtraction,
-        guard: runtimeDebugState,
-      });
-      logMemorySnapshot(traceId, 'print-start');
 
       if (pageCount === 0) return;
 
       // 진행률 표시
       const statusEl = document.getElementById('sb-message');
       const origStatus = statusEl?.textContent || '';
-      let convertTimerRunning = false;
-      let layoutTimerRunning = false;
-      let printTimerRunning = false;
 
       try {
         if (usePrintExtraction) {
-          console.log(`[${traceId}] print extraction path start`);
           const controller = new PrintController(wasm);
           await controller.run({
             title: wasm.fileName,
@@ -333,15 +264,11 @@ export const fileCommands: CommandDef[] = [
               }
             },
           });
-          console.log(`[${traceId}] print extraction path done`);
           if (statusEl) statusEl.textContent = origStatus;
           return;
         }
 
         // SVG 페이지 생성
-        const convertStart = performance.now();
-        console.time(convertTimer);
-        convertTimerRunning = true;
         const svgPages: string[] = [];
         for (let i = 0; i < pageCount; i++) {
           if (statusEl) statusEl.textContent = `인쇄 준비 중... (${i + 1}/${pageCount})`;
@@ -350,39 +277,18 @@ export const fileCommands: CommandDef[] = [
           // UI 갱신을 위한 양보
           if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
         }
-        console.timeEnd(convertTimer);
-        convertTimerRunning = false;
-        const convertElapsed = performance.now() - convertStart;
-        if (convertElapsed >= 1000) {
-          console.warn(`[${traceId}] convertToPrintable exceeded 1s`, {
-            elapsedMs: Number(convertElapsed.toFixed(1)),
-            analysis:
-              '현재 단계는 main-thread WASM renderPageSvg 루프입니다. Promise/yield는 UI 응답성은 높일 수 있지만 병렬화는 못 합니다. 근본 분리는 Worker 안에서 별도 WASM 인스턴스를 돌리는 방식이 필요합니다.',
-          });
-        }
 
         // 첫 페이지 정보로 용지 크기 결정
-        console.time(layoutTimer);
-        layoutTimerRunning = true;
         const pageInfo = wasm.getPageInfo(0);
         const widthMm = Math.round(pageInfo.width * 25.4 / 96);
         const heightMm = Math.round(pageInfo.height * 25.4 / 96);
-        console.timeEnd(layoutTimer);
-        layoutTimerRunning = false;
 
-        console.time(printTimer);
-        printTimerRunning = true;
-        await printSvgPages(traceId, wasm.fileName, pageCount, widthMm, heightMm, svgPages);
-        console.timeEnd(printTimer);
-        printTimerRunning = false;
+        await printSvgPages(wasm.fileName, widthMm, heightMm, svgPages);
 
         if (statusEl) statusEl.textContent = origStatus;
       } catch (err) {
-        if (convertTimerRunning) console.timeEnd(convertTimer);
-        if (layoutTimerRunning) console.timeEnd(layoutTimer);
-        if (printTimerRunning) console.timeEnd(printTimer);
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[${traceId}] file:print 실패`, msg);
+        console.error('[file:print]', msg);
         if (statusEl) statusEl.textContent = `인쇄 실패: ${msg}`;
       }
     },

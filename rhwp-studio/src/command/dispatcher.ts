@@ -15,53 +15,24 @@ export class CommandDispatcher {
    * @returns true: 실행됨, false: 미등록 또는 비활성
    */
   dispatch(commandId: string, params?: Record<string, unknown>): boolean {
-    const traceId = commandId === 'file:print'
-      ? `print:${Date.now()}`
-      : undefined;
-
-    if (traceId) {
-      console.log(`[${traceId}] 1. dispatcher.dispatch 진입`, {
-        commandId,
-        params,
-      });
-    }
-
     const def = this.registry.get(commandId);
     if (!def) {
-      if (traceId) {
-        console.warn(`[${traceId}] dispatcher에서 미등록 커맨드 차단`);
-      }
       console.warn(`[CommandDispatcher] 미등록 커맨드: ${commandId}`);
       return false;
     }
 
     const ctx = this.services.getContext();
     if (def.canExecute && !def.canExecute(ctx)) {
-      if (traceId) {
-        console.warn(`[${traceId}] dispatcher.canExecute 차단`, ctx);
-      }
       // canExecute 실패 — 비활성 상태
       return false;
     }
 
     try {
-      if (traceId) {
-        console.log(`[${traceId}] 2. dispatcher에서 execute 호출 직전`);
-      }
-      def.execute(this.services, {
-        ...params,
-        __traceId: traceId,
-      });
+      def.execute(this.services, params);
       // 커맨드 실행 후 UI 상태 갱신 알림
       this.eventBus.emit('command-state-changed');
-      if (traceId) {
-        console.log(`[${traceId}] 3. dispatcher.dispatch 반환`);
-      }
       return true;
     } catch (err) {
-      if (traceId) {
-        console.error(`[${traceId}] dispatcher.execute 예외`, err);
-      }
       console.error(`[CommandDispatcher] 커맨드 실행 실패: ${commandId}`, err);
       return false;
     }
