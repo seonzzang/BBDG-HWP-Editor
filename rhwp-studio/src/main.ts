@@ -203,7 +203,9 @@ async function setupPdfDevtoolsApi(): Promise<void> {
     createPdfDevtoolsApi,
     createPdfPreviewRange,
   } = await import('@/pdf/pdf-devtools');
+  const { PdfPreviewController } = await import('@/pdf/pdf-preview-controller');
   const pdfDevtoolsApi = createPdfDevtoolsApi(wasm);
+  const workerPreview = new PdfPreviewController();
 
   (window as any).__pdfExport = (params?: Record<string, unknown>) =>
     pdfDevtoolsApi.exportPdf(params);
@@ -213,6 +215,16 @@ async function setupPdfDevtoolsApi(): Promise<void> {
     pdfDevtoolsApi.previewPdf({ range: createPdfPreviewRange(start, end) });
   (window as any).__disposePdfPreview = () =>
     pdfDevtoolsApi.disposePreview();
+  (window as any).__disposeWorkerPdfPreview = () =>
+    workerPreview.dispose();
+
+  (window as any).__openGeneratedWorkerPdfInApp = async (path: string) => {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const bytes = await invoke('debug_read_generated_pdf', { path }) as number[];
+    const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+    await workerPreview.open(blob, { title: path.split(/[/\\\\]/).pop() ?? 'Generated PDF' });
+    return { path, size: bytes.length };
+  };
 }
 
 async function setupPrintWorkerDevtoolsApi(): Promise<void> {
@@ -291,6 +303,7 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
     params: {
       startPage?: number;
       endPage?: number;
+      inApp?: boolean;
     } = {},
   ) => {
     if (wasm.pageCount <= 0) {
@@ -324,7 +337,20 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       throw new Error('Current document PDF export did not return an output path.');
     }
 
-    await open(outputPdfPath);
+    if (params.inApp) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const { PdfPreviewController } = await import('@/pdf/pdf-preview-controller');
+      const preview = new PdfPreviewController();
+      const bytes = await invoke('debug_read_generated_pdf', { path: outputPdfPath }) as number[];
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+      await preview.open(blob, {
+        title: `${wasm.fileName} (${startPage}-${endPage})`,
+      });
+      (window as any).__currentDocWorkerPdfPreview = preview;
+    } else {
+      await open(outputPdfPath);
+    }
+
     return {
       outputPdfPath,
       pageRange: {

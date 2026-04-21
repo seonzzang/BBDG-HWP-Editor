@@ -383,6 +383,11 @@ pub fn debug_run_print_worker_pdf_export_for_current_doc(
     run_print_worker_pdf_export(&request, Duration::from_secs(60))
 }
 
+#[tauri::command]
+pub fn debug_read_generated_pdf(path: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&path).map_err(|error| format!("generated pdf read failed ({path}): {error}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
