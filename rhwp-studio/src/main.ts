@@ -186,6 +186,7 @@ async function initialize(): Promise<void> {
     if (import.meta.env.DEV) {
       (window as any).__inputHandler = inputHandler;
       (window as any).__canvasView = canvasView;
+      (window as any).__printExtraction = () => dispatcher.dispatch('file:print', { usePrintExtraction: true });
     }
   } catch (error) {
     msg.textContent = `WASM 초기화 실패: ${error}`;
