@@ -21,6 +21,7 @@ const DEFAULT_PDF_WORKER_BATCH_SIZE = 30;
 const DEFAULT_PDF_WORKER_SVG_BATCH_SIZE = 30;
 
 type PdfChunkPreviewCursor = {
+  sourceFileName: string;
   startPage: number;
   endPage: number;
   nextStartPage: number;
@@ -76,6 +77,17 @@ function parsePageRangeInput(
   }
 
   return null;
+}
+
+function isPdfChunkCursorCurrentDocument(
+  cursor: PdfChunkPreviewCursor | null,
+  services: Parameters<NonNullable<CommandDef['execute']>>[0],
+): cursor is PdfChunkPreviewCursor {
+  if (!cursor) return false;
+  return (
+    cursor.sourceFileName === services.wasm.fileName &&
+    cursor.totalPages === services.wasm.pageCount
+  );
 }
 
 async function previewCurrentDocPdfChunk(
@@ -172,6 +184,7 @@ async function previewCurrentDocPdfChunk(
     });
 
     currentPdfChunkCursor = {
+      sourceFileName: wasm.fileName,
       startPage,
       endPage,
       nextStartPage: endPage + 1,
@@ -588,7 +601,8 @@ export const fileCommands: CommandDef[] = [
     label: '다음 20쪽 PDF 미리보기',
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services) {
-      if (!currentPdfChunkCursor) {
+      if (!isPdfChunkCursorCurrentDocument(currentPdfChunkCursor, services)) {
+        currentPdfChunkCursor = null;
         alert('먼저 [파일] → [PDF 미리보기 (20쪽)]를 실행해주세요.');
         return;
       }
@@ -617,17 +631,20 @@ export const fileCommands: CommandDef[] = [
     label: '이전 20쪽 PDF 미리보기',
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services) {
-      const chunkSize = currentPdfChunkCursor?.chunkSize ?? DEFAULT_PDF_PREVIEW_CHUNK_SIZE;
-      const startPage = currentPdfChunkCursor
-        ? Math.max(1, currentPdfChunkCursor.startPage - chunkSize)
+      const activeCursor = isPdfChunkCursorCurrentDocument(currentPdfChunkCursor, services)
+        ? currentPdfChunkCursor
+        : null;
+      const chunkSize = activeCursor?.chunkSize ?? DEFAULT_PDF_PREVIEW_CHUNK_SIZE;
+      const startPage = activeCursor
+        ? Math.max(1, activeCursor.startPage - chunkSize)
         : Math.max(1, getCurrentPageFromStatusBar() - chunkSize);
 
       try {
         await previewCurrentDocPdfChunk(services, {
           startPage,
           chunkSize,
-          batchSize: currentPdfChunkCursor?.batchSize ?? DEFAULT_PDF_WORKER_BATCH_SIZE,
-          svgBatchSize: currentPdfChunkCursor?.svgBatchSize ?? DEFAULT_PDF_WORKER_SVG_BATCH_SIZE,
+          batchSize: activeCursor?.batchSize ?? DEFAULT_PDF_WORKER_BATCH_SIZE,
+          svgBatchSize: activeCursor?.svgBatchSize ?? DEFAULT_PDF_WORKER_SVG_BATCH_SIZE,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
