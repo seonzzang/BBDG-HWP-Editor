@@ -657,3 +657,62 @@
 /* 계산식 오류 표시 */
 .formula-error { margin-top: 8px; padding: 8px 12px; background: var(--color-surface)3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404; font-size: var(--font-size-base); }
 .formula-input-error { border-color: #dc3545 !important; box-shadow: 0 0 0 2px rgba(220,53,69,0.2) !important; }
+
+/* ─── 인쇄 준비 오버레이 ─── */
+.print-progress-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 18, 30, 0.38);
+  backdrop-filter: blur(3px);
+}
+
+.print-progress-card {
+  width: min(440px, calc(100vw - 32px));
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f8fc 100%);
+  border: 1px solid rgba(101, 125, 172, 0.25);
+  box-shadow: 0 18px 48px rgba(21, 34, 56, 0.22);
+}
+
+.print-progress-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #243553;
+  margin-bottom: 8px;
+}
+
+.print-progress-message {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #52627d;
+  margin-bottom: 14px;
+}
+
+.print-progress-bar {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dbe3f1;
+}
+
+.print-progress-bar-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2a6cf0 0%, #58a6ff 100%);
+  transition: width 140ms ease;
+}
+
+.print-progress-text {
+  margin-top: 10px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #39527b;
+}
