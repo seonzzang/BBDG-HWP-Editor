@@ -62,10 +62,22 @@ function getContext(): EditorContext {
   };
 }
 
+function getRuntimeDebugState(): {
+  isInitializingDocumentDefined: boolean;
+  isInitializingDocument: boolean | undefined;
+} {
+  return {
+    // 현재 rebuild 기준 main.ts에는 load guard 변수가 존재하지 않음을 명시적으로 기록
+    isInitializingDocumentDefined: false,
+    isInitializingDocument: undefined,
+  };
+}
+
 const commandServices: CommandServices = {
   eventBus,
   wasm,
   getContext,
+  getRuntimeDebugState,
   getInputHandler: () => inputHandler,
   getViewportManager: () => canvasView?.getViewportManager() ?? null,
 };

@@ -58,6 +58,11 @@ export interface CommandServices {
   wasm: WasmBridge;
   /** 현재 에디터 상태 스냅샷 */
   getContext: () => EditorContext;
+  /** 디버그용 런타임 상태 */
+  getRuntimeDebugState?: () => {
+    isInitializingDocumentDefined: boolean;
+    isInitializingDocument: boolean | undefined;
+  };
   /** InputHandler 접근 (문서 미로드 시 null) */
   getInputHandler: () => InputHandler | null;
   /** ViewportManager 접근 (문서 미로드 시 null) */
