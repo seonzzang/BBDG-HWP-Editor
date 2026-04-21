@@ -5,8 +5,19 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::print_job::{
-    create_debug_print_job_request, write_print_job_manifest, PrintJobRequest, PrintWorkerMessage,
+    create_debug_print_job_request, create_print_job_request_from_svg_pages,
+    write_print_job_manifest, PrintJobRequest, PrintWorkerMessage,
 };
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FrontendPdfExportRequest {
+    pub job_id: String,
+    pub source_file_name: String,
+    pub width_px: u32,
+    pub height_px: u32,
+    pub svg_pages: Vec<String>,
+}
 
 fn workspace_root() -> Result<PathBuf, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -353,6 +364,23 @@ pub fn debug_probe_print_worker_runtime() -> Result<Vec<PrintWorkerMessage>, Str
 pub fn debug_run_print_worker_pdf_export() -> Result<Vec<PrintWorkerMessage>, String> {
     let request = create_debug_print_job_request("debug-print-worker-pdf-export", 3, None)?;
     run_print_worker_pdf_export(&request, Duration::from_secs(20))
+}
+
+#[tauri::command]
+pub fn debug_run_print_worker_pdf_export_for_current_doc(
+    payload: FrontendPdfExportRequest,
+) -> Result<Vec<PrintWorkerMessage>, String> {
+    let page_count = payload.svg_pages.len() as u32;
+    let request = create_print_job_request_from_svg_pages(
+        &payload.job_id,
+        &payload.source_file_name,
+        page_count,
+        payload.width_px,
+        payload.height_px,
+        &payload.svg_pages,
+    )?;
+
+    run_print_worker_pdf_export(&request, Duration::from_secs(60))
 }
 
 #[cfg(test)]

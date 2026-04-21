@@ -286,6 +286,54 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       messages,
     };
   };
+
+  (window as any).__previewCurrentDocPdfExport = async (
+    params: {
+      startPage?: number;
+      endPage?: number;
+    } = {},
+  ) => {
+    if (wasm.pageCount <= 0) {
+      throw new Error('문서가 로드되지 않았습니다.');
+    }
+
+    const startPage = Math.max(1, Math.min(params.startPage ?? 1, wasm.pageCount));
+    const endPage = Math.max(startPage, Math.min(params.endPage ?? Math.min(wasm.pageCount, 20), wasm.pageCount));
+    const pageIndexes = Array.from(
+      { length: endPage - startPage + 1 },
+      (_, index) => startPage - 1 + index,
+    );
+
+    const svgPages = pageIndexes.map((pageIndex) => wasm.renderPageSvg(pageIndex));
+    const firstPageInfo = wasm.getPageInfo(pageIndexes[0]);
+
+    const messages = await invoke('debug_run_print_worker_pdf_export_for_current_doc', {
+      payload: {
+        jobId: `current-doc-pdf-${Date.now()}`,
+        sourceFileName: wasm.fileName,
+        widthPx: firstPageInfo.width,
+        heightPx: firstPageInfo.height,
+        svgPages,
+      },
+    }) as unknown;
+
+    const outputPdfPath = extractOutputPdfPath(messages);
+    console.log('[print-worker-current-doc-pdf] messages', messages);
+
+    if (!outputPdfPath) {
+      throw new Error('Current document PDF export did not return an output path.');
+    }
+
+    await open(outputPdfPath);
+    return {
+      outputPdfPath,
+      pageRange: {
+        startPage,
+        endPage,
+      },
+      messages,
+    };
+  };
 }
 
 /**
