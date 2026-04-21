@@ -3,8 +3,8 @@ import { access, readFile } from 'node:fs/promises';
 import { stdin, stdout, stderr } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { constants as fsConstants } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type {
   PrintJobProgress,
   PrintJobRequest,
@@ -30,9 +30,14 @@ function writeResult(result: PrintJobResult): void {
   });
 }
 
+function getWorkspaceRoot(): string {
+  const scriptDir = dirname(fileURLToPath(import.meta.url));
+  return resolve(scriptDir, '..');
+}
+
 async function loadPuppeteerCore(): Promise<typeof import('puppeteer-core')> {
   const modulePath = resolve(
-    process.cwd(),
+    getWorkspaceRoot(),
     'rhwp-studio',
     'node_modules',
     'puppeteer-core',
