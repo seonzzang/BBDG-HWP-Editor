@@ -97,6 +97,17 @@ pub fn create_debug_print_job_request(
     })
 }
 
+pub fn write_print_job_manifest(request: &PrintJobRequest) -> Result<PathBuf, String> {
+    let manifest_path = PathBuf::from(&request.temp_dir).join("print-job.json");
+    let payload = serde_json::to_string_pretty(request)
+        .map_err(|error| format!("print job manifest serialize failed: {error}"))?;
+
+    fs::write(&manifest_path, payload)
+        .map_err(|error| format!("print job manifest write failed: {error}"))?;
+
+    Ok(manifest_path)
+}
+
 fn create_debug_svg_pages(temp_dir: &PathBuf, count: u32) -> Result<Vec<PathBuf>, String> {
     let mut svg_paths = Vec::new();
 

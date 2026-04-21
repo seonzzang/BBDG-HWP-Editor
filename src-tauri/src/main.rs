@@ -13,7 +13,8 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             print_worker::debug_run_print_worker_echo,
-            print_worker::debug_run_print_worker_timeout_echo
+            print_worker::debug_run_print_worker_timeout_echo,
+            print_worker::debug_run_print_worker_manifest_echo
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,4 +1,5 @@
 import { createInterface } from 'node:readline';
+import { readFile } from 'node:fs/promises';
 import { stdin, stdout, stderr } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type {
@@ -69,7 +70,32 @@ async function handleJob(request: PrintJobRequest): Promise<void> {
   });
 }
 
+async function loadRequestFromManifest(manifestPath: string): Promise<PrintJobRequest> {
+  const raw = await readFile(manifestPath, 'utf8');
+  return JSON.parse(raw) as PrintJobRequest;
+}
+
 async function main(): Promise<void> {
+  const manifestPath = process.argv[2];
+  if (manifestPath) {
+    try {
+      const request = await loadRequestFromManifest(manifestPath);
+      await handleJob(request);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      stderr.write(`[print-worker] ${message}\n`);
+      writeResult({
+        jobId: 'unknown',
+        ok: false,
+        durationMs: 0,
+        errorCode: 'WORKER_MANIFEST_ERROR',
+        errorMessage: message,
+      });
+      return;
+    }
+  }
+
   const rl = createInterface({
     input: stdin,
     crlfDelay: Infinity,

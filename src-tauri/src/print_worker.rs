@@ -5,7 +5,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::print_job::{
-    create_debug_print_job_request, PrintJobRequest, PrintWorkerMessage,
+    create_debug_print_job_request, write_print_job_manifest, PrintJobRequest, PrintWorkerMessage,
 };
 
 fn workspace_root() -> Result<PathBuf, String> {
@@ -40,29 +40,60 @@ pub fn run_print_worker_echo_with_timeout(
     request: &PrintJobRequest,
     timeout: Duration,
 ) -> Result<Vec<PrintWorkerMessage>, String> {
+    run_print_worker_with_timeout(request, timeout, WorkerRequestMode::Stdin)
+}
+
+#[derive(Debug, Clone, Copy)]
+enum WorkerRequestMode {
+    Stdin,
+    Manifest,
+}
+
+fn run_print_worker_with_timeout(
+    request: &PrintJobRequest,
+    timeout: Duration,
+    mode: WorkerRequestMode,
+) -> Result<Vec<PrintWorkerMessage>, String> {
     let script_path = print_worker_script_path()?;
     if !script_path.exists() {
         return Err(format!("print worker script not found: {}", script_path.display()));
     }
 
     let started_at = Instant::now();
-    let mut child = Command::new("node")
+    let mut command = Command::new("node");
+    command
         .arg("--experimental-strip-types")
         .arg(script_path)
-        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let manifest_path = match mode {
+        WorkerRequestMode::Stdin => {
+            command.stdin(Stdio::piped());
+            None
+        }
+        WorkerRequestMode::Manifest => {
+            command.stdin(Stdio::null());
+            let manifest_path = write_print_job_manifest(request)?;
+            command.arg(&manifest_path);
+            Some(manifest_path)
+        }
+    };
+
+    let mut child = command
         .spawn()
         .map_err(|error| format!("print worker spawn failed: {error}"))?;
 
-    let payload = serde_json::to_string(request)
-        .map_err(|error| format!("print worker request serialize failed: {error}"))?;
+    if matches!(mode, WorkerRequestMode::Stdin) {
+        let payload = serde_json::to_string(request)
+            .map_err(|error| format!("print worker request serialize failed: {error}"))?;
 
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(payload.as_bytes())
-            .and_then(|_| stdin.write_all(b"\n"))
-            .map_err(|error| format!("print worker stdin write failed: {error}"))?;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(payload.as_bytes())
+                .and_then(|_| stdin.write_all(b"\n"))
+                .map_err(|error| format!("print worker stdin write failed: {error}"))?;
+        }
     }
     let status = loop {
         match child
@@ -76,6 +107,9 @@ pub fn run_print_worker_echo_with_timeout(
                         .kill()
                         .map_err(|error| format!("print worker kill failed: {error}"))?;
                     let _ = child.wait();
+                    if let Some(path) = &manifest_path {
+                        let _ = std::fs::remove_file(path);
+                    }
                     return Err(format!(
                         "print worker timed out after {}ms and was terminated",
                         timeout.as_millis()
@@ -106,6 +140,9 @@ pub fn run_print_worker_echo_with_timeout(
         .map_err(|error| format!("print worker stderr read failed: {error}"))?;
 
     if !status.success() {
+        if let Some(path) = &manifest_path {
+            let _ = std::fs::remove_file(path);
+        }
         return Err(format!(
             "print worker exited with status {:?} after {}ms{}",
             status.code(),
@@ -118,11 +155,21 @@ pub fn run_print_worker_echo_with_timeout(
         ));
     }
 
-    parse_worker_messages(&stdout_output)
+    let messages = parse_worker_messages(&stdout_output);
+    if let Some(path) = &manifest_path {
+        let _ = std::fs::remove_file(path);
+    }
+    messages
 }
 
 pub fn run_print_worker_echo(request: &PrintJobRequest) -> Result<Vec<PrintWorkerMessage>, String> {
     run_print_worker_echo_with_timeout(request, Duration::from_secs(5))
+}
+
+pub fn run_print_worker_manifest_echo(
+    request: &PrintJobRequest,
+) -> Result<Vec<PrintWorkerMessage>, String> {
+    run_print_worker_with_timeout(request, Duration::from_secs(5), WorkerRequestMode::Manifest)
 }
 
 #[tauri::command]
@@ -136,6 +183,12 @@ pub fn debug_run_print_worker_timeout_echo() -> Result<Vec<PrintWorkerMessage>, 
     let request =
         create_debug_print_job_request("debug-print-worker-timeout-echo", 12, Some(250))?;
     run_print_worker_echo_with_timeout(&request, Duration::from_millis(100))
+}
+
+#[tauri::command]
+pub fn debug_run_print_worker_manifest_echo() -> Result<Vec<PrintWorkerMessage>, String> {
+    let request = create_debug_print_job_request("debug-print-worker-manifest-echo", 12, None)?;
+    run_print_worker_manifest_echo(&request)
 }
 
 #[cfg(test)]
@@ -161,5 +214,17 @@ mod tests {
         let error = run_print_worker_echo_with_timeout(&request, Duration::from_millis(100))
             .expect_err("echo worker should time out");
         assert!(error.contains("timed out"));
+    }
+
+    #[test]
+    fn echo_worker_reads_request_from_manifest_file() {
+        let request = create_debug_print_job_request("unit-test-manifest-job", 10, None)
+            .expect("debug manifest request");
+
+        let messages =
+            run_print_worker_manifest_echo(&request).expect("manifest echo worker should respond");
+        assert!(messages.len() >= 2);
+        assert!(matches!(messages.first(), Some(PrintWorkerMessage::Progress { .. })));
+        assert!(matches!(messages.last(), Some(PrintWorkerMessage::Result { .. })));
     }
 }

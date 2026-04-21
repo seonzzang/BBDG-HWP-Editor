@@ -234,6 +234,12 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       return error;
     }
   };
+
+  (window as any).__testPrintWorkerManifestEcho = async () => {
+    const messages = await invoke('debug_run_print_worker_manifest_echo') as unknown;
+    console.log('[print-worker-manifest-echo] messages', messages);
+    return messages;
+  };
 }
 
 /**
