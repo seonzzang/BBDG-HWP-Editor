@@ -45,6 +45,7 @@ export class PrintTask {
         if (shouldFlush && pendingBlocks.length > 0) {
           const html = this.renderChunkHtml(pendingBlocks);
           if (html) {
+            await yieldToIdle();
             await onChunk(html, {
               done: chunk.done,
               nextCursor: chunk.nextCursor,
@@ -89,6 +90,17 @@ export class PrintTask {
 
 async function yieldToBrowser(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
+async function yieldToIdle(): Promise<void> {
+  if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+    await new Promise<void>((resolve) => {
+      window.requestIdleCallback(() => resolve(), { timeout: 100 });
+    });
+    return;
+  }
+
+  await yieldToBrowser();
 }
 
 function normalizeImageHtml(src: string, alt: string): string {
