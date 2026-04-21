@@ -34,7 +34,6 @@ use crate::renderer::page_layout::PageLayoutInfo;
 use crate::renderer::DEFAULT_DPI;
 use crate::error::HwpError;
 use crate::document_core::{DocumentCore, DEFAULT_FALLBACK_FONT};
-use crate::print_module::{PrintChunk, PrintCursor, PrintRangeRequest, PrintTargetEntry, PrintTargetKind, PrintTaskState};
 
 impl From<HwpError> for JsValue {
     fn from(err: HwpError) -> Self {
@@ -51,7 +50,6 @@ pub struct HwpDocument {
     core: DocumentCore,
     styles: ResolvedStyleSet,
     paging_ctx: Option<IncrementalPagingContext>,
-    print_task: Option<PrintTaskState>,
 }
 
 impl std::ops::Deref for HwpDocument {
@@ -71,58 +69,6 @@ impl std::ops::DerefMut for HwpDocument {
 ///
 /// 테스트 및 CLI 환경에서 `HwpDocument::from_bytes()` 등을 직접 호출할 수 있도록 한다.
 impl HwpDocument {
-    fn total_page_count_usize(&self) -> usize {
-        self.pagination.iter().map(|pr| pr.pages.len()).sum()
-    }
-
-    fn build_print_plan(
-        &self,
-        range: &PrintRangeRequest,
-    ) -> Result<Vec<PrintTargetEntry>, JsValue> {
-        let total_pages = self.total_page_count_usize();
-        let selected_pages: Vec<usize> = match range {
-            PrintRangeRequest::All => (0..total_pages).collect(),
-            PrintRangeRequest::CurrentPage { page } => {
-                if *page == 0 || *page > total_pages {
-                    return Err(JsValue::from_str(&format!(
-                        "print page {} is out of range 1..={}",
-                        page, total_pages
-                    )));
-                }
-                vec![page - 1]
-            }
-            PrintRangeRequest::PageRange { start, end } => {
-                if *start == 0 || *end == 0 || start > end || *end > total_pages {
-                    return Err(JsValue::from_str(&format!(
-                        "print range {}-{} is out of range 1..={}",
-                        start, end, total_pages
-                    )));
-                }
-                ((*start - 1)..=(*end - 1)).collect()
-            }
-        };
-
-        let mut entries = Vec::new();
-        for page_index in selected_pages {
-            let (page_content, _, _) = self
-                .find_page(page_index as u32)
-                .map_err(JsValue::from)?;
-
-            for column in &page_content.column_contents {
-                for item in &column.items {
-                    entries.push(PrintTargetEntry::from_page_item(
-                        page_index,
-                        page_content.section_index,
-                        column.column_index as usize,
-                        item,
-                    ));
-                }
-            }
-        }
-
-        Ok(entries)
-    }
-
     pub fn from_bytes(data: &[u8]) -> Result<HwpDocument, HwpError> {
         DocumentCore::from_bytes(data).map(|core| {
             let styles = resolve_styles(&core.document.doc_info, DEFAULT_DPI);
@@ -130,7 +76,6 @@ impl HwpDocument {
                 core,
                 styles,
                 paging_ctx: None,
-                print_task: None,
             }
         })
     }
@@ -156,7 +101,6 @@ impl HwpDocument {
                     core,
                     styles,
                     paging_ctx: None,
-                    print_task: None,
                 }
             })
             .map_err(|e| e.into())
@@ -172,235 +116,7 @@ impl HwpDocument {
             core,
             styles,
             paging_ctx: None,
-            print_task: None,
         }
-    }
-
-    /// 인쇄 전용 데이터 추출 세션을 시작한다.
-    ///
-    /// Step 1에서는 인쇄 상태 초기화와 커서 시그니처만 제공한다.
-    #[wasm_bindgen(js_name = beginPrintTask)]
-    pub fn begin_print_task(&mut self, options_json: Option<String>) -> Result<String, JsValue> {
-        #[cfg(target_arch = "wasm32")]
-        web_sys::console::log_1(&"[print-api] begin_print_task start".into());
-
-        let range = if let Some(json) = options_json {
-            serde_json::from_str::<PrintRangeRequest>(&json)
-                .map_err(|e| JsValue::from_str(&format!("begin_print_task range parse failed: {e}")))?
-        } else {
-            PrintRangeRequest::All
-        };
-        let mut state = PrintTaskState::new();
-        state.range = range;
-        state.entries = self.build_print_plan(&state.range)?;
-        state.current_entry_index = 0;
-        let cursor = PrintCursor::default();
-        self.print_task = Some(state);
-        let json = serde_json::to_string(&cursor)
-            .map_err(|e| JsValue::from_str(&format!("begin_print_task serialize failed: {e}")))?;
-
-        #[cfg(target_arch = "wasm32")]
-        web_sys::console::log_1(
-            &format!(
-                "[print-api] begin_print_task done bytes={} task_active={} planned_entries={}",
-                json.len(),
-                self.print_task.is_some(),
-                self.print_task.as_ref().map(|s| s.entries.len()).unwrap_or(0)
-            ).into()
-        );
-
-        Ok(json)
-    }
-
-    /// 인쇄 전용 데이터 추출 세션에서 다음 chunk를 꺼낸다.
-    ///
-    /// Step 1에서는 JSON 직렬화 가능한 빈 chunk 시그니처만 제공한다.
-    #[wasm_bindgen(js_name = extractPrintChunk)]
-    pub fn extract_print_chunk(
-        &mut self,
-        cursor_json: &str,
-        max_blocks: usize,
-    ) -> Result<String, JsValue> {
-        #[cfg(target_arch = "wasm32")]
-        web_sys::console::log_1(
-            &format!(
-                "[print-api] extract_print_chunk start cursor_bytes={} max_blocks={} task_active={}",
-                cursor_json.len(),
-                max_blocks,
-                self.print_task.is_some()
-            ).into()
-        );
-
-        if self.print_task.is_none() {
-            return Err(JsValue::from_str("print task is not active"));
-        }
-
-        let _cursor: PrintCursor = serde_json::from_str(cursor_json)
-            .map_err(|e| JsValue::from_str(&format!("extract_print_chunk cursor parse failed: {e}")))?;
-
-        let mut blocks = Vec::new();
-        let mut last_page_index: Option<usize> = None;
-        let mut current_entry_index = self
-            .print_task
-            .as_ref()
-            .ok_or_else(|| JsValue::from_str("print task is not active"))?
-            .current_entry_index;
-        let total_entries = self
-            .print_task
-            .as_ref()
-            .ok_or_else(|| JsValue::from_str("print task is not active"))?
-            .entries
-            .len();
-
-        while current_entry_index < total_entries && blocks.len() < max_blocks {
-            let entry = self
-                .print_task
-                .as_ref()
-                .ok_or_else(|| JsValue::from_str("print task is not active"))?
-                .entries[current_entry_index]
-                .clone();
-
-            if let Some(prev_page_index) = last_page_index {
-                if prev_page_index != entry.page_index && blocks.len() < max_blocks {
-                    blocks.push(crate::print_module::PrintBlock::PageBreak {
-                        section_index: entry.section_index,
-                        paragraph_index: entry.paragraph_index,
-                    });
-                }
-            }
-
-            let section = self.document.sections.get(entry.section_index)
-                .ok_or_else(|| JsValue::from_str("print entry section out of range"))?;
-            let para = section.paragraphs.get(entry.paragraph_index)
-                .ok_or_else(|| JsValue::from_str("print entry paragraph out of range"))?;
-
-            match entry.kind {
-                PrintTargetKind::FullParagraph | PrintTargetKind::PartialParagraph { .. } => {
-                    let paragraph_html = self.paragraph_to_html(para, None, None);
-                    if !paragraph_html.is_empty() {
-                        blocks.push(crate::print_module::PrintBlock::Paragraph {
-                            html: paragraph_html,
-                            section_index: entry.section_index,
-                            paragraph_index: entry.paragraph_index,
-                        });
-                    }
-
-                    if blocks.len() < max_blocks && matches!(para.column_type, ColumnBreakType::Page) {
-                        blocks.push(crate::print_module::PrintBlock::PageBreak {
-                            section_index: entry.section_index,
-                            paragraph_index: entry.paragraph_index,
-                        });
-                    }
-                }
-                PrintTargetKind::Table { control_index }
-                | PrintTargetKind::PartialTable { control_index, .. } => {
-                    let control = para.controls.get(control_index)
-                        .ok_or_else(|| JsValue::from_str("print entry table control out of range"))?;
-                    let control_html = self.control_to_html(control);
-                    if !control_html.is_empty() {
-                        blocks.push(crate::print_module::PrintBlock::Table {
-                            html: control_html,
-                            section_index: entry.section_index,
-                            paragraph_index: entry.paragraph_index,
-                            control_index,
-                        });
-                    }
-                }
-                PrintTargetKind::Shape { control_index } => {
-                    let control = para.controls.get(control_index)
-                        .ok_or_else(|| JsValue::from_str("print entry shape control out of range"))?;
-                    match control {
-                        Control::Picture(_) => {
-                            let control_html = self.control_to_html(control);
-                            if !control_html.is_empty() {
-                                blocks.push(crate::print_module::PrintBlock::Image {
-                                    src: control_html,
-                                    alt: format!(
-                                        "picture-{}-{}-{}",
-                                        entry.section_index, entry.paragraph_index, control_index
-                                    ),
-                                    mime: None,
-                                    section_index: entry.section_index,
-                                    paragraph_index: entry.paragraph_index,
-                                    control_index,
-                                });
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            last_page_index = Some(entry.page_index);
-            current_entry_index += 1;
-        }
-
-        if let Some(state) = self.print_task.as_mut() {
-            state.current_entry_index = current_entry_index;
-        }
-
-        let done = current_entry_index >= total_entries;
-        let next_cursor = if done {
-            None
-        } else {
-            let next_entry = self
-                .print_task
-                .as_ref()
-                .ok_or_else(|| JsValue::from_str("print task is not active"))?
-                .entries
-                .get(current_entry_index)
-                .ok_or_else(|| JsValue::from_str("next print entry is out of range"))?;
-            Some(PrintCursor {
-                section_index: next_entry.section_index,
-                paragraph_index: next_entry.paragraph_index,
-                control_index: next_entry.control_index,
-            })
-        };
-
-        let chunk = PrintChunk {
-            done,
-            next_cursor,
-            blocks,
-        };
-
-        let json = serde_json::to_string(&chunk)
-            .map_err(|e| JsValue::from_str(&format!("extract_print_chunk serialize failed: {e}")))?;
-
-        #[cfg(target_arch = "wasm32")]
-        web_sys::console::log_1(
-            &format!(
-                "[print-api] extract_print_chunk done bytes={} blocks={} done={}",
-                json.len(),
-                chunk.blocks.len(),
-                chunk.done
-            ).into()
-        );
-
-        Ok(json)
-    }
-
-    /// 인쇄 전용 데이터 추출 세션을 종료한다.
-    #[wasm_bindgen(js_name = endPrintTask)]
-    pub fn end_print_task(&mut self) -> Result<(), JsValue> {
-        #[cfg(target_arch = "wasm32")]
-        web_sys::console::log_1(
-            &format!(
-                "[print-api] end_print_task start task_active={}",
-                self.print_task.is_some()
-            ).into()
-        );
-
-        self.print_task = None;
-
-        #[cfg(target_arch = "wasm32")]
-        web_sys::console::log_1(
-            &format!(
-                "[print-api] end_print_task done task_active={}",
-                self.print_task.is_some()
-            ).into()
-        );
-
-        Ok(())
     }
 
     /// 증분 페이징을 시작한다.

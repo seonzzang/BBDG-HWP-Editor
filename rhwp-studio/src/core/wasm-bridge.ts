@@ -1,5 +1,5 @@
 import init, { HwpDocument, version } from '@wasm/rhwp.js';
-import type { DocumentInfo, PageInfo, PageDef, SectionDef, CursorRect, HitTestResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, NavContextEntry, FieldInfoResult, BookmarkInfo, PrintCursor, PrintChunk, PrintRangeRequest } from './types';
+import type { DocumentInfo, PageInfo, PageDef, SectionDef, CursorRect, HitTestResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, NavContextEntry, FieldInfoResult, BookmarkInfo } from './types';
 
 /** HWPX 비표준 감지 경고 리포트 (#177). */
 export interface ValidationReport {
@@ -192,58 +192,6 @@ export class WasmBridge {
       return true;
     }
     return doc.isPagingFinished();
-  }
-
-  beginPrintTask(options?: PrintRangeRequest): PrintCursor {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    const doc = this.doc as any;
-    if (typeof doc.beginPrintTask !== 'function') {
-      throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
-    }
-    const traceId = `print-api:${Date.now()}`;
-    console.log(`[${traceId}] beginPrintTask start`);
-    const optionsJson = options ? JSON.stringify(options) : undefined;
-    const raw = doc.beginPrintTask(optionsJson);
-    console.log(`[${traceId}] beginPrintTask raw bytes=${raw.length}`);
-    const parsed = JSON.parse(raw) as PrintCursor;
-    console.log(`[${traceId}] beginPrintTask parsed`, parsed);
-    return parsed;
-  }
-
-  extractPrintChunk(cursor: PrintCursor, maxBlocks: number): PrintChunk {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    const doc = this.doc as any;
-    if (typeof doc.extractPrintChunk !== 'function') {
-      throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
-    }
-    const traceId = `print-api:${Date.now()}`;
-    const cursorJson = JSON.stringify(cursor);
-    console.log(`[${traceId}] extractPrintChunk start`, {
-      cursor,
-      cursorBytes: cursorJson.length,
-      maxBlocks,
-    });
-    const raw = doc.extractPrintChunk(cursorJson, maxBlocks);
-    console.log(`[${traceId}] extractPrintChunk raw bytes=${raw.length}`);
-    const parsed = JSON.parse(raw) as PrintChunk;
-    console.log(`[${traceId}] extractPrintChunk parsed`, {
-      done: parsed.done,
-      blockCount: parsed.blocks.length,
-      nextCursor: parsed.nextCursor,
-    });
-    return parsed;
-  }
-
-  endPrintTask(): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    const doc = this.doc as any;
-    if (typeof doc.endPrintTask !== 'function') {
-      throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
-    }
-    const traceId = `print-api:${Date.now()}`;
-    console.log(`[${traceId}] endPrintTask start`);
-    doc.endPrintTask();
-    console.log(`[${traceId}] endPrintTask done`);
   }
 
   getPageInfo(pageNum: number): PageInfo {
