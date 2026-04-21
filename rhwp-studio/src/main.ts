@@ -319,13 +319,15 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
 
     const svgPages = pageIndexes.map((pageIndex) => wasm.renderPageSvg(pageIndex));
     const firstPageInfo = wasm.getPageInfo(pageIndexes[0]);
+    const widthPx = Math.max(1, Math.round(firstPageInfo.width));
+    const heightPx = Math.max(1, Math.round(firstPageInfo.height));
 
     const messages = await invoke('debug_run_print_worker_pdf_export_for_current_doc', {
       payload: {
         jobId: `current-doc-pdf-${Date.now()}`,
         sourceFileName: wasm.fileName,
-        widthPx: firstPageInfo.width,
-        heightPx: firstPageInfo.height,
+        widthPx,
+        heightPx,
         svgPages,
       },
     }) as unknown;
