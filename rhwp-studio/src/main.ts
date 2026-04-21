@@ -217,6 +217,24 @@ async function setupPdfDevtoolsApi(): Promise<void> {
 
 async function setupPrintWorkerDevtoolsApi(): Promise<void> {
   const { invoke } = await import('@tauri-apps/api/core');
+  const { open } = await import('@tauri-apps/plugin-shell');
+
+  const extractOutputPdfPath = (messages: unknown): string | null => {
+    if (!Array.isArray(messages)) return null;
+
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const item = messages[index] as {
+        type?: string;
+        result?: { ok?: boolean; outputPdfPath?: string };
+      };
+
+      if (item?.type === 'result' && item.result?.ok && item.result.outputPdfPath) {
+        return item.result.outputPdfPath;
+      }
+    }
+
+    return null;
+  };
 
   (window as any).__testPrintWorkerEcho = async () => {
     const messages = await invoke('debug_run_print_worker_echo') as unknown;
@@ -251,6 +269,22 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
     const messages = await invoke('debug_run_print_worker_pdf_export') as unknown;
     console.log('[print-worker-pdf-export] messages', messages);
     return messages;
+  };
+
+  (window as any).__previewPrintWorkerPdfExport = async () => {
+    const messages = await invoke('debug_run_print_worker_pdf_export') as unknown;
+    const outputPdfPath = extractOutputPdfPath(messages);
+    console.log('[print-worker-pdf-preview] messages', messages);
+
+    if (!outputPdfPath) {
+      throw new Error('PDF export did not return an output path.');
+    }
+
+    await open(outputPdfPath);
+    return {
+      outputPdfPath,
+      messages,
+    };
   };
 }
 
