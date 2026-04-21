@@ -17,7 +17,7 @@ use web_sys::HtmlCanvasElement;
 
 use crate::model::document::{Document, Section};
 use crate::model::control::Control;
-use crate::model::paragraph::Paragraph;
+use crate::model::paragraph::{Paragraph, ColumnBreakType};
 use crate::model::page::ColumnDef;
 use crate::model::path::{PathSegment, DocumentPath, path_from_flat};
 use crate::renderer::pagination::{IncrementalPagingContext, Paginator, PaginationResult};
@@ -35,6 +35,32 @@ use crate::renderer::DEFAULT_DPI;
 use crate::error::HwpError;
 use crate::document_core::{DocumentCore, DEFAULT_FALLBACK_FONT};
 use crate::print_module::{PrintChunk, PrintCursor, PrintTaskState};
+
+fn paragraph_to_print_blocks(
+    para: &Paragraph,
+    section_index: usize,
+    paragraph_index: usize,
+) -> Vec<crate::print_module::PrintBlock> {
+    let mut blocks = Vec::new();
+    let escaped = crate::document_core::helpers::clipboard_escape_html(&para.text);
+
+    if !escaped.is_empty() {
+        blocks.push(crate::print_module::PrintBlock::Paragraph {
+            html: format!("<p>{}</p>", escaped.replace('\n', "<br/>")),
+            section_index,
+            paragraph_index,
+        });
+    }
+
+    if matches!(para.column_type, ColumnBreakType::Page) {
+        blocks.push(crate::print_module::PrintBlock::PageBreak {
+            section_index,
+            paragraph_index,
+        });
+    }
+
+    blocks
+}
 
 impl From<HwpError> for JsValue {
     fn from(err: HwpError) -> Self {
@@ -180,10 +206,63 @@ impl HwpDocument {
             state.cursor = cursor;
         }
 
+        let state_cursor = self
+            .print_task
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("print task is not active"))?
+            .cursor
+            .clone();
+
+        let mut blocks = Vec::new();
+        let mut section_index = state_cursor.section_index;
+        let mut paragraph_index = state_cursor.paragraph_index;
+
+        while section_index < self.document.sections.len() && blocks.len() < max_blocks {
+            let section = &self.document.sections[section_index];
+
+            while paragraph_index < section.paragraphs.len() && blocks.len() < max_blocks {
+                let para = &section.paragraphs[paragraph_index];
+                let para_blocks = paragraph_to_print_blocks(para, section_index, paragraph_index);
+
+                for block in para_blocks {
+                    if blocks.len() >= max_blocks {
+                        break;
+                    }
+                    blocks.push(block);
+                }
+
+                paragraph_index += 1;
+            }
+
+            if paragraph_index >= self.document.sections[section_index].paragraphs.len() {
+                section_index += 1;
+                paragraph_index = 0;
+            }
+        }
+
+        let done = section_index >= self.document.sections.len();
+        let next_cursor = if done {
+            None
+        } else {
+            Some(PrintCursor {
+                section_index,
+                paragraph_index,
+                control_index: None,
+            })
+        };
+
+        if let Some(state) = self.print_task.as_mut() {
+            state.cursor = next_cursor.clone().unwrap_or(PrintCursor {
+                section_index,
+                paragraph_index,
+                control_index: None,
+            });
+        }
+
         let chunk = PrintChunk {
-            done: true,
-            next_cursor: None,
-            blocks: Vec::new(),
+            done,
+            next_cursor,
+            blocks,
         };
 
         let json = serde_json::to_string(&chunk)
