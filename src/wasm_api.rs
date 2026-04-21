@@ -129,11 +129,25 @@ impl HwpDocument {
     /// Step 1에서는 인쇄 상태 초기화와 커서 시그니처만 제공한다.
     #[wasm_bindgen(js_name = beginPrintTask)]
     pub fn begin_print_task(&mut self) -> Result<String, JsValue> {
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&"[print-api] begin_print_task start".into());
+
         let state = PrintTaskState::new();
         let cursor = state.cursor.clone();
         self.print_task = Some(state);
-        serde_json::to_string(&cursor)
-            .map_err(|e| JsValue::from_str(&format!("begin_print_task serialize failed: {e}")))
+        let json = serde_json::to_string(&cursor)
+            .map_err(|e| JsValue::from_str(&format!("begin_print_task serialize failed: {e}")))?;
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "[print-api] begin_print_task done bytes={} task_active={}",
+                json.len(),
+                self.print_task.is_some()
+            ).into()
+        );
+
+        Ok(json)
     }
 
     /// 인쇄 전용 데이터 추출 세션에서 다음 chunk를 꺼낸다.
@@ -143,8 +157,18 @@ impl HwpDocument {
     pub fn extract_print_chunk(
         &mut self,
         cursor_json: &str,
-        _max_blocks: usize,
+        max_blocks: usize,
     ) -> Result<String, JsValue> {
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "[print-api] extract_print_chunk start cursor_bytes={} max_blocks={} task_active={}",
+                cursor_json.len(),
+                max_blocks,
+                self.print_task.is_some()
+            ).into()
+        );
+
         if self.print_task.is_none() {
             return Err(JsValue::from_str("print task is not active"));
         }
@@ -162,14 +186,43 @@ impl HwpDocument {
             blocks: Vec::new(),
         };
 
-        serde_json::to_string(&chunk)
-            .map_err(|e| JsValue::from_str(&format!("extract_print_chunk serialize failed: {e}")))
+        let json = serde_json::to_string(&chunk)
+            .map_err(|e| JsValue::from_str(&format!("extract_print_chunk serialize failed: {e}")))?;
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "[print-api] extract_print_chunk done bytes={} blocks={} done={}",
+                json.len(),
+                chunk.blocks.len(),
+                chunk.done
+            ).into()
+        );
+
+        Ok(json)
     }
 
     /// 인쇄 전용 데이터 추출 세션을 종료한다.
     #[wasm_bindgen(js_name = endPrintTask)]
     pub fn end_print_task(&mut self) -> Result<(), JsValue> {
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "[print-api] end_print_task start task_active={}",
+                self.print_task.is_some()
+            ).into()
+        );
+
         self.print_task = None;
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "[print-api] end_print_task done task_active={}",
+                self.print_task.is_some()
+            ).into()
+        );
+
         Ok(())
     }
 

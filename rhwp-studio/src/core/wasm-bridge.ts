@@ -200,7 +200,13 @@ export class WasmBridge {
     if (typeof doc.beginPrintTask !== 'function') {
       throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
     }
-    return JSON.parse(doc.beginPrintTask()) as PrintCursor;
+    const traceId = `print-api:${Date.now()}`;
+    console.log(`[${traceId}] beginPrintTask start`);
+    const raw = doc.beginPrintTask();
+    console.log(`[${traceId}] beginPrintTask raw bytes=${raw.length}`);
+    const parsed = JSON.parse(raw) as PrintCursor;
+    console.log(`[${traceId}] beginPrintTask parsed`, parsed);
+    return parsed;
   }
 
   extractPrintChunk(cursor: PrintCursor, maxBlocks: number): PrintChunk {
@@ -209,7 +215,22 @@ export class WasmBridge {
     if (typeof doc.extractPrintChunk !== 'function') {
       throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
     }
-    return JSON.parse(doc.extractPrintChunk(JSON.stringify(cursor), maxBlocks)) as PrintChunk;
+    const traceId = `print-api:${Date.now()}`;
+    const cursorJson = JSON.stringify(cursor);
+    console.log(`[${traceId}] extractPrintChunk start`, {
+      cursor,
+      cursorBytes: cursorJson.length,
+      maxBlocks,
+    });
+    const raw = doc.extractPrintChunk(cursorJson, maxBlocks);
+    console.log(`[${traceId}] extractPrintChunk raw bytes=${raw.length}`);
+    const parsed = JSON.parse(raw) as PrintChunk;
+    console.log(`[${traceId}] extractPrintChunk parsed`, {
+      done: parsed.done,
+      blockCount: parsed.blocks.length,
+      nextCursor: parsed.nextCursor,
+    });
+    return parsed;
   }
 
   endPrintTask(): void {
@@ -218,7 +239,10 @@ export class WasmBridge {
     if (typeof doc.endPrintTask !== 'function') {
       throw new Error('현재 WASM 빌드는 인쇄 추출 API를 지원하지 않습니다');
     }
+    const traceId = `print-api:${Date.now()}`;
+    console.log(`[${traceId}] endPrintTask start`);
     doc.endPrintTask();
+    console.log(`[${traceId}] endPrintTask done`);
   }
 
   getPageInfo(pageNum: number): PageInfo {
