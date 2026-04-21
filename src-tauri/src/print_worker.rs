@@ -388,6 +388,21 @@ pub fn debug_read_generated_pdf(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&path).map_err(|error| format!("generated pdf read failed ({path}): {error}"))
 }
 
+#[tauri::command]
+pub fn debug_open_generated_pdf(path: String) -> Result<(), String> {
+    let pdf_path = PathBuf::from(&path);
+    if !pdf_path.exists() {
+        return Err(format!("generated pdf file not found: {path}"));
+    }
+
+    Command::new("explorer.exe")
+        .arg(&pdf_path)
+        .spawn()
+        .map_err(|error| format!("generated pdf open failed ({path}): {error}"))?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

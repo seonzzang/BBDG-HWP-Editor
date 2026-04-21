@@ -229,7 +229,6 @@ async function setupPdfDevtoolsApi(): Promise<void> {
 
 async function setupPrintWorkerDevtoolsApi(): Promise<void> {
   const { invoke } = await import('@tauri-apps/api/core');
-  const { open } = await import('@tauri-apps/plugin-shell');
 
   const extractOutputPdfPath = (messages: unknown): string | null => {
     if (!Array.isArray(messages)) return null;
@@ -329,7 +328,7 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       );
     }
 
-    await open(outputPdfPath);
+    await invoke('debug_open_generated_pdf', { path: outputPdfPath });
     return {
       outputPdfPath,
       messages,
@@ -392,9 +391,15 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       });
       (window as any).__currentDocWorkerPdfPreview = preview;
     } else {
-      await open(outputPdfPath);
+      await invoke('debug_open_generated_pdf', { path: outputPdfPath });
     }
 
+    console.log('[print-worker-current-doc-pdf] preview ready', {
+      outputPdfPath,
+      inApp: params.inApp === true,
+      startPage,
+      endPage,
+    });
     return {
       outputPdfPath,
       pageRange: {
