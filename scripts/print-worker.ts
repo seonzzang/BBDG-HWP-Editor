@@ -1,5 +1,6 @@
 import { createInterface } from 'node:readline';
 import { stdin, stdout, stderr } from 'node:process';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type {
   PrintJobProgress,
   PrintJobRequest,
@@ -45,6 +46,10 @@ async function handleJob(request: PrintJobRequest): Promise<void> {
     batchIndex: 0,
     message: `Echo worker received ${request.svgPagePaths.length} svg paths`,
   });
+
+  if (request.debugDelayMs && request.debugDelayMs > 0) {
+    await sleep(request.debugDelayMs);
+  }
 
   const completedPages = Math.min(request.batchSize, request.pageCount);
   writeProgress({

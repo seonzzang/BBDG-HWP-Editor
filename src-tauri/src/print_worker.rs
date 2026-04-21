@@ -1,7 +1,8 @@
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::Instant;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -34,6 +35,7 @@ pub struct PrintJobRequest {
     pub page_count: u32,
     pub page_size: PrintPageSize,
     pub svg_page_paths: Vec<String>,
+    pub debug_delay_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,7 +79,26 @@ fn print_worker_script_path() -> Result<PathBuf, String> {
     Ok(workspace_root()?.join("scripts").join("print-worker.ts"))
 }
 
-pub fn run_print_worker_echo(request: &PrintJobRequest) -> Result<Vec<PrintWorkerMessage>, String> {
+fn parse_worker_messages(stdout_output: &str) -> Result<Vec<PrintWorkerMessage>, String> {
+    let mut messages = Vec::new();
+    for line in stdout_output.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let message = serde_json::from_str::<PrintWorkerMessage>(trimmed)
+            .map_err(|error| format!("print worker stdout parse failed: {error}; raw={trimmed}"))?;
+        messages.push(message);
+    }
+
+    Ok(messages)
+}
+
+pub fn run_print_worker_echo_with_timeout(
+    request: &PrintJobRequest,
+    timeout: Duration,
+) -> Result<Vec<PrintWorkerMessage>, String> {
     let script_path = print_worker_script_path()?;
     if !script_path.exists() {
         return Err(format!("print worker script not found: {}", script_path.display()));
@@ -102,6 +123,27 @@ pub fn run_print_worker_echo(request: &PrintJobRequest) -> Result<Vec<PrintWorke
             .and_then(|_| stdin.write_all(b"\n"))
             .map_err(|error| format!("print worker stdin write failed: {error}"))?;
     }
+    let status = loop {
+        match child
+            .try_wait()
+            .map_err(|error| format!("print worker try_wait failed: {error}"))?
+        {
+            Some(status) => break status,
+            None => {
+                if started_at.elapsed() >= timeout {
+                    child
+                        .kill()
+                        .map_err(|error| format!("print worker kill failed: {error}"))?;
+                    let _ = child.wait();
+                    return Err(format!(
+                        "print worker timed out after {}ms and was terminated",
+                        timeout.as_millis()
+                    ));
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+        }
+    };
 
     let stdout = child
         .stdout
@@ -112,35 +154,15 @@ pub fn run_print_worker_echo(request: &PrintJobRequest) -> Result<Vec<PrintWorke
         .take()
         .ok_or_else(|| "print worker stderr pipe is missing".to_string())?;
 
-    let mut messages = Vec::new();
-    for line in BufReader::new(stdout).lines() {
-        let line = line.map_err(|error| format!("print worker stdout read failed: {error}"))?;
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
+    let mut stdout_output = String::new();
+    BufReader::new(stdout)
+        .read_to_string(&mut stdout_output)
+        .map_err(|error| format!("print worker stdout read failed: {error}"))?;
 
-        let message = serde_json::from_str::<PrintWorkerMessage>(trimmed)
-            .map_err(|error| format!("print worker stdout parse failed: {error}; raw={trimmed}"))?;
-        messages.push(message);
-    }
-
-    let status = child
-        .wait()
-        .map_err(|error| format!("print worker wait failed: {error}"))?;
-    let stderr_output = {
-        let mut collected = String::new();
-        for line in BufReader::new(stderr).lines() {
-            let line = line.map_err(|error| format!("print worker stderr read failed: {error}"))?;
-            if !line.trim().is_empty() {
-                if !collected.is_empty() {
-                    collected.push('\n');
-                }
-                collected.push_str(&line);
-            }
-        }
-        collected
-    };
+    let mut stderr_output = String::new();
+    BufReader::new(stderr)
+        .read_to_string(&mut stderr_output)
+        .map_err(|error| format!("print worker stderr read failed: {error}"))?;
 
     if !status.success() {
         return Err(format!(
@@ -155,7 +177,11 @@ pub fn run_print_worker_echo(request: &PrintJobRequest) -> Result<Vec<PrintWorke
         ));
     }
 
-    Ok(messages)
+    parse_worker_messages(&stdout_output)
+}
+
+pub fn run_print_worker_echo(request: &PrintJobRequest) -> Result<Vec<PrintWorkerMessage>, String> {
+    run_print_worker_echo_with_timeout(request, Duration::from_secs(5))
 }
 
 #[tauri::command]
@@ -179,9 +205,37 @@ pub fn debug_run_print_worker_echo() -> Result<Vec<PrintWorkerMessage>, String> 
             dpi: 96,
         },
         svg_page_paths: Vec::new(),
+        debug_delay_ms: None,
     };
 
     run_print_worker_echo(&request)
+}
+
+#[tauri::command]
+pub fn debug_run_print_worker_timeout_echo() -> Result<Vec<PrintWorkerMessage>, String> {
+    let temp_dir = std::env::temp_dir().join("bbdg-hwp-editor-print-test");
+    std::fs::create_dir_all(&temp_dir)
+        .map_err(|error| format!("print worker temp dir create failed: {error}"))?;
+
+    let request = PrintJobRequest {
+        job_id: "debug-print-worker-timeout-echo".to_string(),
+        source_file_name: "sample.hwp".to_string(),
+        output_mode: "preview".to_string(),
+        page_range: PrintJobRange::All,
+        batch_size: 5,
+        temp_dir: temp_dir.display().to_string(),
+        output_pdf_path: temp_dir.join("sample.pdf").display().to_string(),
+        page_count: 12,
+        page_size: PrintPageSize {
+            width_px: 794,
+            height_px: 1123,
+            dpi: 96,
+        },
+        svg_page_paths: Vec::new(),
+        debug_delay_ms: Some(250),
+    };
+
+    run_print_worker_echo_with_timeout(&request, Duration::from_millis(100))
 }
 
 #[cfg(test)]
@@ -205,11 +259,37 @@ mod tests {
                 dpi: 96,
             },
             svg_page_paths: Vec::new(),
+            debug_delay_ms: None,
         };
 
         let messages = run_print_worker_echo(&request).expect("echo worker should respond");
         assert!(messages.len() >= 2);
         assert!(matches!(messages.first(), Some(PrintWorkerMessage::Progress { .. })));
         assert!(matches!(messages.last(), Some(PrintWorkerMessage::Result { .. })));
+    }
+
+    #[test]
+    fn echo_worker_times_out_and_reports_termination() {
+        let request = PrintJobRequest {
+            job_id: "unit-test-timeout-job".to_string(),
+            source_file_name: "sample.hwp".to_string(),
+            output_mode: "preview".to_string(),
+            page_range: PrintJobRange::All,
+            batch_size: 5,
+            temp_dir: std::env::temp_dir().display().to_string(),
+            output_pdf_path: std::env::temp_dir().join("unit-timeout-test.pdf").display().to_string(),
+            page_count: 10,
+            page_size: PrintPageSize {
+                width_px: 794,
+                height_px: 1123,
+                dpi: 96,
+            },
+            svg_page_paths: Vec::new(),
+            debug_delay_ms: Some(250),
+        };
+
+        let error = run_print_worker_echo_with_timeout(&request, Duration::from_millis(100))
+            .expect_err("echo worker should time out");
+        assert!(error.contains("timed out"));
     }
 }

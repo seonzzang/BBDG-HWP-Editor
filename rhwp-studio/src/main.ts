@@ -223,6 +223,17 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
     console.log('[print-worker-echo] messages', messages);
     return messages;
   };
+
+  (window as any).__testPrintWorkerTimeout = async () => {
+    try {
+      const messages = await invoke('debug_run_print_worker_timeout_echo') as unknown;
+      console.log('[print-worker-timeout] unexpected success', messages);
+      return messages;
+    } catch (error) {
+      console.log('[print-worker-timeout] expected timeout', error);
+      return error;
+    }
+  };
 }
 
 /**

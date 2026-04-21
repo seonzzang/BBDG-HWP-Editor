@@ -28,6 +28,7 @@ export interface PrintJobRequest {
   pageCount: number;
   pageSize: PrintPageSize;
   svgPagePaths: string[];
+  debugDelayMs?: number;
 }
 
 export interface PrintJobProgress {
