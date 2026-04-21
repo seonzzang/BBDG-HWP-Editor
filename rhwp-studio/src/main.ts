@@ -230,6 +230,13 @@ async function setupPdfDevtoolsApi(): Promise<void> {
 async function setupPrintWorkerDevtoolsApi(): Promise<void> {
   const { invoke } = await import('@tauri-apps/api/core');
   const yieldToBrowser = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+  type CurrentDocPdfPreviewParams = {
+    startPage?: number;
+    endPage?: number;
+    inApp?: boolean;
+    batchSize?: number;
+    svgBatchSize?: number;
+  };
 
   const extractOutputPdfPath = (messages: unknown): string | null => {
     if (!Array.isArray(messages)) return null;
@@ -339,14 +346,8 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
     };
   };
 
-  (window as any).__previewCurrentDocPdfExport = async (
-    params: {
-      startPage?: number;
-      endPage?: number;
-      inApp?: boolean;
-      batchSize?: number;
-      svgBatchSize?: number;
-    } = {},
+  const previewCurrentDocPdfExport = async (
+    params: CurrentDocPdfPreviewParams = {},
   ) => {
     if (wasm.pageCount <= 0) {
       throw new Error('문서가 로드되지 않았습니다.');
@@ -454,6 +455,82 @@ async function setupPrintWorkerDevtoolsApi(): Promise<void> {
       workerDurationMs: result?.durationMs,
       messages,
     };
+  };
+
+  (window as any).__previewCurrentDocPdfExport = previewCurrentDocPdfExport;
+
+  (window as any).__previewCurrentDocPdfChunk = async (
+    params: {
+      startPage?: number;
+      chunkSize?: number;
+      inApp?: boolean;
+      batchSize?: number;
+      svgBatchSize?: number;
+    } = {},
+  ) => {
+    if (wasm.pageCount <= 0) {
+      throw new Error('문서가 로드되지 않았습니다.');
+    }
+
+    const chunkSize = Math.max(1, Math.round(params.chunkSize ?? 20));
+    const startPage = Math.max(1, Math.min(params.startPage ?? 1, wasm.pageCount));
+    const endPage = Math.min(wasm.pageCount, startPage + chunkSize - 1);
+
+    const result = await previewCurrentDocPdfExport({
+      startPage,
+      endPage,
+      inApp: params.inApp ?? true,
+      batchSize: params.batchSize ?? 30,
+      svgBatchSize: params.svgBatchSize ?? 30,
+    });
+
+    (window as any).__currentDocPdfChunkCursor = {
+      nextStartPage: endPage + 1,
+      chunkSize,
+      inApp: params.inApp ?? true,
+      batchSize: params.batchSize ?? 30,
+      svgBatchSize: params.svgBatchSize ?? 30,
+      totalPages: wasm.pageCount,
+    };
+
+    console.log('[print-worker-current-doc-pdf] chunk preview ready', {
+      startPage,
+      endPage,
+      chunkSize,
+      nextStartPage: endPage + 1,
+      totalPages: wasm.pageCount,
+    });
+
+    return result;
+  };
+
+  (window as any).__previewNextCurrentDocPdfChunk = async () => {
+    const cursor = (window as any).__currentDocPdfChunkCursor as
+      | {
+          nextStartPage: number;
+          chunkSize: number;
+          inApp: boolean;
+          batchSize: number;
+          svgBatchSize: number;
+          totalPages: number;
+        }
+      | undefined;
+
+    if (!cursor) {
+      throw new Error('먼저 __previewCurrentDocPdfChunk()를 실행해주세요.');
+    }
+
+    if (cursor.nextStartPage > cursor.totalPages) {
+      throw new Error('더 이상 미리보기할 다음 페이지 구간이 없습니다.');
+    }
+
+    return (window as any).__previewCurrentDocPdfChunk({
+      startPage: cursor.nextStartPage,
+      chunkSize: cursor.chunkSize,
+      inApp: cursor.inApp,
+      batchSize: cursor.batchSize,
+      svgBatchSize: cursor.svgBatchSize,
+    });
   };
 }
 
