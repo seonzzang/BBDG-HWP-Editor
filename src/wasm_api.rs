@@ -289,6 +289,21 @@ impl HwpDocument {
                                 paragraph_index,
                                 control_index,
                             });
+                        } else if let Control::Picture(pic) = control {
+                            let html = self.picture_to_html(pic);
+                            if !html.is_empty() {
+                                blocks.push(crate::print_module::PrintBlock::Image {
+                                    src: html,
+                                    alt: format!(
+                                        "picture-{}-{}-{}",
+                                        section_index, paragraph_index, control_index
+                                    ),
+                                    mime: None,
+                                    section_index,
+                                    paragraph_index,
+                                    control_index,
+                                });
+                            }
                         }
                     }
                 }
