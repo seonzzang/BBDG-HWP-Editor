@@ -186,10 +186,8 @@ async function initialize(): Promise<void> {
     if (import.meta.env.DEV) {
       (window as any).__inputHandler = inputHandler;
       (window as any).__canvasView = canvasView;
-      (window as any).__printExtraction = (params: Record<string, unknown> = {}) =>
-        dispatcher.dispatch('file:print', { usePrintExtraction: true, ...params });
       (window as any).__printBaseline = (params: Record<string, unknown> = {}) =>
-        dispatcher.dispatch('file:print', { usePrintExtraction: false, ...params });
+        dispatcher.dispatch('file:print', params);
 
       await setupPdfDevtoolsApi();
     }

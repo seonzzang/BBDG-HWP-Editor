@@ -9,8 +9,6 @@ import {
   saveDocumentToFileSystem,
   type FileSystemWindowLike,
 } from '@/command/file-system-access';
-import { PrintController } from '@/print/print-controller';
-import type { PrintRangeRequest } from '@/core/types';
 import { PrintProgressOverlay } from '@/ui/print-progress-overlay';
 
 const DEFAULT_SVG_BATCH_SIZE = 50;
@@ -280,16 +278,6 @@ export const fileCommands: CommandDef[] = [
     shortcutLabel: 'Ctrl+P',
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services, params) {
-      const usePrintExtraction = params?.usePrintExtraction === true;
-      const requestedPrintRange = isPrintRangeRequest(params?.printRange)
-        ? params.printRange
-        : undefined;
-      const debugChunkDelayMs = typeof params?.debugChunkDelayMs === 'number'
-        ? params.debugChunkDelayMs
-        : undefined;
-      const pageBatchSize = typeof params?.pageBatchSize === 'number'
-        ? params.pageBatchSize
-        : undefined;
       const wasm = services.wasm;
       const pageCount = wasm.pageCount;
       const samplePageLimit = typeof params?.samplePageLimit === 'number'
@@ -307,38 +295,6 @@ export const fileCommands: CommandDef[] = [
       const abortSignal = printOverlay.show('인쇄 준비 중');
 
       try {
-        if (usePrintExtraction) {
-          try {
-            const controller = new PrintController(wasm);
-            await controller.run({
-              title: wasm.fileName,
-              range: requestedPrintRange,
-              debugChunkDelayMs,
-              pageBatchSize,
-              totalPages: getRequestedPrintPageCount(requestedPrintRange, pageCount),
-              onProgress: ({ processedPages, totalPages }) => {
-                if (statusEl) {
-                  renderPrintProgress(statusEl, processedPages, totalPages);
-                }
-                printOverlay.updateProgress(
-                  processedPages,
-                  totalPages ?? processedPages,
-                  '실험 인쇄 경로로 인쇄 데이터를 준비하고 있습니다...',
-                );
-              },
-            });
-            if (statusEl) statusEl.innerHTML = origStatus;
-            printOverlay.hide();
-            return;
-          } catch (extractionError) {
-            console.warn('[file:print] print extraction failed, falling back to svg print', extractionError);
-            if (statusEl) {
-              statusEl.textContent = '인쇄 추출 경로 실패, 기본 인쇄로 전환 중...';
-            }
-            printOverlay.updateMessage('기본 인쇄 경로로 전환 중...');
-          }
-        }
-
         // SVG 페이지 생성
         console.time(`[${traceId}] svg.generate`);
         console.log('[Print Baseline] start', {
@@ -392,26 +348,6 @@ export const fileCommands: CommandDef[] = [
   },
 ];
 
-function isPrintRangeRequest(value: unknown): value is PrintRangeRequest {
-  if (!value || typeof value !== 'object') return false;
-
-  const type = (value as { type?: unknown }).type;
-  if (type === 'all') {
-    return true;
-  }
-
-  if (type === 'currentPage') {
-    return typeof (value as { page?: unknown }).page === 'number';
-  }
-
-  if (type === 'pageRange') {
-    return typeof (value as { start?: unknown }).start === 'number'
-      && typeof (value as { end?: unknown }).end === 'number';
-  }
-
-  return false;
-}
-
 async function waitForPrintLayout(): Promise<void> {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -463,21 +399,6 @@ async function generateSvgPagesInBatches(params: {
   }
 
   return svgPages;
-}
-
-function getRequestedPrintPageCount(
-  range: PrintRangeRequest | undefined,
-  totalPageCount: number,
-): number {
-  if (!range || range.type === 'all') {
-    return totalPageCount;
-  }
-
-  if (range.type === 'currentPage') {
-    return 1;
-  }
-
-  return Math.max(0, range.end - range.start + 1);
 }
 
 function renderPrintProgress(
