@@ -36,77 +36,6 @@ use crate::error::HwpError;
 use crate::document_core::{DocumentCore, DEFAULT_FALLBACK_FONT};
 use crate::print_module::{PrintChunk, PrintCursor, PrintTaskState};
 
-fn paragraph_to_print_blocks(
-    para: &Paragraph,
-    section_index: usize,
-    paragraph_index: usize,
-) -> Vec<crate::print_module::PrintBlock> {
-    let mut blocks = Vec::new();
-    let escaped = crate::document_core::helpers::clipboard_escape_html(&para.text);
-
-    if !escaped.is_empty() {
-        blocks.push(crate::print_module::PrintBlock::Paragraph {
-            html: format!("<p>{}</p>", escaped.replace('\n', "<br/>")),
-            section_index,
-            paragraph_index,
-        });
-    }
-
-    if matches!(para.column_type, ColumnBreakType::Page) {
-        blocks.push(crate::print_module::PrintBlock::PageBreak {
-            section_index,
-            paragraph_index,
-        });
-    }
-
-    blocks
-}
-
-fn table_to_print_html(table: &crate::model::table::Table) -> String {
-    let mut html = String::from("<table><tbody>");
-
-    for row in 0..table.row_count {
-        html.push_str("<tr>");
-        for col in 0..table.col_count {
-            let Some(cell) = table.cell_at(row, col) else {
-                continue;
-            };
-
-            if cell.row != row || cell.col != col {
-                continue;
-            }
-
-            html.push_str("<td");
-            if cell.col_span > 1 {
-                html.push_str(&format!(" colspan=\"{}\"", cell.col_span));
-            }
-            if cell.row_span > 1 {
-                html.push_str(&format!(" rowspan=\"{}\"", cell.row_span));
-            }
-            html.push('>');
-
-            let mut first_para = true;
-            for para in &cell.paragraphs {
-                let escaped = crate::document_core::helpers::clipboard_escape_html(&para.text);
-                if escaped.is_empty() {
-                    continue;
-                }
-                if !first_para {
-                    html.push_str("<br/>");
-                }
-                html.push_str(&escaped.replace('\n', "<br/>"));
-                first_para = false;
-            }
-
-            html.push_str("</td>");
-        }
-        html.push_str("</tr>");
-    }
-
-    html.push_str("</tbody></table>");
-    html
-}
-
 impl From<HwpError> for JsValue {
     fn from(err: HwpError) -> Self {
         JsValue::from_str(&err.to_string())
@@ -267,13 +196,13 @@ impl HwpDocument {
 
             while paragraph_index < section.paragraphs.len() && blocks.len() < max_blocks {
                 let para = &section.paragraphs[paragraph_index];
-                let para_blocks = paragraph_to_print_blocks(para, section_index, paragraph_index);
-
-                for block in para_blocks {
-                    if blocks.len() >= max_blocks {
-                        break;
-                    }
-                    blocks.push(block);
+                let paragraph_html = self.paragraph_to_html(para, None, None);
+                if !paragraph_html.is_empty() {
+                    blocks.push(crate::print_module::PrintBlock::Paragraph {
+                        html: paragraph_html,
+                        section_index,
+                        paragraph_index,
+                    });
                 }
 
                 if blocks.len() < max_blocks {
@@ -282,18 +211,23 @@ impl HwpDocument {
                             break;
                         }
 
-                        if let Control::Table(table) = control {
-                            blocks.push(crate::print_module::PrintBlock::Table {
-                                html: table_to_print_html(table),
-                                section_index,
-                                paragraph_index,
-                                control_index,
-                            });
-                        } else if let Control::Picture(pic) = control {
-                            let html = self.picture_to_html(pic);
-                            if !html.is_empty() {
+                        let control_html = self.control_to_html(control);
+                        if control_html.is_empty() {
+                            continue;
+                        }
+
+                        match control {
+                            Control::Table(_) => {
+                                blocks.push(crate::print_module::PrintBlock::Table {
+                                    html: control_html,
+                                    section_index,
+                                    paragraph_index,
+                                    control_index,
+                                });
+                            }
+                            Control::Picture(_) => {
                                 blocks.push(crate::print_module::PrintBlock::Image {
-                                    src: html,
+                                    src: control_html,
                                     alt: format!(
                                         "picture-{}-{}-{}",
                                         section_index, paragraph_index, control_index
@@ -304,8 +238,16 @@ impl HwpDocument {
                                     control_index,
                                 });
                             }
+                            _ => {}
                         }
                     }
+                }
+
+                if blocks.len() < max_blocks && matches!(para.column_type, ColumnBreakType::Page) {
+                    blocks.push(crate::print_module::PrintBlock::PageBreak {
+                        section_index,
+                        paragraph_index,
+                    });
                 }
 
                 paragraph_index += 1;
