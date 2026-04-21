@@ -10,9 +10,144 @@ import {
   type FileSystemWindowLike,
 } from '@/command/file-system-access';
 import { PrintProgressOverlay } from '@/ui/print-progress-overlay';
+import { PdfPreviewController } from '@/pdf/pdf-preview-controller';
+import { invoke } from '@tauri-apps/api/core';
+import { showToast } from '@/ui/toast';
 
 const DEFAULT_SVG_BATCH_SIZE = 50;
 const DEFAULT_DOM_INSERT_BATCH_SIZE = 50;
+const DEFAULT_PDF_PREVIEW_CHUNK_SIZE = 20;
+const DEFAULT_PDF_WORKER_BATCH_SIZE = 30;
+const DEFAULT_PDF_WORKER_SVG_BATCH_SIZE = 30;
+
+type PdfChunkPreviewCursor = {
+  nextStartPage: number;
+  chunkSize: number;
+  batchSize: number;
+  svgBatchSize: number;
+  totalPages: number;
+};
+
+const workerPdfPreview = new PdfPreviewController();
+let currentPdfChunkCursor: PdfChunkPreviewCursor | null = null;
+
+async function yieldToBrowser(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
+async function previewCurrentDocPdfChunk(
+  services: Parameters<NonNullable<CommandDef['execute']>>[0],
+  params: {
+    startPage?: number;
+    chunkSize?: number;
+    batchSize?: number;
+    svgBatchSize?: number;
+  } = {},
+): Promise<void> {
+  const wasm = services.wasm;
+  if (wasm.pageCount <= 0) {
+    throw new Error('문서가 로드되지 않았습니다.');
+  }
+
+  const startPage = Math.max(1, Math.min(params.startPage ?? 1, wasm.pageCount));
+  const chunkSize = Math.max(1, Math.round(params.chunkSize ?? DEFAULT_PDF_PREVIEW_CHUNK_SIZE));
+  const endPage = Math.min(wasm.pageCount, startPage + chunkSize - 1);
+  const batchSize = Math.max(1, Math.round(params.batchSize ?? DEFAULT_PDF_WORKER_BATCH_SIZE));
+  const svgBatchSize = Math.max(1, Math.round(params.svgBatchSize ?? DEFAULT_PDF_WORKER_SVG_BATCH_SIZE));
+  const pageIndexes = Array.from(
+    { length: endPage - startPage + 1 },
+    (_, index) => startPage - 1 + index,
+  );
+
+  const statusEl = document.getElementById('sb-message');
+  const originalStatus = statusEl?.innerHTML ?? '';
+  const overlay = new PrintProgressOverlay();
+  const abortSignal = overlay.show('PDF 미리보기 준비 중');
+  const svgPages: string[] = [];
+
+  try {
+    for (let startIndex = 0; startIndex < pageIndexes.length; startIndex += svgBatchSize) {
+      if (abortSignal.aborted) {
+        throw new Error('PDF 미리보기 준비가 취소되었습니다.');
+      }
+
+      const batchPageIndexes = pageIndexes.slice(startIndex, startIndex + svgBatchSize);
+      for (const pageIndex of batchPageIndexes) {
+        if (abortSignal.aborted) {
+          throw new Error('PDF 미리보기 준비가 취소되었습니다.');
+        }
+        svgPages.push(wasm.renderPageSvg(pageIndex));
+      }
+
+      const completedPages = Math.min(startIndex + batchPageIndexes.length, pageIndexes.length);
+      statusEl && renderPrintProgress(statusEl, completedPages, pageIndexes.length);
+      overlay.updateProgress(
+        completedPages,
+        pageIndexes.length,
+        `PDF 미리보기 준비 중... (${startPage + completedPages - 1}/${endPage}페이지)`,
+      );
+
+      if (completedPages < pageIndexes.length) {
+        await yieldToBrowser();
+      }
+    }
+
+    const firstPageInfo = wasm.getPageInfo(pageIndexes[0]);
+    const messages = await invoke('debug_run_print_worker_pdf_export_for_current_doc', {
+      payload: {
+        jobId: `menu-pdf-preview-${Date.now()}`,
+        sourceFileName: wasm.fileName,
+        widthPx: Math.max(1, Math.round(firstPageInfo.width)),
+        heightPx: Math.max(1, Math.round(firstPageInfo.height)),
+        batchSize,
+        svgPages,
+      },
+    }) as Array<{
+      type?: string;
+      result?: {
+        ok?: boolean;
+        outputPdfPath?: string;
+        errorCode?: string;
+        errorMessage?: string;
+      };
+    }>;
+
+    const resultMessage = [...messages].reverse().find((message) => message.type === 'result')?.result;
+    const outputPdfPath = resultMessage?.ok ? resultMessage.outputPdfPath : undefined;
+    if (!outputPdfPath) {
+      throw new Error(
+        resultMessage?.errorMessage
+          ? `PDF 미리보기 생성 실패 (${resultMessage.errorCode ?? 'UNKNOWN'}): ${resultMessage.errorMessage}`
+          : 'PDF 미리보기 생성 결과를 확인할 수 없습니다.',
+      );
+    }
+
+    const bytes = await invoke('debug_read_generated_pdf', { path: outputPdfPath }) as number[];
+    const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+    await workerPdfPreview.open(blob, {
+      title: `${wasm.fileName} (${startPage}-${endPage})`,
+    });
+
+    currentPdfChunkCursor = {
+      nextStartPage: endPage + 1,
+      chunkSize,
+      batchSize,
+      svgBatchSize,
+      totalPages: wasm.pageCount,
+    };
+
+    statusEl && (statusEl.innerHTML = originalStatus);
+    overlay.hide();
+    showToast({
+      message: `PDF 미리보기 ${startPage}-${endPage}페이지를 열었습니다.`,
+      durationMs: 3000,
+    });
+  } catch (error) {
+    statusEl && (statusEl.textContent = error instanceof Error ? error.message : String(error));
+    overlay.hide();
+    throw error;
+  }
+}
 
 async function printSvgPages(
   fileName: string,
@@ -335,6 +470,49 @@ export const fileCommands: CommandDef[] = [
         console.error('[file:print]', msg);
         if (statusEl) statusEl.textContent = `인쇄 실패: ${msg}`;
         printOverlay.hide();
+      }
+    },
+  },
+  {
+    id: 'file:pdf-preview-chunk',
+    label: 'PDF 미리보기 (20쪽)',
+    canExecute: (ctx) => ctx.hasDocument,
+    async execute(services) {
+      try {
+        await previewCurrentDocPdfChunk(services);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('[file:pdf-preview-chunk]', message);
+        alert(`PDF 미리보기에 실패했습니다.\n${message}`);
+      }
+    },
+  },
+  {
+    id: 'file:pdf-preview-next-chunk',
+    label: '다음 20쪽 PDF 미리보기',
+    canExecute: (ctx) => ctx.hasDocument,
+    async execute(services) {
+      if (!currentPdfChunkCursor) {
+        alert('먼저 [파일] → [PDF 미리보기 (20쪽)]를 실행해주세요.');
+        return;
+      }
+
+      if (currentPdfChunkCursor.nextStartPage > currentPdfChunkCursor.totalPages) {
+        alert('더 이상 미리보기할 다음 페이지 구간이 없습니다.');
+        return;
+      }
+
+      try {
+        await previewCurrentDocPdfChunk(services, {
+          startPage: currentPdfChunkCursor.nextStartPage,
+          chunkSize: currentPdfChunkCursor.chunkSize,
+          batchSize: currentPdfChunkCursor.batchSize,
+          svgBatchSize: currentPdfChunkCursor.svgBatchSize,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('[file:pdf-preview-next-chunk]', message);
+        alert(`다음 PDF 미리보기에 실패했습니다.\n${message}`);
       }
     },
   },
