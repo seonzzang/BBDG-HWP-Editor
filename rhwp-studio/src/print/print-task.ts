@@ -1,16 +1,21 @@
-import type { PrintBlock, PrintChunk, PrintCursor } from '../core/types';
+import type { PrintBlock, PrintChunk, PrintCursor, PrintRangeRequest } from '../core/types';
 import { WasmBridge } from '../core/wasm-bridge';
 
 const DEFAULT_PRINT_CHUNK_SIZE = 24;
+
+export interface PrintTaskOptions {
+  range?: PrintRangeRequest;
+}
 
 export class PrintTask {
   constructor(
     private readonly wasm: WasmBridge,
     private readonly chunkSize: number = DEFAULT_PRINT_CHUNK_SIZE,
+    private readonly options: PrintTaskOptions = {},
   ) {}
 
   begin(): PrintCursor {
-    return this.wasm.beginPrintTask();
+    return this.wasm.beginPrintTask(this.options.range);
   }
 
   extract(cursor: PrintCursor): PrintChunk {

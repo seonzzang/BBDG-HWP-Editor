@@ -10,6 +10,7 @@ import {
   type FileSystemWindowLike,
 } from '@/command/file-system-access';
 import { PrintController } from '@/print/print-controller';
+import type { PrintRangeRequest } from '@/core/types';
 
 function printSvgPages(
   fileName: string,
@@ -244,6 +245,9 @@ export const fileCommands: CommandDef[] = [
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services, params) {
       const usePrintExtraction = params?.usePrintExtraction === true;
+      const requestedPrintRange = isPrintRangeRequest(params?.printRange)
+        ? params.printRange
+        : undefined;
       const wasm = services.wasm;
       const pageCount = wasm.pageCount;
 
@@ -259,6 +263,7 @@ export const fileCommands: CommandDef[] = [
             const controller = new PrintController(wasm);
             await controller.run({
               title: wasm.fileName,
+              range: requestedPrintRange,
               onProgress: (processedBlocks) => {
                 if (statusEl) {
                   statusEl.textContent = `인쇄 데이터 준비 중... (${processedBlocks} blocks)`;
@@ -309,3 +314,23 @@ export const fileCommands: CommandDef[] = [
     },
   },
 ];
+
+function isPrintRangeRequest(value: unknown): value is PrintRangeRequest {
+  if (!value || typeof value !== 'object') return false;
+
+  const type = (value as { type?: unknown }).type;
+  if (type === 'all') {
+    return true;
+  }
+
+  if (type === 'currentPage') {
+    return typeof (value as { page?: unknown }).page === 'number';
+  }
+
+  if (type === 'pageRange') {
+    return typeof (value as { start?: unknown }).start === 'number'
+      && typeof (value as { end?: unknown }).end === 'number';
+  }
+
+  return false;
+}
