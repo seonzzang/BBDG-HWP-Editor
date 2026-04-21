@@ -34,7 +34,7 @@ use crate::renderer::page_layout::PageLayoutInfo;
 use crate::renderer::DEFAULT_DPI;
 use crate::error::HwpError;
 use crate::document_core::{DocumentCore, DEFAULT_FALLBACK_FONT};
-use crate::print_module::{PrintChunk, PrintCursor, PrintRangeRequest, PrintTargetEntry, PrintTaskState};
+use crate::print_module::{PrintChunk, PrintCursor, PrintRangeRequest, PrintTargetEntry, PrintTargetKind, PrintTaskState};
 
 impl From<HwpError> for JsValue {
     fn from(err: HwpError) -> Self {
@@ -235,95 +235,127 @@ impl HwpDocument {
             return Err(JsValue::from_str("print task is not active"));
         }
 
-        let cursor: PrintCursor = serde_json::from_str(cursor_json)
+        let _cursor: PrintCursor = serde_json::from_str(cursor_json)
             .map_err(|e| JsValue::from_str(&format!("extract_print_chunk cursor parse failed: {e}")))?;
 
         let mut blocks = Vec::new();
-        let mut section_index = cursor.section_index;
-        let mut paragraph_index = cursor.paragraph_index;
+        let mut last_page_index: Option<usize> = None;
+        let mut current_entry_index = self
+            .print_task
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("print task is not active"))?
+            .current_entry_index;
+        let total_entries = self
+            .print_task
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("print task is not active"))?
+            .entries
+            .len();
 
-        while section_index < self.document.sections.len() && blocks.len() < max_blocks {
-            let section = &self.document.sections[section_index];
+        while current_entry_index < total_entries && blocks.len() < max_blocks {
+            let entry = self
+                .print_task
+                .as_ref()
+                .ok_or_else(|| JsValue::from_str("print task is not active"))?
+                .entries[current_entry_index]
+                .clone();
 
-            while paragraph_index < section.paragraphs.len() && blocks.len() < max_blocks {
-                let para = &section.paragraphs[paragraph_index];
-                let paragraph_html = self.paragraph_to_html(para, None, None);
-                if !paragraph_html.is_empty() {
-                    blocks.push(crate::print_module::PrintBlock::Paragraph {
-                        html: paragraph_html,
-                        section_index,
-                        paragraph_index,
+            if let Some(prev_page_index) = last_page_index {
+                if prev_page_index != entry.page_index && blocks.len() < max_blocks {
+                    blocks.push(crate::print_module::PrintBlock::PageBreak {
+                        section_index: entry.section_index,
+                        paragraph_index: entry.paragraph_index,
                     });
                 }
+            }
 
-                if blocks.len() < max_blocks {
-                    for (control_index, control) in para.controls.iter().enumerate() {
-                        if blocks.len() >= max_blocks {
-                            break;
-                        }
+            let section = self.document.sections.get(entry.section_index)
+                .ok_or_else(|| JsValue::from_str("print entry section out of range"))?;
+            let para = section.paragraphs.get(entry.paragraph_index)
+                .ok_or_else(|| JsValue::from_str("print entry paragraph out of range"))?;
 
-                        let control_html = self.control_to_html(control);
-                        if control_html.is_empty() {
-                            continue;
-                        }
+            match entry.kind {
+                PrintTargetKind::FullParagraph | PrintTargetKind::PartialParagraph { .. } => {
+                    let paragraph_html = self.paragraph_to_html(para, None, None);
+                    if !paragraph_html.is_empty() {
+                        blocks.push(crate::print_module::PrintBlock::Paragraph {
+                            html: paragraph_html,
+                            section_index: entry.section_index,
+                            paragraph_index: entry.paragraph_index,
+                        });
+                    }
 
-                        match control {
-                            Control::Table(_) => {
-                                blocks.push(crate::print_module::PrintBlock::Table {
-                                    html: control_html,
-                                    section_index,
-                                    paragraph_index,
-                                    control_index,
-                                });
-                            }
-                            Control::Picture(_) => {
+                    if blocks.len() < max_blocks && matches!(para.column_type, ColumnBreakType::Page) {
+                        blocks.push(crate::print_module::PrintBlock::PageBreak {
+                            section_index: entry.section_index,
+                            paragraph_index: entry.paragraph_index,
+                        });
+                    }
+                }
+                PrintTargetKind::Table { control_index }
+                | PrintTargetKind::PartialTable { control_index, .. } => {
+                    let control = para.controls.get(control_index)
+                        .ok_or_else(|| JsValue::from_str("print entry table control out of range"))?;
+                    let control_html = self.control_to_html(control);
+                    if !control_html.is_empty() {
+                        blocks.push(crate::print_module::PrintBlock::Table {
+                            html: control_html,
+                            section_index: entry.section_index,
+                            paragraph_index: entry.paragraph_index,
+                            control_index,
+                        });
+                    }
+                }
+                PrintTargetKind::Shape { control_index } => {
+                    let control = para.controls.get(control_index)
+                        .ok_or_else(|| JsValue::from_str("print entry shape control out of range"))?;
+                    match control {
+                        Control::Picture(_) => {
+                            let control_html = self.control_to_html(control);
+                            if !control_html.is_empty() {
                                 blocks.push(crate::print_module::PrintBlock::Image {
                                     src: control_html,
                                     alt: format!(
                                         "picture-{}-{}-{}",
-                                        section_index, paragraph_index, control_index
+                                        entry.section_index, entry.paragraph_index, control_index
                                     ),
                                     mime: None,
-                                    section_index,
-                                    paragraph_index,
+                                    section_index: entry.section_index,
+                                    paragraph_index: entry.paragraph_index,
                                     control_index,
                                 });
                             }
-                            _ => {}
                         }
+                        _ => {}
                     }
                 }
-
-                if blocks.len() < max_blocks && matches!(para.column_type, ColumnBreakType::Page) {
-                    blocks.push(crate::print_module::PrintBlock::PageBreak {
-                        section_index,
-                        paragraph_index,
-                    });
-                }
-
-                paragraph_index += 1;
             }
 
-            if paragraph_index >= self.document.sections[section_index].paragraphs.len() {
-                section_index += 1;
-                paragraph_index = 0;
-            }
+            last_page_index = Some(entry.page_index);
+            current_entry_index += 1;
         }
 
-        let done = section_index >= self.document.sections.len();
+        if let Some(state) = self.print_task.as_mut() {
+            state.current_entry_index = current_entry_index;
+        }
+
+        let done = current_entry_index >= total_entries;
         let next_cursor = if done {
             None
         } else {
+            let next_entry = self
+                .print_task
+                .as_ref()
+                .ok_or_else(|| JsValue::from_str("print task is not active"))?
+                .entries
+                .get(current_entry_index)
+                .ok_or_else(|| JsValue::from_str("next print entry is out of range"))?;
             Some(PrintCursor {
-                section_index,
-                paragraph_index,
-                control_index: None,
+                section_index: next_entry.section_index,
+                paragraph_index: next_entry.paragraph_index,
+                control_index: next_entry.control_index,
             })
         };
-
-        if let Some(state) = self.print_task.as_mut() {
-            state.current_entry_index = state.entries.len().min(blocks.len());
-        }
 
         let chunk = PrintChunk {
             done,
