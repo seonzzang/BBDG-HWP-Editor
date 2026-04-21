@@ -2,9 +2,11 @@ import type { PrintBlock, PrintChunk, PrintCursor, PrintRangeRequest } from '../
 import { WasmBridge } from '../core/wasm-bridge';
 
 const DEFAULT_PRINT_CHUNK_SIZE = 24;
+const DEFAULT_PRINT_PAGE_BATCH_SIZE = 5;
 
 export interface PrintTaskOptions {
   range?: PrintRangeRequest;
+  pageBatchSize?: number;
 }
 
 export class PrintTask {
@@ -28,14 +30,29 @@ export class PrintTask {
 
   async run(onChunk: (html: string, chunk: PrintChunk) => Promise<void> | void): Promise<void> {
     let cursor = this.begin();
+    let pendingBlocks: PrintBlock[] = [];
+    let pendingPages = 0;
 
     try {
       while (true) {
         const chunk = this.extract(cursor);
-        const html = this.renderChunkHtml(chunk.blocks);
+        pendingBlocks.push(...chunk.blocks);
+        pendingPages += countCompletedPages(chunk.blocks);
+        const shouldFlush = pendingPages >= (this.options.pageBatchSize ?? DEFAULT_PRINT_PAGE_BATCH_SIZE)
+          || chunk.done
+          || !chunk.nextCursor;
 
-        if (html) {
-          await onChunk(html, chunk);
+        if (shouldFlush && pendingBlocks.length > 0) {
+          const html = this.renderChunkHtml(pendingBlocks);
+          if (html) {
+            await onChunk(html, {
+              done: chunk.done,
+              nextCursor: chunk.nextCursor,
+              blocks: pendingBlocks,
+            });
+          }
+          pendingBlocks = [];
+          pendingPages = 0;
         }
 
         if (chunk.done || !chunk.nextCursor) {
@@ -83,6 +100,10 @@ function normalizeImageHtml(src: string, alt: string): string {
   const safeSrc = escapeHtml(src);
   const safeAlt = escapeHtml(alt);
   return `<img src="${safeSrc}" alt="${safeAlt}" />`;
+}
+
+function countCompletedPages(blocks: PrintBlock[]): number {
+  return blocks.filter((block) => block.type === 'pageBreak').length;
 }
 
 function escapeHtml(value: string): string {
