@@ -190,6 +190,7 @@ async function initialize(): Promise<void> {
         dispatcher.dispatch('file:print', params);
 
       await setupPdfDevtoolsApi();
+      await setupPrintWorkerDevtoolsApi();
     }
   } catch (error) {
     msg.textContent = `WASM 초기화 실패: ${error}`;
@@ -212,6 +213,16 @@ async function setupPdfDevtoolsApi(): Promise<void> {
     pdfDevtoolsApi.previewPdf({ range: createPdfPreviewRange(start, end) });
   (window as any).__disposePdfPreview = () =>
     pdfDevtoolsApi.disposePreview();
+}
+
+async function setupPrintWorkerDevtoolsApi(): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+
+  (window as any).__testPrintWorkerEcho = async () => {
+    const messages = await invoke('debug_run_print_worker_echo') as unknown;
+    console.log('[print-worker-echo] messages', messages);
+    return messages;
+  };
 }
 
 /**

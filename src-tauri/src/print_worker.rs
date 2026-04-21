@@ -1,0 +1,215 @@
+use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::Instant;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrintPageSize {
+    pub width_px: u32,
+    pub height_px: u32,
+    pub dpi: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PrintJobRange {
+    All,
+    CurrentPage { current_page: u32 },
+    PageRange { start_page: u32, end_page: u32 },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrintJobRequest {
+    pub job_id: String,
+    pub source_file_name: String,
+    pub output_mode: String,
+    pub page_range: PrintJobRange,
+    pub batch_size: u32,
+    pub temp_dir: String,
+    pub output_pdf_path: String,
+    pub page_count: u32,
+    pub page_size: PrintPageSize,
+    pub svg_page_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrintJobProgress {
+    pub job_id: String,
+    pub phase: String,
+    pub completed_pages: u32,
+    pub total_pages: u32,
+    pub batch_index: Option<u32>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrintJobResult {
+    pub job_id: String,
+    pub ok: bool,
+    pub output_pdf_path: Option<String>,
+    pub duration_ms: u64,
+    pub error_code: Option<String>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PrintWorkerMessage {
+    Progress { progress: PrintJobProgress },
+    Result { result: PrintJobResult },
+}
+
+fn workspace_root() -> Result<PathBuf, String> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "workspace root를 찾을 수 없습니다".to_string())
+}
+
+fn print_worker_script_path() -> Result<PathBuf, String> {
+    Ok(workspace_root()?.join("scripts").join("print-worker.ts"))
+}
+
+pub fn run_print_worker_echo(request: &PrintJobRequest) -> Result<Vec<PrintWorkerMessage>, String> {
+    let script_path = print_worker_script_path()?;
+    if !script_path.exists() {
+        return Err(format!("print worker script not found: {}", script_path.display()));
+    }
+
+    let started_at = Instant::now();
+    let mut child = Command::new("node")
+        .arg("--experimental-strip-types")
+        .arg(script_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("print worker spawn failed: {error}"))?;
+
+    let payload = serde_json::to_string(request)
+        .map_err(|error| format!("print worker request serialize failed: {error}"))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(payload.as_bytes())
+            .and_then(|_| stdin.write_all(b"\n"))
+            .map_err(|error| format!("print worker stdin write failed: {error}"))?;
+    }
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "print worker stdout pipe is missing".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "print worker stderr pipe is missing".to_string())?;
+
+    let mut messages = Vec::new();
+    for line in BufReader::new(stdout).lines() {
+        let line = line.map_err(|error| format!("print worker stdout read failed: {error}"))?;
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let message = serde_json::from_str::<PrintWorkerMessage>(trimmed)
+            .map_err(|error| format!("print worker stdout parse failed: {error}; raw={trimmed}"))?;
+        messages.push(message);
+    }
+
+    let status = child
+        .wait()
+        .map_err(|error| format!("print worker wait failed: {error}"))?;
+    let stderr_output = {
+        let mut collected = String::new();
+        for line in BufReader::new(stderr).lines() {
+            let line = line.map_err(|error| format!("print worker stderr read failed: {error}"))?;
+            if !line.trim().is_empty() {
+                if !collected.is_empty() {
+                    collected.push('\n');
+                }
+                collected.push_str(&line);
+            }
+        }
+        collected
+    };
+
+    if !status.success() {
+        return Err(format!(
+            "print worker exited with status {:?} after {}ms{}",
+            status.code(),
+            started_at.elapsed().as_millis(),
+            if stderr_output.is_empty() {
+                String::new()
+            } else {
+                format!(": {stderr_output}")
+            }
+        ));
+    }
+
+    Ok(messages)
+}
+
+#[tauri::command]
+pub fn debug_run_print_worker_echo() -> Result<Vec<PrintWorkerMessage>, String> {
+    let temp_dir = std::env::temp_dir().join("bbdg-hwp-editor-print-test");
+    std::fs::create_dir_all(&temp_dir)
+        .map_err(|error| format!("print worker temp dir create failed: {error}"))?;
+
+    let request = PrintJobRequest {
+        job_id: "debug-print-worker-echo".to_string(),
+        source_file_name: "sample.hwp".to_string(),
+        output_mode: "preview".to_string(),
+        page_range: PrintJobRange::All,
+        batch_size: 5,
+        temp_dir: temp_dir.display().to_string(),
+        output_pdf_path: temp_dir.join("sample.pdf").display().to_string(),
+        page_count: 12,
+        page_size: PrintPageSize {
+            width_px: 794,
+            height_px: 1123,
+            dpi: 96,
+        },
+        svg_page_paths: Vec::new(),
+    };
+
+    run_print_worker_echo(&request)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn echo_worker_returns_progress_and_result_messages() {
+        let request = PrintJobRequest {
+            job_id: "unit-test-job".to_string(),
+            source_file_name: "sample.hwp".to_string(),
+            output_mode: "preview".to_string(),
+            page_range: PrintJobRange::All,
+            batch_size: 5,
+            temp_dir: std::env::temp_dir().display().to_string(),
+            output_pdf_path: std::env::temp_dir().join("unit-test.pdf").display().to_string(),
+            page_count: 10,
+            page_size: PrintPageSize {
+                width_px: 794,
+                height_px: 1123,
+                dpi: 96,
+            },
+            svg_page_paths: Vec::new(),
+        };
+
+        let messages = run_print_worker_echo(&request).expect("echo worker should respond");
+        assert!(messages.len() >= 2);
+        assert!(matches!(messages.first(), Some(PrintWorkerMessage::Progress { .. })));
+        assert!(matches!(messages.last(), Some(PrintWorkerMessage::Result { .. })));
+    }
+}
