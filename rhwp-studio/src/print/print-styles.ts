@@ -54,5 +54,17 @@ body {
   max-width: 100%;
   height: auto;
 }
+
+@media screen {
+  .print-document {
+    contain: layout style;
+  }
+
+  .print-block {
+    content-visibility: auto;
+    contain: layout style paint;
+    contain-intrinsic-size: 297mm auto;
+  }
+}
 `.trim();
 }
