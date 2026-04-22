@@ -105,8 +105,8 @@ export const REGISTERED_FONTS = new Set(FONT_LIST.map(f => f.name));
 /** 초기 렌더링에 필수인 폰트 (대부분의 HWP 문서 기본 서체) */
 const CRITICAL_FONTS = new Set(['함초롬바탕', '함초롬돋움']);
 
-/** CSS @font-face 등록 여부 (중복 등록 방지) */
-let fontFaceRegistered = false;
+/** CSS @font-face가 등록된 폰트 이름 (지연 등록) */
+const registeredFontFaces = new Set<string>();
 
 /** 이미 로드 완료된 woff2 파일 (중복 네트워크 요청 방지) */
 const loadedFiles = new Set<string>();
@@ -158,19 +158,8 @@ export async function loadWebFonts(
   onProgress?: (loaded: number, total: number) => void,
 ): Promise<void> {
   // 0) OS 폰트 감지 (@font-face 등록 전에 실행해야 정확)
-  if (!fontFaceRegistered) {
+  if (registeredFontFaces.size === 0) {
     detectOSFonts();
-  }
-
-  // 1) CSS @font-face 규칙 전체 등록 (네트워크 미발생, 최초 1회만)
-  if (!fontFaceRegistered) {
-    const style = document.createElement('style');
-    style.textContent = FONT_LIST.map(f => {
-      const fmt = f.format ?? 'woff2';
-      return `@font-face { font-family: "${f.name}"; src: url("${f.file}") format("${fmt}"); font-display: swap; }`;
-    }).join('\n');
-    document.head.appendChild(style);
-    fontFaceRegistered = true;
   }
 
   // 2) 로드 대상 결정: docFonts에 포함된 폰트 + CRITICAL만 로드
@@ -194,6 +183,18 @@ export async function loadWebFonts(
   }
 
   if (uniqueToLoad.length === 0) return;
+
+  // 필요한 폰트만 CSS @font-face 지연 등록
+  const cssEntries = toLoad.filter(f => !registeredFontFaces.has(f.name));
+  if (cssEntries.length > 0) {
+    const style = document.createElement('style');
+    style.textContent = cssEntries.map(f => {
+      const fmt = f.format ?? 'woff2';
+      registeredFontFaces.add(f.name);
+      return `@font-face { font-family: "${f.name}"; src: url("${f.file}") format("${fmt}"); font-display: swap; }`;
+    }).join('\n');
+    document.head.appendChild(style);
+  }
 
   const total = uniqueToLoad.length;
   console.log(`[FontLoader] 웹폰트 로드 시작: ${total}개 woff2 (이미 로드됨: ${loadedFiles.size}개)`);
