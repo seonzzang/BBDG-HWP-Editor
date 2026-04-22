@@ -32,6 +32,7 @@ fn build_client() -> Result<Client, String> {
     Client::builder()
         .timeout(Duration::from_secs(30))
         .redirect(Policy::limited(10))
+        .user_agent("BBDG-HWP-Editor/0.7")
         .build()
         .map_err(|error| format!("HTTP 클라이언트 초기화 실패: {error}"))
 }

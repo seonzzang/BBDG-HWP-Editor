@@ -879,7 +879,10 @@ async function loadRemoteCandidate(candidate: {
     const errMsg = error instanceof Error ? error.message : String(error);
     msg.textContent = `링크 문서 열기 실패: ${errMsg}`;
     console.error('[link-drop] remote document open failed', { candidate, error });
-    alert(`링크에서 문서를 열지 못했습니다.\n${errMsg}`);
+    showToast({
+      message: `링크 문서 열기 실패: ${errMsg}`,
+      durationMs: 5000,
+    });
   }
 }
 
