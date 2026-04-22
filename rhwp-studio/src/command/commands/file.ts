@@ -97,6 +97,8 @@ async function previewCurrentDocPdfChunk(
     chunkSize?: number;
     batchSize?: number;
     svgBatchSize?: number;
+    openExternally?: boolean;
+    trackCursor?: boolean;
   } = {},
 ): Promise<void> {
   const wasm = services.wasm;
@@ -109,6 +111,8 @@ async function previewCurrentDocPdfChunk(
   const endPage = Math.min(wasm.pageCount, startPage + chunkSize - 1);
   const batchSize = Math.max(1, Math.round(params.batchSize ?? DEFAULT_PDF_WORKER_BATCH_SIZE));
   const svgBatchSize = Math.max(1, Math.round(params.svgBatchSize ?? DEFAULT_PDF_WORKER_SVG_BATCH_SIZE));
+  const openExternally = params.openExternally ?? false;
+  const trackCursor = params.trackCursor ?? true;
   const pageIndexes = Array.from(
     { length: endPage - startPage + 1 },
     (_, index) => startPage - 1 + index,
@@ -148,6 +152,12 @@ async function previewCurrentDocPdfChunk(
     }
 
     const firstPageInfo = wasm.getPageInfo(pageIndexes[0]);
+    statusEl && renderPrintProgress(statusEl, pageIndexes.length, pageIndexes.length);
+    overlay.updateProgress(
+      pageIndexes.length,
+      pageIndexes.length,
+      `PDF 생성 중... (${startPage}-${endPage}페이지)`,
+    );
     const messages = await invoke('debug_run_print_worker_pdf_export_for_current_doc', {
       payload: {
         jobId: `menu-pdf-preview-${Date.now()}`,
@@ -177,27 +187,35 @@ async function previewCurrentDocPdfChunk(
       );
     }
 
-    const bytes = await invoke('debug_read_generated_pdf', { path: outputPdfPath }) as number[];
-    const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
-    await workerPdfPreview.open(blob, {
-      title: `${wasm.fileName} (${startPage}-${endPage})`,
-    });
+    if (openExternally) {
+      await invoke('debug_open_generated_pdf', { path: outputPdfPath });
+    } else {
+      const bytes = await invoke('debug_read_generated_pdf', { path: outputPdfPath }) as number[];
+      const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+      await workerPdfPreview.open(blob, {
+        title: `${wasm.fileName} (${startPage}-${endPage})`,
+      });
+    }
 
-    currentPdfChunkCursor = {
-      sourceFileName: wasm.fileName,
-      startPage,
-      endPage,
-      nextStartPage: endPage + 1,
-      chunkSize,
-      batchSize,
-      svgBatchSize,
-      totalPages: wasm.pageCount,
-    };
+    if (trackCursor) {
+      currentPdfChunkCursor = {
+        sourceFileName: wasm.fileName,
+        startPage,
+        endPage,
+        nextStartPage: endPage + 1,
+        chunkSize,
+        batchSize,
+        svgBatchSize,
+        totalPages: wasm.pageCount,
+      };
+    }
 
     statusEl && (statusEl.innerHTML = originalStatus);
     overlay.hide();
     showToast({
-      message: `PDF 미리보기 ${startPage}-${endPage}페이지를 열었습니다.`,
+      message: openExternally
+        ? `PDF ${startPage}-${endPage}페이지를 외부 뷰어로 열었습니다.`
+        : `PDF 미리보기 ${startPage}-${endPage}페이지를 열었습니다.`,
       durationMs: 3000,
     });
   } catch (error) {
@@ -622,11 +640,33 @@ export const fileCommands: CommandDef[] = [
         console.error('[file:pdf-preview-range]', message);
         alert(`페이지 범위 PDF 미리보기에 실패했습니다.\n${message}`);
       }
+      },
     },
-  },
-  {
-    id: 'file:pdf-preview-next-chunk',
-    label: '다음 20쪽 PDF 미리보기',
+    {
+      id: 'file:pdf-export-full',
+      label: '전체 인쇄용 PDF 생성',
+      icon: 'icon-print',
+      canExecute: (ctx) => ctx.hasDocument,
+      async execute(services) {
+        try {
+          await previewCurrentDocPdfChunk(services, {
+            startPage: 1,
+            chunkSize: services.wasm.pageCount,
+            batchSize: DEFAULT_PDF_WORKER_BATCH_SIZE,
+            svgBatchSize: DEFAULT_PDF_WORKER_SVG_BATCH_SIZE,
+            openExternally: true,
+            trackCursor: false,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error('[file:pdf-export-full]', message);
+          alert(`전체 인쇄용 PDF 생성에 실패했습니다.\n${message}`);
+        }
+      },
+    },
+    {
+      id: 'file:pdf-preview-next-chunk',
+      label: '다음 20쪽 PDF 미리보기',
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services) {
       if (!isPdfChunkCursorCurrentDocument(currentPdfChunkCursor, services)) {
