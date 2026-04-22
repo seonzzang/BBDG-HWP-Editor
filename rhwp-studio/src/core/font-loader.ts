@@ -110,6 +110,8 @@ const registeredFontFaces = new Set<string>();
 
 /** 이미 로드 완료된 woff2 파일 (중복 네트워크 요청 방지) */
 const loadedFiles = new Set<string>();
+/** 이미 로드 실패한 웹폰트 파일 (세션 중 재시도 방지) */
+const failedFiles = new Set<string>();
 
 /**
  * OS에 설치된 폰트인지 감지한다 (document.fonts.check 기반).
@@ -172,11 +174,11 @@ export async function loadWebFonts(
     return true;
   });
 
-  // woff2 파일 기준으로 중복 제거 + 이미 로드된 파일 건너뜀
+  // woff2 파일 기준으로 중복 제거 + 이미 성공/실패가 확정된 파일 건너뜀
   const seenFiles = new Set<string>();
   const uniqueToLoad: FontEntry[] = [];
   for (const f of toLoad) {
-    if (!seenFiles.has(f.file) && !loadedFiles.has(f.file)) {
+    if (!seenFiles.has(f.file) && !loadedFiles.has(f.file) && !failedFiles.has(f.file)) {
       seenFiles.add(f.file);
       uniqueToLoad.push(f);
     }
@@ -197,12 +199,14 @@ export async function loadWebFonts(
   }
 
   const total = uniqueToLoad.length;
-  console.log(`[FontLoader] 웹폰트 로드 시작: ${total}개 woff2 (이미 로드됨: ${loadedFiles.size}개)`);
+  console.log(
+    `[FontLoader] 웹폰트 로드 시작: ${total}개 (성공 캐시: ${loadedFiles.size}개, 실패 캐시: ${failedFiles.size}개)`,
+  );
 
   // 같은 woff2 파일에 매핑된 모든 이름도 함께 등록
   const fileToNames = new Map<string, string[]>();
   for (const f of toLoad) {
-    if (!loadedFiles.has(f.file)) {
+    if (!loadedFiles.has(f.file) && !failedFiles.has(f.file)) {
       const names = fileToNames.get(f.file) ?? [];
       names.push(f.name);
       fileToNames.set(f.file, names);
@@ -227,6 +231,7 @@ export async function loadWebFonts(
         loadedFiles.add(f.file);
         loaded++;
       } catch {
+        failedFiles.add(f.file);
         failed++;
       }
       onProgress?.(loaded + failed, total);
@@ -236,5 +241,13 @@ export async function loadWebFonts(
     }
   }
 
-  console.log(`[FontLoader] 폰트 로드 완료: ${loaded}개 성공, ${failed}개 실패 (총 ${loadedFiles.size}개 woff2 로드됨)`);
+  if (failed > 0) {
+    console.log(
+      `[FontLoader] 폰트 로드 완료: ${loaded}개 성공, ${failed}개 실패 (성공 캐시: ${loadedFiles.size}개, 실패 캐시: ${failedFiles.size}개)`,
+    );
+  } else {
+    console.log(
+      `[FontLoader] 폰트 로드 완료: ${loaded}개 성공 (성공 캐시: ${loadedFiles.size}개, 실패 캐시: ${failedFiles.size}개)`,
+    );
+  }
 }
