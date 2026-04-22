@@ -16,7 +16,7 @@ import { showToast } from '@/ui/toast';
 
 const DEFAULT_SVG_BATCH_SIZE = 50;
 const DEFAULT_DOM_INSERT_BATCH_SIZE = 50;
-const DEFAULT_PDF_PREVIEW_CHUNK_SIZE = 20;
+const DEFAULT_PDF_PREVIEW_CHUNK_SIZE = 10;
 const DEFAULT_PDF_WORKER_BATCH_SIZE = 30;
 const DEFAULT_PDF_WORKER_SVG_BATCH_SIZE = 30;
 
@@ -579,7 +579,7 @@ export const fileCommands: CommandDef[] = [
   },
   {
     id: 'file:pdf-preview-chunk',
-    label: 'PDF 미리보기 (20쪽)',
+      label: 'PDF 미리보기 (10쪽)',
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services) {
       try {
@@ -593,7 +593,7 @@ export const fileCommands: CommandDef[] = [
   },
   {
     id: 'file:pdf-preview-current-chunk',
-    label: '현재 20쪽 PDF 미리보기',
+      label: '현재 10쪽 PDF 미리보기',
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services) {
       const currentPage = getCurrentPageFromStatusBar();
@@ -666,12 +666,12 @@ export const fileCommands: CommandDef[] = [
     },
     {
       id: 'file:pdf-preview-next-chunk',
-      label: '다음 20쪽 PDF 미리보기',
+      label: '다음 10쪽 PDF 미리보기',
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services) {
       if (!isPdfChunkCursorCurrentDocument(currentPdfChunkCursor, services)) {
         currentPdfChunkCursor = null;
-        alert('먼저 [파일] → [PDF 미리보기 (20쪽)]를 실행해주세요.');
+          alert('먼저 [파일] → [PDF 미리보기 (10쪽)]를 실행해주세요.');
         return;
       }
 
@@ -696,7 +696,7 @@ export const fileCommands: CommandDef[] = [
   },
   {
     id: 'file:pdf-preview-prev-chunk',
-    label: '이전 20쪽 PDF 미리보기',
+      label: '이전 10쪽 PDF 미리보기',
     canExecute: (ctx) => ctx.hasDocument,
     async execute(services) {
       const activeCursor = isPdfChunkCursorCurrentDocument(currentPdfChunkCursor, services)
