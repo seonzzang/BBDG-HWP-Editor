@@ -93,3 +93,17 @@ export function pickPrimaryDropCandidate(
 
   return candidates[0] ?? null;
 }
+
+export function summarizeDropCandidates(
+  candidates: DroppedResourceCandidate[],
+): Array<Record<string, unknown>> {
+  return candidates.map((candidate) => ({
+    kind: candidate.kind,
+    source: candidate.source,
+    name: candidate.name,
+    url: candidate.url,
+    fileName: candidate.file?.name,
+    fileType: candidate.file?.type,
+    fileSize: candidate.file?.size,
+  }));
+}

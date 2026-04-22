@@ -26,7 +26,7 @@ import { TableObjectRenderer } from '@/engine/table-object-renderer';
 import { TableResizeRenderer } from '@/engine/table-resize-renderer';
 import { Ruler } from '@/view/ruler';
 import { invoke } from '@tauri-apps/api/core';
-import { extractDropCandidates, pickPrimaryDropCandidate } from '@/command/link-drop';
+import { extractDropCandidates, pickPrimaryDropCandidate, summarizeDropCandidates } from '@/command/link-drop';
 
 const wasm = new WasmBridge();
 const eventBus = new EventBus();
@@ -592,7 +592,17 @@ function setupFileInput(): void {
     e.preventDefault();
     container.classList.remove('drag-over');
     const candidates = extractDropCandidates(e.dataTransfer);
+    console.log('[link-drop] candidates', summarizeDropCandidates(candidates));
     const candidate = pickPrimaryDropCandidate(candidates);
+    console.log('[link-drop] selected candidate', candidate
+      ? {
+        kind: candidate.kind,
+        source: candidate.source,
+        name: candidate.name,
+        url: candidate.url,
+        fileName: candidate.file?.name,
+      }
+      : null);
     if (!candidate) return;
 
     if (candidate.kind === 'file') {
