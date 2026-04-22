@@ -28,6 +28,10 @@ struct RemoteProbe {
     detection_method: String,
 }
 
+fn remote_hwp_temp_root() -> PathBuf {
+    std::env::temp_dir().join("bbdg-hwp-link-drop")
+}
+
 fn build_client() -> Result<Client, String> {
     Client::builder()
         .timeout(Duration::from_secs(30))
@@ -241,13 +245,12 @@ fn probe_remote_hwp(
 }
 
 fn temp_download_path(file_name: &str) -> Result<PathBuf, String> {
+    cleanup_stale_remote_downloads();
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| format!("시간 계산 실패: {error}"))?
         .as_millis();
-    let dir = std::env::temp_dir()
-        .join("bbdg-hwp-link-drop")
-        .join(format!("drop-{timestamp}"));
+    let dir = remote_hwp_temp_root().join(format!("drop-{timestamp}"));
     fs::create_dir_all(&dir).map_err(|error| format!("임시 디렉터리 생성 실패: {error}"))?;
     Ok(dir.join(file_name))
 }
@@ -291,6 +294,63 @@ fn sniff_downloaded_document(bytes: &[u8]) -> Result<(), String> {
     Err(format!(
         "지원되지 않는 다운로드 데이터입니다. HWP/HWPX 시그니처가 아닙니다. [{prefix}]"
     ))
+}
+
+fn cleanup_stale_remote_downloads() {
+    let root = remote_hwp_temp_root();
+    let Ok(entries) = fs::read_dir(&root) else {
+        return;
+    };
+
+    let now = SystemTime::now();
+    let ttl = Duration::from_secs(60 * 60 * 24);
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if !metadata.is_dir() {
+            continue;
+        }
+
+        let is_stale = metadata
+            .modified()
+            .ok()
+            .and_then(|modified| now.duration_since(modified).ok())
+            .map(|age| age >= ttl)
+            .unwrap_or(false);
+
+        if is_stale {
+            let _ = fs::remove_dir_all(path);
+        }
+    }
+}
+
+#[tauri::command]
+pub fn cleanup_remote_hwp_temp_path(path: String) -> Result<(), String> {
+    let target = PathBuf::from(path);
+    let canonical_target = target
+        .canonicalize()
+        .map_err(|error| format!("임시 파일 경로 확인 실패: {error}"))?;
+
+    let root = remote_hwp_temp_root();
+    let canonical_root = root.canonicalize().unwrap_or(root);
+
+    if !canonical_target.starts_with(&canonical_root) {
+        return Err("허용되지 않은 임시 파일 경로입니다.".to_string());
+    }
+
+    if canonical_target.is_file() {
+        fs::remove_file(&canonical_target)
+            .map_err(|error| format!("임시 파일 삭제 실패: {error}"))?;
+    }
+
+    if let Some(parent) = canonical_target.parent() {
+        let _ = fs::remove_dir(parent);
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

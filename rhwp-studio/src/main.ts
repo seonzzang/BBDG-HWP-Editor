@@ -860,12 +860,14 @@ async function loadRemoteCandidate(candidate: {
   source?: string;
 }): Promise<void> {
   const msg = sbMessage();
+  let tempPathToCleanup: string | null = null;
   try {
     msg.textContent = '링크에서 문서를 확인하는 중...';
     const result = await invoke('resolve_remote_hwp_url', {
       url: candidate.url,
       suggestedName: candidate.name ?? null,
     }) as RemoteHwpOpenResult;
+    tempPathToCleanup = result.tempPath;
     msg.textContent = '문서를 다운로드하는 중...';
     const data = new Uint8Array(result.bytes);
     await loadBytes(data, result.fileName, null);
@@ -896,6 +898,12 @@ async function loadRemoteCandidate(candidate: {
       message: `링크 문서 열기 실패: ${errMsg}`,
       durationMs: 5000,
     });
+  } finally {
+    if (tempPathToCleanup) {
+      invoke('cleanup_remote_hwp_temp_path', { path: tempPathToCleanup }).catch((error) => {
+        console.warn('[link-drop] temp cleanup skipped', { path: tempPathToCleanup, error });
+      });
+    }
   }
 }
 
