@@ -901,6 +901,10 @@ async function loadRemoteCandidate(candidate: {
   } finally {
     if (tempPathToCleanup) {
       invoke('cleanup_remote_hwp_temp_path', { path: tempPathToCleanup }).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('Command cleanup_remote_hwp_temp_path not found')) {
+          return;
+        }
         console.warn('[link-drop] temp cleanup skipped', { path: tempPathToCleanup, error });
       });
     }
