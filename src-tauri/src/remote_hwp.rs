@@ -150,10 +150,18 @@ fn headers_from_response(response: &Response) -> (Option<String>, Option<String>
     (content_type, content_disposition)
 }
 
-fn probe_remote_hwp(client: &Client, url: &str) -> Result<RemoteProbe, String> {
+fn probe_remote_hwp(
+    client: &Client,
+    url: &str,
+    suggested_name: Option<&str>,
+) -> Result<RemoteProbe, String> {
     if let Some(probe) = direct_file_extension_probe(url) {
         return Ok(probe);
     }
+
+    let suggested_name = suggested_name
+        .filter(|name| is_hwp_file_name(name))
+        .map(sanitize_file_name);
 
     let mut head_error: Option<String> = None;
 
@@ -168,8 +176,10 @@ fn probe_remote_hwp(client: &Client, url: &str) -> Result<RemoteProbe, String> {
 
                 if is_hwp_like_content_type(content_type.as_deref())
                     || disposition_name.as_deref().map(is_hwp_file_name).unwrap_or(false)
+                    || suggested_name.is_some()
                 {
                     let file_name = disposition_name
+                        .or_else(|| suggested_name.clone())
                         .or_else(|| file_name_from_url(&final_url))
                         .map(|name| sanitize_file_name(&name))
                         .unwrap_or_else(|| "downloaded-document.hwp".to_string());
@@ -206,8 +216,10 @@ fn probe_remote_hwp(client: &Client, url: &str) -> Result<RemoteProbe, String> {
 
     if is_hwp_like_content_type(content_type.as_deref())
         || disposition_name.as_deref().map(is_hwp_file_name).unwrap_or(false)
+        || suggested_name.is_some()
     {
         let file_name = disposition_name
+            .or_else(|| suggested_name)
             .or_else(|| file_name_from_url(&final_url))
             .map(|name| sanitize_file_name(&name))
             .unwrap_or_else(|| "downloaded-document.hwp".to_string());
@@ -244,10 +256,13 @@ fn write_downloaded_bytes(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn resolve_remote_hwp_url(url: String) -> Result<RemoteHwpOpenResult, String> {
+pub fn resolve_remote_hwp_url(
+    url: String,
+    suggested_name: Option<String>,
+) -> Result<RemoteHwpOpenResult, String> {
     ensure_http_url(&url)?;
     let client = build_client()?;
-    let probe = probe_remote_hwp(&client, &url)?;
+    let probe = probe_remote_hwp(&client, &url, suggested_name.as_deref())?;
 
     let response = client
         .get(&probe.final_url)

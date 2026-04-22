@@ -1,6 +1,6 @@
 export type DroppedResourceCandidate = {
   kind: 'file' | 'url';
-  source: 'file' | 'download-url' | 'uri-list' | 'plain-text';
+  source: 'file' | 'download-url' | 'uri-list' | 'plain-text' | 'html';
   name?: string;
   url?: string;
   file?: File;
@@ -74,7 +74,31 @@ export function extractDropCandidates(dataTransfer: DataTransfer | null): Droppe
     pushUrl('plain-text', normalizeUrl(plainText));
   }
 
+  const html = dataTransfer.getData('text/html');
+  if (html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const elements = Array.from(doc.querySelectorAll('a[href], img[src]'));
+    for (const element of elements) {
+      const href = element.getAttribute('href') ?? element.getAttribute('src');
+      const text = element.textContent?.trim() || undefined;
+      pushUrl('html', normalizeUrl(href ?? ''), text);
+    }
+  }
+
   return candidates;
+}
+
+function looksLikeHwpName(value?: string): boolean {
+  if (!value) return false;
+  const lower = value.trim().toLowerCase();
+  return lower.endsWith('.hwp') || lower.endsWith('.hwpx');
+}
+
+function looksLikeHwpUrl(value?: string): boolean {
+  if (!value) return false;
+  const lower = value.split(/[?#]/, 1)[0]?.toLowerCase() ?? value.toLowerCase();
+  return lower.endsWith('.hwp') || lower.endsWith('.hwpx');
 }
 
 export function pickPrimaryDropCandidate(
@@ -85,13 +109,20 @@ export function pickPrimaryDropCandidate(
   const fileCandidate = candidates.find((candidate) => candidate.kind === 'file');
   if (fileCandidate) return fileCandidate;
 
-  const downloadUrl = candidates.find((candidate) => candidate.source === 'download-url');
-  if (downloadUrl) return downloadUrl;
+  const score = (candidate: DroppedResourceCandidate): number => {
+    let value = 0;
 
-  const uriList = candidates.find((candidate) => candidate.source === 'uri-list');
-  if (uriList) return uriList;
+    if (candidate.source === 'download-url') value += 40;
+    if (candidate.source === 'html') value += 15;
+    if (candidate.source === 'uri-list') value += 10;
+    if (candidate.source === 'plain-text') value += 5;
+    if (looksLikeHwpUrl(candidate.url)) value += 60;
+    if (looksLikeHwpName(candidate.name)) value += 30;
 
-  return candidates[0] ?? null;
+    return value;
+  };
+
+  return [...candidates].sort((left, right) => score(right) - score(left))[0] ?? null;
 }
 
 export function summarizeDropCandidates(

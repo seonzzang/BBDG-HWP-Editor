@@ -618,7 +618,11 @@ function setupFileInput(): void {
     }
 
     if (candidate.kind === 'url' && candidate.url) {
-      await loadRemoteUrl(candidate.url);
+      await loadRemoteCandidate({
+        url: candidate.url,
+        name: candidate.name,
+        source: candidate.source,
+      });
     }
   });
 }
@@ -842,11 +846,18 @@ type RemoteHwpOpenResult = {
   detectionMethod: string;
 };
 
-async function loadRemoteUrl(url: string): Promise<void> {
+async function loadRemoteCandidate(candidate: {
+  url: string;
+  name?: string;
+  source?: string;
+}): Promise<void> {
   const msg = sbMessage();
   try {
     msg.textContent = '링크에서 문서를 확인하는 중...';
-    const result = await invoke('resolve_remote_hwp_url', { url }) as RemoteHwpOpenResult;
+    const result = await invoke('resolve_remote_hwp_url', {
+      url: candidate.url,
+      suggestedName: candidate.name ?? null,
+    }) as RemoteHwpOpenResult;
     msg.textContent = '문서를 다운로드하는 중...';
     const data = new Uint8Array(result.bytes);
     await loadBytes(data, result.fileName, null);
@@ -855,7 +866,9 @@ async function loadRemoteUrl(url: string): Promise<void> {
       durationMs: 3000,
     });
     console.log('[link-drop] remote document opened', {
-      url,
+      url: candidate.url,
+      source: candidate.source,
+      suggestedName: candidate.name,
       finalUrl: result.finalUrl,
       tempPath: result.tempPath,
       detectionMethod: result.detectionMethod,
@@ -865,7 +878,7 @@ async function loadRemoteUrl(url: string): Promise<void> {
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     msg.textContent = `링크 문서 열기 실패: ${errMsg}`;
-    console.error('[link-drop] remote document open failed', { url, error });
+    console.error('[link-drop] remote document open failed', { candidate, error });
     alert(`링크에서 문서를 열지 못했습니다.\n${errMsg}`);
   }
 }
