@@ -46,6 +46,7 @@ function substituteCssFontFamily(cssFont: string): string {
 
 export class WasmBridge {
   private doc: HwpDocument | null = null;
+  private retiredDocs: HwpDocument[] = [];
   private initialized = false;
   private _fileName = 'document.hwp';
   private _currentFileHandle: FileSystemFileHandleLike | null = null;
@@ -88,7 +89,11 @@ export class WasmBridge {
   loadDocument(data: Uint8Array, fileName?: string): DocumentInfo {
     const previousDoc = this.doc;
     this.doc = null;
-    this.freeDocument(previousDoc, 'replace');
+    if (previousDoc) {
+      // 연속 링크 드롭/문서 교체 시 일부 문서에서 free()가 불안정해
+      // 즉시 해제 대신 은퇴 목록으로 넘기고, 앱 종료 시 정리한다.
+      this.retiredDocs.push(previousDoc);
+    }
     this._fileName = fileName ?? 'document.hwp';
     this._currentFileHandle = null;
     let nextDoc: HwpDocument | null = null;
@@ -1390,5 +1395,10 @@ export class WasmBridge {
     const doc = this.doc;
     this.doc = null;
     this.freeDocument(doc, 'dispose');
+    if (this.retiredDocs.length > 0) {
+      for (const retired of this.retiredDocs.splice(0)) {
+        this.freeDocument(retired, 'dispose-retired');
+      }
+    }
   }
 }
