@@ -743,7 +743,11 @@ export function onClick(this: any, e: MouseEvent): void {
     this.textarea.focus();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message.includes('null pointer passed to rust') || document.body.dataset.docTransition === '1') {
+    if (
+      message.includes('null pointer passed to rust')
+      || message.includes('문서가 로드되지 않았습니다')
+      || document.body.dataset.docTransition === '1'
+    ) {
       return;
     }
     console.warn('[InputHandler] hitTest 실패:', err);
