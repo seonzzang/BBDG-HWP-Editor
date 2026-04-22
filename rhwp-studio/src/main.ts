@@ -25,6 +25,8 @@ import { CellSelectionRenderer } from '@/engine/cell-selection-renderer';
 import { TableObjectRenderer } from '@/engine/table-object-renderer';
 import { TableResizeRenderer } from '@/engine/table-resize-renderer';
 import { Ruler } from '@/view/ruler';
+import { invoke } from '@tauri-apps/api/core';
+import { extractDropCandidates, pickPrimaryDropCandidate } from '@/command/link-drop';
 
 const wasm = new WasmBridge();
 const eventBus = new EventBus();
@@ -589,14 +591,25 @@ function setupFileInput(): void {
   container.addEventListener('drop', async (e) => {
     e.preventDefault();
     container.classList.remove('drag-over');
-    const file = e.dataTransfer?.files[0];
-    if (!file) return;
-    const dropName = file.name.toLowerCase();
-    if (!dropName.endsWith('.hwp') && !dropName.endsWith('.hwpx')) {
-      alert('HWP/HWPX 파일만 지원합니다.');
+    const candidates = extractDropCandidates(e.dataTransfer);
+    const candidate = pickPrimaryDropCandidate(candidates);
+    if (!candidate) return;
+
+    if (candidate.kind === 'file') {
+      const file = candidate.file;
+      if (!file) return;
+      const dropName = file.name.toLowerCase();
+      if (!dropName.endsWith('.hwp') && !dropName.endsWith('.hwpx')) {
+        alert('HWP/HWPX 파일만 지원합니다.');
+        return;
+      }
+      await loadFile(file);
       return;
     }
-    await loadFile(file);
+
+    if (candidate.kind === 'url' && candidate.url) {
+      await loadRemoteUrl(candidate.url);
+    }
   });
 }
 
@@ -806,6 +819,44 @@ async function loadFile(file: File): Promise<void> {
     console.error('[main] 파일 로드 실패:', error);
     // 모바일에서 상태 메시지가 숨겨질 수 있으므로 alert으로도 표시
     if (window.innerWidth < 768) alert(errMsg);
+  }
+}
+
+type RemoteHwpOpenResult = {
+  fileName: string;
+  finalUrl: string;
+  tempPath: string;
+  bytes: number[];
+  contentType?: string | null;
+  contentDisposition?: string | null;
+  detectionMethod: string;
+};
+
+async function loadRemoteUrl(url: string): Promise<void> {
+  const msg = sbMessage();
+  try {
+    msg.textContent = '링크에서 문서를 확인하는 중...';
+    const result = await invoke('resolve_remote_hwp_url', { url }) as RemoteHwpOpenResult;
+    msg.textContent = '문서를 다운로드하는 중...';
+    const data = new Uint8Array(result.bytes);
+    await loadBytes(data, result.fileName, null);
+    showToast({
+      message: `${result.fileName} 문서를 링크에서 열었습니다.`,
+      durationMs: 3000,
+    });
+    console.log('[link-drop] remote document opened', {
+      url,
+      finalUrl: result.finalUrl,
+      tempPath: result.tempPath,
+      detectionMethod: result.detectionMethod,
+      contentType: result.contentType,
+      contentDisposition: result.contentDisposition,
+    });
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    msg.textContent = `링크 문서 열기 실패: ${errMsg}`;
+    console.error('[link-drop] remote document open failed', { url, error });
+    alert(`링크에서 문서를 열지 못했습니다.\n${errMsg}`);
   }
 }
 

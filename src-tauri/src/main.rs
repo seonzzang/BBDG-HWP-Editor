@@ -5,6 +5,7 @@
 
 mod print_worker;
 mod print_job;
+mod remote_hwp;
 
 fn main() {
     tauri::Builder::default()
@@ -19,7 +20,8 @@ fn main() {
             print_worker::debug_run_print_worker_pdf_export,
             print_worker::debug_run_print_worker_pdf_export_for_current_doc,
             print_worker::debug_read_generated_pdf,
-            print_worker::debug_open_generated_pdf
+            print_worker::debug_open_generated_pdf,
+            remote_hwp::resolve_remote_hwp_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
