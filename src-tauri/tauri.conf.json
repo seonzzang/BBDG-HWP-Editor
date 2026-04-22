@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "BBDG HWP Editor",
-  "version": "0.7.103",
+  "version": "0.7.105",
   "identifier": "com.bbdg.hwp-editor",
   "build": {
     "beforeDevCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File ./src-tauri/ensure-vite-dev-server.ps1",

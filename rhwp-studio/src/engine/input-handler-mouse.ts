@@ -5,6 +5,8 @@ import type { ContextMenuItem } from '@/ui/context-menu';
 import * as _connector from './input-handler-connector';
 
 export function onClick(this: any, e: MouseEvent): void {
+  if (document.body.dataset.docTransition === '1') return;
+
   // 연결선 드로잉 모드: 연결점 클릭으로 시작/끝
   if (this.connectorDrawingMode && e.button === 0) {
     const target = e.target as HTMLElement;
@@ -740,6 +742,10 @@ export function onClick(this: any, e: MouseEvent): void {
     // textarea에 포커스하여 키보드 입력 수신
     this.textarea.focus();
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('null pointer passed to rust') || document.body.dataset.docTransition === '1') {
+      return;
+    }
     console.warn('[InputHandler] hitTest 실패:', err);
   }
 }

@@ -846,6 +846,14 @@ type RemoteHwpOpenResult = {
   detectionMethod: string;
 };
 
+function setDocumentTransitioning(isTransitioning: boolean): void {
+  if (isTransitioning) {
+    document.body.dataset.docTransition = '1';
+  } else {
+    delete document.body.dataset.docTransition;
+  }
+}
+
 async function loadRemoteCandidate(candidate: {
   url: string;
   name?: string;
@@ -878,7 +886,12 @@ async function loadRemoteCandidate(candidate: {
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     msg.textContent = `링크 문서 열기 실패: ${errMsg}`;
-    console.error('[link-drop] remote document open failed', { candidate, error });
+    console.error('[link-drop] remote document open failed:', errMsg, {
+      url: candidate.url,
+      source: candidate.source,
+      suggestedName: candidate.name,
+      rawError: error,
+    });
     showToast({
       message: `링크 문서 열기 실패: ${errMsg}`,
       durationMs: 5000,
@@ -892,13 +905,19 @@ async function loadBytes(
   fileHandle: typeof wasm.currentFileHandle,
   startTime = performance.now(),
 ): Promise<void> {
-  const docInfo = wasm.loadDocument(data, fileName);
-  wasm.currentFileHandle = fileHandle;
-  const elapsed = performance.now() - startTime;
-  // initializeDocument 안에서 #177 validation 모달이 표시될 수 있음.
-  // HWPX 토스트는 모달과의 이벤트 충돌을 피하기 위해 모달 닫힌 후 표시.
-  await initializeDocument(docInfo, `${fileName} — ${docInfo.pageCount}페이지 (${elapsed.toFixed(1)}ms)`);
-  notifyHwpxBetaIfNeeded();
+  setDocumentTransitioning(true);
+  inputHandler?.deactivate();
+  try {
+    const docInfo = wasm.loadDocument(data, fileName);
+    wasm.currentFileHandle = fileHandle;
+    const elapsed = performance.now() - startTime;
+    // initializeDocument 안에서 #177 validation 모달이 표시될 수 있음.
+    // HWPX 토스트는 모달과의 이벤트 충돌을 피하기 위해 모달 닫힌 후 표시.
+    await initializeDocument(docInfo, `${fileName} — ${docInfo.pageCount}페이지 (${elapsed.toFixed(1)}ms)`);
+    notifyHwpxBetaIfNeeded();
+  } finally {
+    setDocumentTransitioning(false);
+  }
 }
 
 /**
