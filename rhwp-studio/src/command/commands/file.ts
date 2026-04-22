@@ -192,8 +192,33 @@ async function previewCurrentDocPdfChunk(
     } else {
       const bytes = await invoke('debug_read_generated_pdf', { path: outputPdfPath }) as number[];
       const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+      const canGoPrev = startPage > 1;
+      const canGoNext = endPage < wasm.pageCount;
       await workerPdfPreview.open(blob, {
-        title: `${wasm.fileName} (${startPage}-${endPage})`,
+        title: `${wasm.fileName} PDF 미리보기`,
+        statusText: `${startPage}-${endPage} / ${wasm.pageCount}쪽`,
+        canGoPrev,
+        canGoNext,
+        onPrev: canGoPrev
+          ? async () => {
+            await previewCurrentDocPdfChunk(services, {
+              startPage: Math.max(1, startPage - chunkSize),
+              chunkSize,
+              batchSize,
+              svgBatchSize,
+            });
+          }
+          : undefined,
+        onNext: canGoNext
+          ? async () => {
+            await previewCurrentDocPdfChunk(services, {
+              startPage: endPage + 1,
+              chunkSize,
+              batchSize,
+              svgBatchSize,
+            });
+          }
+          : undefined,
       });
     }
 

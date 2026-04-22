@@ -744,10 +744,24 @@
     color: #243553;
   }
 
+  .pdf-preview-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .pdf-preview-status {
+    font-size: 12px;
+    color: #5a6f90;
+    font-variant-numeric: tabular-nums;
+  }
+
   .pdf-preview-actions {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .pdf-preview-frame {
