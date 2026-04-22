@@ -50,6 +50,15 @@ export class WasmBridge {
   private _fileName = 'document.hwp';
   private _currentFileHandle: FileSystemFileHandleLike | null = null;
 
+  private freeDocument(doc: HwpDocument | null, reason: string): void {
+    if (!doc) return;
+    try {
+      doc.free();
+    } catch (error) {
+      console.warn(`[WasmBridge] 문서 해제 실패 (${reason})`, error);
+    }
+  }
+
   async initialize(): Promise<void> {
     if (this.initialized) return;
     this.installMeasureTextWidth();
@@ -77,17 +86,24 @@ export class WasmBridge {
   }
 
   loadDocument(data: Uint8Array, fileName?: string): DocumentInfo {
-    if (this.doc) {
-      this.doc.free();
-    }
+    const previousDoc = this.doc;
+    this.doc = null;
+    this.freeDocument(previousDoc, 'replace');
     this._fileName = fileName ?? 'document.hwp';
     this._currentFileHandle = null;
-    this.doc = new HwpDocument(data);
-    this.doc.convertToEditable();
-    this.doc.setFileName(this._fileName);
-    const info: DocumentInfo = JSON.parse(this.doc.getDocumentInfo());
-    console.log(`[WasmBridge] 문서 로드: ${info.pageCount}페이지`);
-    return info;
+    let nextDoc: HwpDocument | null = null;
+    try {
+      nextDoc = new HwpDocument(data);
+      nextDoc.convertToEditable();
+      nextDoc.setFileName(this._fileName);
+      const info: DocumentInfo = JSON.parse(nextDoc.getDocumentInfo());
+      this.doc = nextDoc;
+      console.log(`[WasmBridge] 문서 로드: ${info.pageCount}페이지`);
+      return info;
+    } catch (error) {
+      this.freeDocument(nextDoc, 'load-failure');
+      throw error;
+    }
   }
 
   createNewDocument(): DocumentInfo {
@@ -156,7 +172,14 @@ export class WasmBridge {
   }
 
   get pageCount(): number {
-    return this.doc?.pageCount() ?? 0;
+    if (!this.doc) return 0;
+    try {
+      return this.doc.pageCount();
+    } catch (error) {
+      console.warn('[WasmBridge] pageCount 조회 실패, 문서 참조를 초기화합니다', error);
+      this.doc = null;
+      return 0;
+    }
   }
 
   supportsProgressivePaging(): boolean {
@@ -1364,9 +1387,8 @@ export class WasmBridge {
   }
 
   dispose(): void {
-    if (this.doc) {
-      this.doc.free();
-      this.doc = null;
-    }
+    const doc = this.doc;
+    this.doc = null;
+    this.freeDocument(doc, 'dispose');
   }
 }
