@@ -256,6 +256,43 @@ fn write_downloaded_bytes(path: &Path, bytes: &[u8]) -> Result<(), String> {
     fs::write(path, bytes).map_err(|error| format!("임시 파일 저장 실패: {error}"))
 }
 
+fn looks_like_hwp_bytes(bytes: &[u8]) -> bool {
+    const HWP_CFB_MAGIC: &[u8; 8] = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1";
+    bytes.len() >= HWP_CFB_MAGIC.len() && &bytes[..HWP_CFB_MAGIC.len()] == HWP_CFB_MAGIC
+}
+
+fn looks_like_hwpx_bytes(bytes: &[u8]) -> bool {
+    // ZIP local file header / empty archive / spanned archive
+    matches!(
+        bytes.get(0..4),
+        Some([0x50, 0x4B, 0x03, 0x04] | [0x50, 0x4B, 0x05, 0x06] | [0x50, 0x4B, 0x07, 0x08])
+    )
+}
+
+fn sniff_downloaded_document(bytes: &[u8]) -> Result<(), String> {
+    if looks_like_hwp_bytes(bytes) || looks_like_hwpx_bytes(bytes) {
+        return Ok(());
+    }
+
+    let prefix = bytes
+        .iter()
+        .take(8)
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    if let Ok(text_prefix) = std::str::from_utf8(bytes.get(0..16).unwrap_or(bytes)) {
+        let trimmed = text_prefix.trim_start();
+        if trimmed.starts_with("<!DOCTYPE") || trimmed.starts_with("<html") {
+            return Err("문서 링크가 아니라 HTML 페이지가 내려왔습니다.".to_string());
+        }
+    }
+
+    Err(format!(
+        "지원되지 않는 다운로드 데이터입니다. HWP/HWPX 시그니처가 아닙니다. [{prefix}]"
+    ))
+}
+
 #[tauri::command]
 pub fn resolve_remote_hwp_url(
     url: String,
@@ -283,6 +320,8 @@ pub fn resolve_remote_hwp_url(
     if bytes.is_empty() {
         return Err("다운로드된 파일이 비어 있습니다.".to_string());
     }
+
+    sniff_downloaded_document(&bytes)?;
 
     let file_name = sanitize_file_name(&probe.file_name);
     let temp_path = temp_download_path(&file_name)?;
