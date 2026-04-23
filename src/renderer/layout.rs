@@ -405,18 +405,15 @@ impl LayoutEngine {
             self.build_header(&mut tree, page_content, header_paragraphs, composed, styles, layout, bin_data_content);
         }
 
-        // 본문 영역 노드
+        // 본문 영역 노드 (clip_rect은 콘텐츠 레이아웃 후 확정)
         let body_id = tree.next_id();
+        let body_bbox = layout_rect_to_bbox(&layout.body_area);
         let mut body_node = RenderNode::new(
             body_id,
             RenderNodeType::Body {
-                clip_rect: if self.clip_enabled.get() {
-                    Some(layout_rect_to_bbox(&layout.body_area))
-                } else {
-                    None
-                },
+                clip_rect: None, // 레이아웃 후 설정
             },
-            layout_rect_to_bbox(&layout.body_area),
+            body_bbox,
         );
 
         // 단별 콘텐츠 레이아웃
@@ -430,6 +427,43 @@ impl LayoutEngine {
 
         // 단 구분선
         self.build_column_separators(&mut tree, &mut body_node, layout);
+
+        // 콘텐츠 레이아웃 후 clip_rect 확정:
+        // 자식 노드(표 등)의 실제 바운딩 박스를 재귀적으로 반영하여
+        // body_area보다 큰 콘텐츠(표 외곽 테두리 등)가 잘리지 않도록 함
+        if self.clip_enabled.get() {
+            let mut clip = body_bbox;
+            fn expand_clip(clip: &mut BoundingBox, node: &RenderNode) {
+                let cb = &node.bbox;
+                let child_bottom = cb.y + cb.height;
+                let child_right = cb.x + cb.width;
+                let clip_bottom = clip.y + clip.height;
+                let clip_right = clip.x + clip.width;
+                if child_bottom > clip_bottom {
+                    clip.height = child_bottom - clip.y;
+                }
+                if child_right > clip_right {
+                    clip.width = child_right - clip.x;
+                }
+                if cb.x < clip.x {
+                    clip.width += clip.x - cb.x;
+                    clip.x = cb.x;
+                }
+                if cb.y < clip.y {
+                    clip.height += clip.y - cb.y;
+                    clip.y = cb.y;
+                }
+                for child in &node.children {
+                    expand_clip(clip, child);
+                }
+            }
+            for child in &body_node.children {
+                expand_clip(&mut clip, child);
+            }
+            body_node.node_type = RenderNodeType::Body {
+                clip_rect: Some(clip),
+            };
+        }
 
         // 용지 기준 이미지: body clip 바깥에 배치 (배경 이미지 등)
         for img_node in paper_images {
@@ -1920,6 +1954,16 @@ impl LayoutEngine {
                     Some(ix)
                 } else if !is_tac && tbl_is_square {
                     Some(col_area.x)
+                } else if is_tac {
+                    // TAC 문단에 PageItem::FullParagraph 가 발행되지 않아
+                    // paragraph_layout 가 호출되지 않는 케이스(선행 공백만 있는 TAC 표 등):
+                    // composed.lines[0] 의 runs 에서 TAC 이전 텍스트 폭을 직접
+                    // 합산해 표 x 좌표에 반영한다. inline_shape_position 미세팅 상태에서
+                    // 기본값 col_area.x(body_left) 으로 붕괴되는 현상 방지.
+                    let leading = composed.get(para_index)
+                        .map(|c| compute_tac_leading_width(c, control_index, styles))
+                        .unwrap_or(0.0);
+                    Some(col_area.x + effective_margin + leading)
                 } else {
                     None
                 };
@@ -2828,4 +2872,51 @@ impl LayoutEngine {
 
         x_base + est_x
     }
+}
+
+/// TAC 표 앞의 선행 텍스트(주로 공백) 폭을 계산한다.
+///
+/// `composed.lines[0]` 의 runs 중 target TAC 이전 문자 범위의 폭을 합산.
+/// TAC 문단에 `PageItem::FullParagraph` 가 발행되지 않아 `paragraph_layout`
+/// 가 호출되지 않는 경우(선행 공백만 있는 TAC 표 등)에 `layout_table_item`
+/// 에서 표 inline x 좌표를 복원하기 위해 사용한다.
+fn compute_tac_leading_width(
+    composed: &ComposedParagraph,
+    target_control_index: usize,
+    styles: &ResolvedStyleSet,
+) -> f64 {
+    let Some(first_line) = composed.lines.first() else { return 0.0; };
+
+    // target TAC 이 composed.tac_controls 에 있으면 해당 위치까지 합산.
+    // 없으면(블록 취급: 너비 ≥ 90% seg_width 등 is_tac_table_inline 이 false 인 경우)
+    // 선행 텍스트는 line 0 전체로 간주하고 모든 run 폭 합산.
+    let tac_pos_opt = composed.tac_controls.iter()
+        .find(|(_, _, ci)| *ci == target_control_index)
+        .map(|(pos, _, _)| *pos);
+
+    let mut char_pos = first_line.char_start;
+    let mut width = 0.0;
+    for run in &first_line.runs {
+        let run_len = run.text.chars().count();
+        let style = resolved_to_text_style(styles, run.char_style_id, run.lang_index);
+        match tac_pos_opt {
+            Some(tac_pos) if char_pos + run_len <= tac_pos => {
+                width += estimate_text_width(&run.text, &style);
+                char_pos += run_len;
+            }
+            Some(tac_pos) if char_pos < tac_pos => {
+                let partial_len = tac_pos - char_pos;
+                let partial: String = run.text.chars().take(partial_len).collect();
+                width += estimate_text_width(&partial, &style);
+                break;
+            }
+            Some(_) => break,
+            None => {
+                // block 취급 TAC: 전체 run 합산
+                width += estimate_text_width(&run.text, &style);
+                char_pos += run_len;
+            }
+        }
+    }
+    width
 }
