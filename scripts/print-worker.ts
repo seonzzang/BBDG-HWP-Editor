@@ -45,6 +45,29 @@ async function appendAnalysisLog(request: PrintJobRequest, message: string, deta
 
 let analysisStartedAt = Date.now();
 
+class PrintJobCancelledError extends Error {
+  constructor() {
+    super('PDF 생성이 취소되었습니다.');
+    this.name = 'PrintJobCancelledError';
+  }
+}
+
+function getCancelRequestPath(request: PrintJobRequest): string {
+  return resolve(request.tempDir, 'print-worker-cancel.request');
+}
+
+async function throwIfCancelled(request: PrintJobRequest): Promise<void> {
+  try {
+    await access(getCancelRequestPath(request), fsConstants.F_OK);
+    await appendAnalysisLog(request, 'pdf job cancel requested');
+    throw new PrintJobCancelledError();
+  } catch (error) {
+    if (error instanceof PrintJobCancelledError) {
+      throw error;
+    }
+  }
+}
+
 function getWorkspaceRoot(): string {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
   return resolve(scriptDir, '..');
@@ -234,6 +257,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
     workerChunkSize,
     outputPdfPath: request.outputPdfPath,
   });
+  await throwIfCancelled(request);
 
   writeProgress({
     jobId: request.jobId,
@@ -245,6 +269,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
   });
 
   await appendAnalysisLog(request, 'launching browser');
+  await throwIfCancelled(request);
   const browserStartedAt = Date.now();
   const { browser, executablePath } = await launchBrowserForJob();
   await appendAnalysisLog(request, 'browser launched', {
@@ -263,6 +288,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
 
     const svgReadStartedAt = Date.now();
     for (let start = 0; start < totalPages; start += batchSize) {
+      await throwIfCancelled(request);
       const batchPaths = request.svgPagePaths.slice(start, start + batchSize);
       const batchSvgMarkup = await Promise.all(
         batchPaths.map((path) => readFile(path, 'utf8')),
@@ -290,6 +316,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
         await sleep(request.debugDelayMs);
       }
     }
+    await throwIfCancelled(request);
     await appendAnalysisLog(request, 'all svg pages loaded', {
       readAllSvgMs: Date.now() - svgReadStartedAt,
       svgCount: svgMarkupPages.length,
@@ -297,6 +324,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
     });
 
     const pageStartedAt = Date.now();
+    await throwIfCancelled(request);
     const page = await browser.newPage();
     await appendAnalysisLog(request, 'browser page created', {
       newPageMs: Date.now() - pageStartedAt,
@@ -309,6 +337,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
 
     const totalChunkCount = Math.ceil(totalPages / workerChunkSize);
     for (let chunkStart = 0; chunkStart < totalPages; chunkStart += workerChunkSize) {
+      await throwIfCancelled(request);
       const chunkIndex = Math.floor(chunkStart / workerChunkSize);
       const chunkPages = svgMarkupPages.slice(chunkStart, chunkStart + workerChunkSize);
       const chunkStartPage = chunkStart + 1;
@@ -329,6 +358,9 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       const htmlDocument = buildPdfHtmlDocument(request, chunkPages);
       await appendAnalysisLog(request, 'html document chunk built', {
         chunkIndex: chunkIndex + 1,
+        totalChunkCount,
+        chunkStartPage,
+        chunkEndPage,
         htmlBuildMs: Date.now() - htmlStartedAt,
         htmlChars: htmlDocument.length,
         approxHtmlBytes: htmlDocument.length * 2,
@@ -336,16 +368,21 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
 
       await appendAnalysisLog(request, 'page.setContent chunk started', {
         chunkIndex: chunkIndex + 1,
+        totalChunkCount,
         chunkStartPage,
         chunkEndPage,
       });
       const setContentStartedAt = Date.now();
+      await throwIfCancelled(request);
       await page.setContent(htmlDocument, {
         waitUntil: 'load',
         timeout: 300_000,
       });
       await appendAnalysisLog(request, 'page.setContent chunk finished', {
         chunkIndex: chunkIndex + 1,
+        totalChunkCount,
+        chunkStartPage,
+        chunkEndPage,
         setContentMs: Date.now() - setContentStartedAt,
       });
 
@@ -360,9 +397,13 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
 
       await appendAnalysisLog(request, 'page.pdf chunk started', {
         chunkIndex: chunkIndex + 1,
+        totalChunkCount,
+        chunkStartPage,
+        chunkEndPage,
         chunkPdfPath,
       });
       const pdfStartedAt = Date.now();
+      await throwIfCancelled(request);
       await page.pdf({
         path: chunkPdfPath,
         width: `${request.pageSize.widthPx}px`,
@@ -379,11 +420,15 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       chunkPdfPaths.push(chunkPdfPath);
       await appendAnalysisLog(request, 'page.pdf chunk finished', {
         chunkIndex: chunkIndex + 1,
+        totalChunkCount,
+        chunkStartPage,
+        chunkEndPage,
         pdfWriteMs: Date.now() - pdfStartedAt,
         chunkPdfPath,
       });
     }
 
+    await throwIfCancelled(request);
     await page.close();
     await appendAnalysisLog(request, 'browser page closed after chunk rendering', {
       totalChunkCount,
@@ -406,6 +451,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
     const { PDFDocument } = await loadPdfLib();
     const mergedDocument = await PDFDocument.create();
     for (const [chunkIndex, chunkPdfPath] of chunkPdfPaths.entries()) {
+      await throwIfCancelled(request);
       const mergeChunkStartedAt = Date.now();
       await appendAnalysisLog(request, 'pdf merge chunk started', {
         chunkIndex: chunkIndex + 1,
@@ -413,6 +459,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
         chunkPdfPath,
       });
       const chunkBytes = await readFile(chunkPdfPath);
+      await throwIfCancelled(request);
       await appendAnalysisLog(request, 'pdf merge chunk read', {
         chunkIndex: chunkIndex + 1,
         readMs: Date.now() - mergeChunkStartedAt,
@@ -420,6 +467,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       });
       const loadStartedAt = Date.now();
       const chunkDocument = await PDFDocument.load(chunkBytes);
+      await throwIfCancelled(request);
       await appendAnalysisLog(request, 'pdf merge chunk loaded', {
         chunkIndex: chunkIndex + 1,
         loadMs: Date.now() - loadStartedAt,
@@ -427,6 +475,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       });
       const copyStartedAt = Date.now();
       const copiedPages = await mergedDocument.copyPages(chunkDocument, chunkDocument.getPageIndices());
+      await throwIfCancelled(request);
       await appendAnalysisLog(request, 'pdf merge chunk copied', {
         chunkIndex: chunkIndex + 1,
         copyMs: Date.now() - copyStartedAt,
@@ -442,11 +491,13 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       });
     }
 
+    await throwIfCancelled(request);
     await appendAnalysisLog(request, 'pdf merge save started', {
       pageCount: mergedDocument.getPageCount(),
     });
     const saveStartedAt = Date.now();
     const mergedBytes = await mergedDocument.save();
+    await throwIfCancelled(request);
     await appendAnalysisLog(request, 'pdf merge save finished', {
       saveMs: Date.now() - saveStartedAt,
       mergedBytes: mergedBytes.length,
@@ -473,8 +524,10 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const cancelled = error instanceof PrintJobCancelledError;
     await appendAnalysisLog(request, 'pdf job failed', {
       errorMessage: message,
+      cancelled,
       durationMs: Date.now() - startedAt,
     });
     writeResult({
@@ -482,7 +535,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       ok: false,
       outputPdfPath: request.outputPdfPath,
       durationMs: Date.now() - startedAt,
-      errorCode: 'PDF_EXPORT_FAILED',
+      errorCode: cancelled ? 'CANCELLED' : 'PDF_EXPORT_FAILED',
       errorMessage: message,
     });
   } finally {

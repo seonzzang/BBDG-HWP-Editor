@@ -9,6 +9,8 @@ use crate::print_job::{
     write_print_job_manifest, PrintJobRequest, PrintWorkerMessage,
 };
 
+const PRINT_WORKER_CANCEL_FILE_NAME: &str = "print-worker-cancel.request";
+
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FrontendPdfExportRequest {
@@ -35,6 +37,27 @@ fn workspace_root() -> Result<PathBuf, String> {
 
 fn print_worker_script_path() -> Result<PathBuf, String> {
     Ok(workspace_root()?.join("scripts").join("print-worker.ts"))
+}
+
+fn validate_print_worker_job_id(job_id: &str) -> Result<(), String> {
+    if job_id.is_empty()
+        || !job_id
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+    {
+        return Err("invalid print worker job id".to_string());
+    }
+
+    Ok(())
+}
+
+fn print_worker_temp_dir(job_id: &str) -> Result<PathBuf, String> {
+    validate_print_worker_job_id(job_id)?;
+    Ok(std::env::temp_dir().join(job_id))
+}
+
+fn print_worker_cancel_path(job_id: &str) -> Result<PathBuf, String> {
+    Ok(print_worker_temp_dir(job_id)?.join(PRINT_WORKER_CANCEL_FILE_NAME))
 }
 
 fn parse_worker_messages(stdout_output: &str) -> Result<Vec<PrintWorkerMessage>, String> {
@@ -282,6 +305,7 @@ pub fn run_print_worker_pdf_export(
     );
 
     let wait_started_at = Instant::now();
+    let cancel_path = print_worker_cancel_path(&request.job_id)?;
     let status = loop {
         match child
             .try_wait()
@@ -289,6 +313,14 @@ pub fn run_print_worker_pdf_export(
         {
             Some(status) => break status,
             None => {
+                if cancel_path.exists() {
+                    child
+                        .kill()
+                        .map_err(|error| format!("print worker pdf cancel kill failed: {error}"))?;
+                    let _ = child.wait();
+                    let _ = std::fs::remove_file(&manifest_path);
+                    return Err("PDF 생성이 취소되었습니다.".to_string());
+                }
                 if started_at.elapsed() >= timeout {
                     child
                         .kill()
@@ -407,16 +439,21 @@ pub fn debug_probe_print_worker_runtime() -> Result<Vec<PrintWorkerMessage>, Str
 }
 
 #[tauri::command]
-pub fn debug_run_print_worker_pdf_export() -> Result<Vec<PrintWorkerMessage>, String> {
+pub async fn debug_run_print_worker_pdf_export() -> Result<Vec<PrintWorkerMessage>, String> {
     let request = create_debug_print_job_request("debug-print-worker-pdf-export", 3, None)?;
-    run_print_worker_pdf_export(&request, Duration::from_secs(20))
+    tauri::async_runtime::spawn_blocking(move || {
+        run_print_worker_pdf_export(&request, Duration::from_secs(20))
+    })
+    .await
+    .map_err(|error| format!("print worker pdf task join failed: {error}"))?
 }
 
 #[tauri::command]
-pub fn debug_run_print_worker_pdf_export_for_current_doc(
+pub async fn debug_run_print_worker_pdf_export_for_current_doc(
     payload: FrontendPdfExportRequest,
 ) -> Result<Vec<PrintWorkerMessage>, String> {
     let page_count = payload.svg_pages.len() as u32;
+    let timeout = pdf_export_timeout_for_page_count(page_count);
     let request = create_print_job_request_from_svg_pages(
         &payload.job_id,
         &payload.source_file_name,
@@ -427,12 +464,38 @@ pub fn debug_run_print_worker_pdf_export_for_current_doc(
         &payload.svg_pages,
     )?;
 
-    run_print_worker_pdf_export(&request, pdf_export_timeout_for_page_count(page_count))
+    tauri::async_runtime::spawn_blocking(move || run_print_worker_pdf_export(&request, timeout))
+        .await
+        .map_err(|error| format!("print worker pdf task join failed: {error}"))?
 }
 
 #[tauri::command]
 pub fn debug_read_generated_pdf(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&path).map_err(|error| format!("generated pdf read failed ({path}): {error}"))
+}
+
+#[tauri::command]
+pub fn debug_read_print_worker_analysis_log(job_id: String) -> Result<String, String> {
+    let log_path = print_worker_temp_dir(&job_id)?.join("print-worker-analysis.log");
+    if !log_path.exists() {
+        return Ok(String::new());
+    }
+
+    std::fs::read_to_string(&log_path)
+        .map_err(|error| format!("print worker analysis log read failed: {error}"))
+}
+
+#[tauri::command]
+pub fn debug_cancel_print_worker_pdf_export(job_id: String) -> Result<(), String> {
+    let temp_dir = print_worker_temp_dir(&job_id)?;
+    std::fs::create_dir_all(&temp_dir)
+        .map_err(|error| format!("print worker cancel dir create failed: {error}"))?;
+    std::fs::write(
+        temp_dir.join(PRINT_WORKER_CANCEL_FILE_NAME),
+        format!("cancelled_at={:?}\n", std::time::SystemTime::now()),
+    )
+    .map_err(|error| format!("print worker cancel request write failed: {error}"))?;
+    Ok(())
 }
 
 #[tauri::command]

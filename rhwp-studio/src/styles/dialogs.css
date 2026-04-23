@@ -103,6 +103,17 @@
   border-color: var(--color-primary);
 }
 
+.dialog-input-readonly {
+  background: #f5f6f8;
+  color: var(--color-text-muted);
+  cursor: text;
+}
+
+.dialog-input-readonly:hover {
+  border-color: var(--color-border);
+  background: #ffffff;
+}
+
 .dialog-select {
   height: 22px;
   border: 1px solid var(--color-border);
@@ -671,34 +682,75 @@
 }
 
 .print-progress-card {
-  width: min(440px, calc(100vw - 32px));
-  padding: 20px 22px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #f5f8fc 100%);
-  border: 1px solid rgba(101, 125, 172, 0.25);
-  box-shadow: 0 18px 48px rgba(21, 34, 56, 0.22);
+  width: min(480px, calc(100vw - 32px));
+  padding: 22px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(88, 166, 255, 0.16), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fd 100%);
+  border: 1px solid rgba(101, 125, 172, 0.28);
+  box-shadow: 0 22px 54px rgba(21, 34, 56, 0.24);
+}
+
+.print-progress-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.print-progress-status-pill {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #e9f1ff;
+  color: #245fcf;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .print-progress-title {
   font-size: 18px;
   font-weight: 700;
   color: #243553;
-  margin-bottom: 8px;
+  min-width: 0;
 }
 
 .print-progress-message {
+  min-height: 39px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(101, 125, 172, 0.14);
   font-size: 13px;
   line-height: 1.5;
+  color: #435470;
+  margin-bottom: 16px;
+}
+
+.print-progress-metrics {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.print-progress-label {
+  font-size: 12px;
+  font-weight: 700;
   color: #52627d;
-  margin-bottom: 14px;
 }
 
 .print-progress-bar {
   width: 100%;
-  height: 10px;
+  height: 12px;
   overflow: hidden;
   border-radius: 999px;
-  background: #dbe3f1;
+  background: #dde6f4;
+  position: relative;
+  box-shadow: inset 0 1px 2px rgba(39, 56, 87, 0.12);
 }
 
 .print-progress-bar-fill {
@@ -706,67 +758,219 @@
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #2a6cf0 0%, #58a6ff 100%);
-  transition: width 140ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.print-progress-bar-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.32) 45%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: print-progress-sheen 1.6s linear infinite;
 }
 
 .print-progress-text {
-    margin-top: 10px;
-    margin-bottom: 16px;
-    font-size: 12px;
+    font-size: 18px;
+    font-weight: 800;
     font-variant-numeric: tabular-nums;
-    color: #39527b;
+    color: #274b86;
   }
 
-  .pdf-preview-shell {
-    position: fixed;
-    inset: 0;
-    z-index: 25000;
-    display: flex;
+.print-progress-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.print-progress-activity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 28px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(42, 108, 240, 0.08);
+  color: #31517f;
+  font-size: 12px;
+}
+
+.print-progress-spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid rgba(42, 108, 240, 0.22);
+  border-top-color: #2a6cf0;
+  border-right-color: #58a6ff;
+  animation: print-progress-spin 0.78s linear infinite;
+}
+
+.print-progress-activity-text {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes print-progress-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes print-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 420px) {
+  .print-progress-card {
+    padding: 18px;
+  }
+
+  .print-progress-footer {
+    align-items: stretch;
     flex-direction: column;
-    background: #edf2f8;
   }
 
-  .pdf-preview-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 52px;
-    padding: 10px 14px;
-    background: linear-gradient(180deg, #ffffff 0%, #f5f8fc 100%);
-    border-bottom: 1px solid rgba(101, 125, 172, 0.2);
-    box-shadow: 0 8px 20px rgba(21, 34, 56, 0.08);
-  }
-
-  .pdf-preview-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #243553;
-  }
-
-  .pdf-preview-title-group {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .pdf-preview-status {
-    font-size: 12px;
-    color: #5a6f90;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .pdf-preview-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .pdf-preview-frame {
-    flex: 1;
+  .print-progress-footer .dialog-btn {
     width: 100%;
-    border: 0;
-    background: #f3f5f8;
   }
+
+  .print-progress-activity {
+    justify-content: center;
+  }
+}
+
+.pdf-preview-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 25000;
+  display: flex;
+  flex-direction: column;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 253, 0.96), rgba(234, 239, 247, 0.96)),
+    #eef3f9;
+}
+
+.pdf-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(36, 53, 83, 0.12);
+  box-shadow: 0 10px 28px rgba(31, 45, 71, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.pdf-preview-title-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pdf-preview-title {
+  overflow: hidden;
+  color: #17243b;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-preview-status {
+  color: #6b778c;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.pdf-preview-return-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #33445f;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.pdf-preview-return-button:hover {
+  border-color: rgba(36, 53, 83, 0.12);
+  background: rgba(36, 53, 83, 0.06);
+  color: #17243b;
+}
+
+.pdf-preview-return-button:active {
+  transform: translateY(1px);
+}
+
+.pdf-preview-return-button:focus-visible {
+  outline: 2px solid rgba(47, 111, 237, 0.32);
+  outline-offset: 2px;
+}
+
+.pdf-preview-return-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #52627a;
+  font-size: 26px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.pdf-preview-return-button:hover .pdf-preview-return-icon {
+  color: #17243b;
+}
+
+.pdf-preview-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #e8edf5;
+}
+
+@media (max-width: 640px) {
+  .pdf-preview-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    min-height: auto;
+    padding: 12px;
+  }
+
+  .pdf-preview-return-button {
+    width: 30px;
+  }
+}

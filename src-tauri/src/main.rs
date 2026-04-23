@@ -20,6 +20,8 @@ fn main() {
             print_worker::debug_run_print_worker_pdf_export,
             print_worker::debug_run_print_worker_pdf_export_for_current_doc,
             print_worker::debug_read_generated_pdf,
+            print_worker::debug_read_print_worker_analysis_log,
+            print_worker::debug_cancel_print_worker_pdf_export,
             print_worker::debug_open_generated_pdf,
             remote_hwp::resolve_remote_hwp_url,
             remote_hwp::cleanup_remote_hwp_temp_path

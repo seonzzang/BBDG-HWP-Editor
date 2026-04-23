@@ -22,6 +22,7 @@ class PrintOptionsDialog {
   private pdfModeRadio!: HTMLInputElement;
   private legacyModeRadio!: HTMLInputElement;
   private helperText!: HTMLDivElement;
+  private printButton!: HTMLButtonElement;
 
   constructor(currentPage: number, totalPages: number) {
     this.currentPage = currentPage;
@@ -64,7 +65,7 @@ class PrintOptionsDialog {
     const intro = document.createElement('p');
     intro.style.margin = '0 0 14px 0';
     intro.style.lineHeight = '1.6';
-    intro.textContent = '인쇄 범위와 방식을 선택한 뒤 [인쇄]를 누르세요. 기본 인쇄는 PDF를 생성한 뒤 외부 PDF 뷰어로 엽니다.';
+    intro.textContent = '인쇄 범위와 방식을 선택한 뒤 [인쇄]를 누르세요. 기본 인쇄는 PDF를 생성한 뒤 앱 내부 PDF 뷰어로 엽니다.';
     body.appendChild(intro);
 
     body.appendChild(this.buildRangeSection());
@@ -86,6 +87,7 @@ class PrintOptionsDialog {
     footer.className = 'dialog-footer';
 
     const printBtn = document.createElement('button');
+    this.printButton = printBtn;
     printBtn.className = 'dialog-btn dialog-btn-primary';
     printBtn.textContent = '인쇄';
     printBtn.addEventListener('click', () => {
@@ -179,6 +181,18 @@ class PrintOptionsDialog {
       element.addEventListener('input', () => this.updateUiState());
     }
 
+    for (const input of [this.startInput, this.endInput]) {
+      input.addEventListener('pointerdown', () => this.activateRangeInputs());
+      input.addEventListener('focus', () => this.activateRangeInputs());
+    }
+    this.endInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.stopPropagation();
+      event.preventDefault();
+      this.activateRangeInputs();
+      this.printButton.click();
+    });
+
     return section;
   }
 
@@ -196,16 +210,16 @@ class PrintOptionsDialog {
     this.pdfModeRadio = this.createRadio(name, true);
     const pdfRow = this.createOptionRow(
       this.pdfModeRadio,
-      'PDF 인쇄 (기본)',
-      '선택한 범위의 PDF를 생성한 뒤 외부 PDF 뷰어로 엽니다.',
+      'PDF 내보내기',
+      '선택한 범위의 PDF를 생성한 뒤 앱 내부 PDF 뷰어로 엽니다.',
     );
     section.appendChild(pdfRow);
 
     this.legacyModeRadio = this.createRadio(name, false);
     const legacyRow = this.createOptionRow(
       this.legacyModeRadio,
-      '기존 인쇄 미리보기',
-      '브라우저 window.print() 기반 인쇄 미리보기를 엽니다. 현재는 전체 문서만 권장됩니다.',
+      '인쇄',
+      '브라우저 window.print() 기반 인쇄 옵션 창을 엽니다. 앱 내부 미리보기 화면은 표시하지 않습니다.',
     );
     section.appendChild(legacyRow);
 
@@ -255,14 +269,22 @@ class PrintOptionsDialog {
 
   private updateUiState(): void {
     const rangeEnabled = this.rangeRadio.checked;
-    this.startInput.disabled = !rangeEnabled;
-    this.endInput.disabled = !rangeEnabled;
+    this.startInput.readOnly = !rangeEnabled;
+    this.endInput.readOnly = !rangeEnabled;
+    this.startInput.classList.toggle('dialog-input-readonly', !rangeEnabled);
+    this.endInput.classList.toggle('dialog-input-readonly', !rangeEnabled);
 
     const usingLegacy = this.legacyModeRadio.checked;
     const rangeSummary = this.getSelectedRangeSummary();
     this.helperText.textContent = usingLegacy
-      ? `기존 인쇄 미리보기는 현재 전체 문서 기준으로 가장 안정적입니다. 선택한 범위는 ${rangeSummary}이며, 필요 시 기존 미리보기 창에서 다시 조정할 수 있습니다.`
-      : `선택한 범위 ${rangeSummary}의 PDF를 백그라운드에서 생성한 뒤 외부 PDF 뷰어로 엽니다.`;
+      ? `${rangeSummary} 인쇄 창 열기`
+      : `${rangeSummary} PDF 내보내기`;
+  }
+
+  private activateRangeInputs(): void {
+    if (this.rangeRadio.checked) return;
+    this.rangeRadio.checked = true;
+    this.updateUiState();
   }
 
   private getSelectedRangeSummary(): string {
@@ -320,6 +342,13 @@ class PrintOptionsDialog {
         event.stopPropagation();
         event.preventDefault();
         this.resolve(null);
+        return;
+      }
+      if (event.key === 'Enter' && target === this.endInput) {
+        event.stopPropagation();
+        event.preventDefault();
+        this.activateRangeInputs();
+        this.printButton.click();
         return;
       }
       if (event.key === 'Enter' && !isEditable) {

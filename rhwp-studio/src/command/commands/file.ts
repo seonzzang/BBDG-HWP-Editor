@@ -10,33 +10,511 @@ import {
   type FileSystemWindowLike,
 } from '@/command/file-system-access';
 import { PrintProgressOverlay } from '@/ui/print-progress-overlay';
-import { PdfPreviewController } from '@/pdf/pdf-preview-controller';
 import { invoke } from '@tauri-apps/api/core';
 import { showToast } from '@/ui/toast';
 import { showPrintOptionsDialog } from '@/ui/print-options-dialog';
+import { PdfPreviewController } from '@/pdf/pdf-preview-controller';
 
 const DEFAULT_SVG_BATCH_SIZE = 50;
 const DEFAULT_DOM_INSERT_BATCH_SIZE = 50;
-const DEFAULT_PDF_PREVIEW_CHUNK_SIZE = 10;
 const DEFAULT_PDF_WORKER_BATCH_SIZE = 30;
 const DEFAULT_PDF_WORKER_SVG_BATCH_SIZE = 30;
+const PDF_PROGRESS_TOTAL_UNITS = 1000;
+const ESTIMATED_PDF_RENDER_SECONDS_PER_CHUNK = 5;
+const ESTIMATED_PDF_MERGE_SECONDS_PER_CHUNK = 12;
+const ESTIMATED_PDF_SAVE_SECONDS = 8;
+const PRINT_ESTIMATE_STORAGE_KEY = 'bbdg.print.pdf.estimate.v1';
+const workerPdfPreview = new PdfPreviewController();
 
-type PdfChunkPreviewCursor = {
-  sourceFileName: string;
-  startPage: number;
-  endPage: number;
-  nextStartPage: number;
-  chunkSize: number;
-  batchSize: number;
-  svgBatchSize: number;
-  totalPages: number;
+type PrintWorkerAnalysisLogEntry = {
+  message?: string;
+  elapsedMs?: number;
+  completedPages?: number;
+  totalPages?: number;
+  chunkIndex?: number;
+  totalChunkCount?: number;
+  chunkStartPage?: number;
+  chunkEndPage?: number;
+  chunkCount?: number;
+  mergedPageCount?: number;
+  pageCount?: number;
+  errorMessage?: string;
+  readAllSvgMs?: number;
+  pdfWriteMs?: number;
+  setContentMs?: number;
+  htmlBuildMs?: number;
+  readMs?: number;
+  loadMs?: number;
+  copyMs?: number;
+  saveMs?: number;
 };
 
-const workerPdfPreview = new PdfPreviewController();
-let currentPdfChunkCursor: PdfChunkPreviewCursor | null = null;
+type PrintEstimateStats = {
+  dataSecondsPerPage: number;
+  renderSecondsPerChunk: number;
+  mergeSecondsPerChunk: number;
+  saveSeconds: number;
+  sampleCount: number;
+  updatedAt: number;
+};
+
+type PrintWorkerProgressEstimator = {
+  stats: PrintEstimateStats;
+  svgStartedElapsedMs?: number;
+  renderStartedElapsedMs?: number;
+  mergeStartedElapsedMs?: number;
+};
 
 async function yieldToBrowser(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
+function parseLatestWorkerAnalysisEntry(logText: string): PrintWorkerAnalysisLogEntry | null {
+  const lines = logText.trim().split(/\r?\n/).filter(Boolean);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    try {
+      const parsed = JSON.parse(lines[index]) as PrintWorkerAnalysisLogEntry;
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    } catch {
+      // Ignore a partially written line and keep walking backward.
+    }
+  }
+  return null;
+}
+
+function parseWorkerAnalysisEntries(logText: string): PrintWorkerAnalysisLogEntry[] {
+  return logText
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        const parsed = JSON.parse(line) as PrintWorkerAnalysisLogEntry;
+        return parsed && typeof parsed === 'object' ? [parsed] : [];
+      } catch {
+        return [];
+      }
+    });
+}
+
+function formatWorkerChunkRange(entry: PrintWorkerAnalysisLogEntry): string {
+  if (
+    typeof entry.chunkStartPage === 'number'
+    && typeof entry.chunkEndPage === 'number'
+  ) {
+    return `, ${entry.chunkStartPage}-${entry.chunkEndPage}쪽`;
+  }
+  return '';
+}
+
+function estimateRemainingSeconds(params: {
+  startedElapsedMs?: number;
+  currentElapsedMs?: number;
+  completed: number;
+  total: number;
+}): number | null {
+  const { startedElapsedMs, currentElapsedMs, completed, total } = params;
+  if (
+    startedElapsedMs === undefined
+    || currentElapsedMs === undefined
+    || completed <= 0
+    || total <= 0
+    || completed >= total
+  ) {
+    return completed >= total ? 0 : null;
+  }
+
+  const elapsedSeconds = Math.max(0, (currentElapsedMs - startedElapsedMs) / 1000);
+  if (elapsedSeconds < 3) return null;
+
+  const rate = completed / elapsedSeconds;
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+
+  return Math.max(0, (total - completed) / rate);
+}
+
+function defaultPrintEstimateStats(): PrintEstimateStats {
+  return {
+    dataSecondsPerPage: 0.015,
+    renderSecondsPerChunk: ESTIMATED_PDF_RENDER_SECONDS_PER_CHUNK,
+    mergeSecondsPerChunk: ESTIMATED_PDF_MERGE_SECONDS_PER_CHUNK,
+    saveSeconds: ESTIMATED_PDF_SAVE_SECONDS,
+    sampleCount: 0,
+    updatedAt: 0,
+  };
+}
+
+function loadPrintEstimateStats(): PrintEstimateStats {
+  try {
+    const raw = window.localStorage.getItem(PRINT_ESTIMATE_STORAGE_KEY);
+    if (!raw) return defaultPrintEstimateStats();
+    const parsed = JSON.parse(raw) as Partial<PrintEstimateStats>;
+    const defaults = defaultPrintEstimateStats();
+    return {
+      dataSecondsPerPage: positiveNumberOr(parsed.dataSecondsPerPage, defaults.dataSecondsPerPage),
+      renderSecondsPerChunk: positiveNumberOr(parsed.renderSecondsPerChunk, defaults.renderSecondsPerChunk),
+      mergeSecondsPerChunk: positiveNumberOr(parsed.mergeSecondsPerChunk, defaults.mergeSecondsPerChunk),
+      saveSeconds: positiveNumberOr(parsed.saveSeconds, defaults.saveSeconds),
+      sampleCount: Math.max(0, Math.floor(positiveNumberOr(parsed.sampleCount, 0))),
+      updatedAt: Math.max(0, Math.floor(positiveNumberOr(parsed.updatedAt, 0))),
+    };
+  } catch {
+    return defaultPrintEstimateStats();
+  }
+}
+
+function positiveNumberOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function clampEstimate(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function blendEstimate(previous: number, next: number, sampleCount: number): number {
+  const alpha = sampleCount <= 0 ? 1 : 0.28;
+  return (previous * (1 - alpha)) + (next * alpha);
+}
+
+function savePrintEstimateStats(stats: PrintEstimateStats): void {
+  try {
+    window.localStorage.setItem(PRINT_ESTIMATE_STORAGE_KEY, JSON.stringify(stats));
+  } catch (error) {
+    console.warn('[print-pdf-analysis] estimate stats save failed', error);
+  }
+}
+
+function estimateMergeAndSaveSeconds(
+  chunkCount: number,
+  completedChunkProgress = 0,
+  stats = loadPrintEstimateStats(),
+): number {
+  const safeChunkCount = Math.max(1, chunkCount);
+  const remainingChunks = Math.max(0, safeChunkCount - completedChunkProgress);
+  return (remainingChunks * stats.mergeSecondsPerChunk) + stats.saveSeconds;
+}
+
+function estimateRenderSeconds(
+  chunkCount: number,
+  completedChunkProgress = 0,
+  stats = loadPrintEstimateStats(),
+): number {
+  const safeChunkCount = Math.max(1, chunkCount);
+  const remainingChunks = Math.max(0, safeChunkCount - completedChunkProgress);
+  return remainingChunks * stats.renderSecondsPerChunk;
+}
+
+function estimateWorkerChunkCount(pageCount: number): number {
+  return Math.max(1, Math.ceil(Math.max(1, pageCount) / DEFAULT_PDF_WORKER_BATCH_SIZE));
+}
+
+function estimateRemainingPostDataSeconds(pageCount: number, stats = loadPrintEstimateStats()): number {
+  const chunkCount = estimateWorkerChunkCount(pageCount);
+  return estimateRenderSeconds(chunkCount, 0, stats) + estimateMergeAndSaveSeconds(chunkCount, 0, stats);
+}
+
+function updatePrintEstimateStatsFromEntries(entries: PrintWorkerAnalysisLogEntry[]): void {
+  const currentStats = loadPrintEstimateStats();
+  const nextStats = { ...currentStats };
+  const sampleCount = currentStats.sampleCount;
+
+  const allSvgLoaded = [...entries].reverse().find((entry) => entry.message === 'all svg pages loaded');
+  if (
+    typeof allSvgLoaded?.readAllSvgMs === 'number'
+    && typeof allSvgLoaded?.totalPages === 'number'
+    && allSvgLoaded.totalPages > 0
+  ) {
+    const secondsPerPage = clampEstimate(
+      allSvgLoaded.readAllSvgMs / 1000 / allSvgLoaded.totalPages,
+      0.001,
+      2,
+    );
+    nextStats.dataSecondsPerPage = blendEstimate(
+      currentStats.dataSecondsPerPage,
+      secondsPerPage,
+      sampleCount,
+    );
+  }
+
+  const renderFinished = [...entries].reverse().find(
+    (entry) => entry.message === 'browser page closed after chunk rendering',
+  );
+  const browserCreated = entries.find((entry) => entry.message === 'browser page created');
+  if (
+    typeof renderFinished?.elapsedMs === 'number'
+    && typeof browserCreated?.elapsedMs === 'number'
+    && typeof renderFinished.totalChunkCount === 'number'
+    && renderFinished.totalChunkCount > 0
+    && renderFinished.elapsedMs > browserCreated.elapsedMs
+  ) {
+    const secondsPerChunk = clampEstimate(
+      (renderFinished.elapsedMs - browserCreated.elapsedMs) / 1000 / renderFinished.totalChunkCount,
+      0.5,
+      180,
+    );
+    nextStats.renderSecondsPerChunk = blendEstimate(
+      currentStats.renderSecondsPerChunk,
+      secondsPerChunk,
+      sampleCount,
+    );
+  }
+
+  const mergeSaveStarted = entries.find((entry) => entry.message === 'pdf merge save started');
+  const mergeStarted = entries.find((entry) => entry.message === 'pdf merge started');
+  const mergeChunkCount = Math.max(
+    0,
+    ...entries
+      .filter((entry) => entry.message?.startsWith('pdf merge chunk') && typeof entry.chunkCount === 'number')
+      .map((entry) => entry.chunkCount ?? 0),
+  );
+  if (
+    typeof mergeSaveStarted?.elapsedMs === 'number'
+    && typeof mergeStarted?.elapsedMs === 'number'
+    && mergeChunkCount > 0
+    && mergeSaveStarted.elapsedMs > mergeStarted.elapsedMs
+  ) {
+    const secondsPerChunk = clampEstimate(
+      (mergeSaveStarted.elapsedMs - mergeStarted.elapsedMs) / 1000 / mergeChunkCount,
+      0.5,
+      240,
+    );
+    nextStats.mergeSecondsPerChunk = blendEstimate(
+      currentStats.mergeSecondsPerChunk,
+      secondsPerChunk,
+      sampleCount,
+    );
+  }
+
+  const saveFinished = [...entries].reverse().find((entry) => entry.message === 'pdf merge save finished');
+  if (typeof saveFinished?.saveMs === 'number') {
+    const saveSeconds = clampEstimate(saveFinished.saveMs / 1000, 0.5, 180);
+    nextStats.saveSeconds = blendEstimate(currentStats.saveSeconds, saveSeconds, sampleCount);
+  }
+
+  nextStats.sampleCount = sampleCount + 1;
+  nextStats.updatedAt = Date.now();
+  savePrintEstimateStats(nextStats);
+  console.log('[print-pdf-analysis] estimate stats updated', nextStats);
+}
+
+async function updatePrintEstimateStatsFromWorkerLog(jobId: string): Promise<void> {
+  try {
+    const logText = await invoke('debug_read_print_worker_analysis_log', { jobId }) as string;
+    const entries = parseWorkerAnalysisEntries(logText);
+    if (entries.length === 0) return;
+    updatePrintEstimateStatsFromEntries(entries);
+  } catch (error) {
+    console.warn('[print-pdf-analysis] estimate stats update failed', error);
+  }
+}
+
+function updateOverlayFromWorkerLogEntry(
+  overlay: PrintProgressOverlay,
+  entry: PrintWorkerAnalysisLogEntry,
+  estimator: PrintWorkerProgressEstimator,
+): void {
+  const message = entry.message ?? '';
+
+  if (message === 'pdf job failed') {
+    overlay.updateProgress(
+      1,
+      PDF_PROGRESS_TOTAL_UNITS,
+      `PDF 생성 실패: ${entry.errorMessage ?? '원인을 확인하는 중입니다.'}`,
+      { animationMs: 0 },
+    );
+    return;
+  }
+
+  if (message === 'svg batch loaded') {
+    const completedPages = Math.max(0, entry.completedPages ?? 0);
+    const totalPages = Math.max(1, entry.totalPages ?? completedPages);
+    const units = 320 + Math.round((completedPages / totalPages) * 120);
+    if (estimator.svgStartedElapsedMs === undefined) {
+      estimator.svgStartedElapsedMs = entry.elapsedMs ?? 0;
+    }
+    const dataEtaSeconds = estimateRemainingSeconds({
+      startedElapsedMs: estimator.svgStartedElapsedMs,
+      currentElapsedMs: entry.elapsedMs,
+      completed: completedPages,
+      total: totalPages,
+    });
+    const totalEtaSeconds = dataEtaSeconds === null
+      ? null
+      : dataEtaSeconds + estimateRemainingPostDataSeconds(totalPages, estimator.stats);
+    overlay.updateEta(totalEtaSeconds, '전체 남은 시간');
+    overlay.updateProgress(
+      units,
+      PDF_PROGRESS_TOTAL_UNITS,
+      `PDF 데이터 읽는 중... (${completedPages}/${totalPages}쪽)`,
+      { animationMs: 450 },
+    );
+    return;
+  }
+
+  if (message === 'all svg pages loaded' || message === 'browser page created') {
+    estimator.renderStartedElapsedMs = entry.elapsedMs ?? estimator.renderStartedElapsedMs;
+    overlay.updateEta(null, '전체 남은 시간');
+    overlay.updateProgress(450, PDF_PROGRESS_TOTAL_UNITS, 'PDF 엔진 준비 중...', { animationMs: 1200 });
+    return;
+  }
+
+  if (
+    message.includes('html document chunk')
+    || message.includes('page.setContent chunk')
+    || message.includes('page.pdf chunk')
+    || message === 'browser page closed after chunk rendering'
+  ) {
+    const chunkIndex = Math.max(1, entry.chunkIndex ?? entry.totalChunkCount ?? 1);
+    const totalChunkCount = Math.max(1, entry.totalChunkCount ?? chunkIndex);
+    const chunkBase = Math.max(0, chunkIndex - 1);
+    const chunkWeight = 1 / totalChunkCount;
+    const inChunkProgress = (() => {
+      if (message === 'browser page closed after chunk rendering') return 1;
+      if (message === 'building html document chunk') return 0.02;
+      if (message === 'html document chunk built') return 0.04;
+      if (message === 'page.setContent chunk started') return 0.08;
+      if (message === 'page.setContent chunk finished') return 0.18;
+      if (message === 'page.pdf chunk started') return 0.25;
+      if (message === 'page.pdf chunk finished') return 1;
+      return 0.02;
+    })();
+    const units = 450 + Math.round(((chunkBase + inChunkProgress) * chunkWeight) * 250);
+    if (estimator.renderStartedElapsedMs === undefined) {
+      estimator.renderStartedElapsedMs = entry.elapsedMs ?? 0;
+    }
+    const renderEtaSeconds = estimateRemainingSeconds({
+      startedElapsedMs: estimator.renderStartedElapsedMs,
+      currentElapsedMs: entry.elapsedMs,
+      completed: chunkBase + inChunkProgress,
+      total: totalChunkCount,
+    });
+    const totalEtaSeconds = renderEtaSeconds === null
+      ? null
+      : renderEtaSeconds + estimateMergeAndSaveSeconds(totalChunkCount, 0, estimator.stats);
+    overlay.updateEta(totalEtaSeconds, '전체 남은 시간');
+    const animationMs = (() => {
+      if (message === 'page.pdf chunk started') return 3200;
+      if (message === 'page.setContent chunk started') return 2200;
+      if (message === 'browser page closed after chunk rendering') return 700;
+      return 700;
+    })();
+    const phase = message.includes('page.pdf')
+      ? 'PDF 파일 생성 중'
+      : 'PDF 레이아웃 생성 중';
+    overlay.updateProgress(
+      units,
+      PDF_PROGRESS_TOTAL_UNITS,
+      `${phase}... (청크 ${chunkIndex}/${totalChunkCount}${formatWorkerChunkRange(entry)})`,
+      { animationMs },
+    );
+    return;
+  }
+
+  if (message === 'pdf merge started') {
+    estimator.mergeStartedElapsedMs = entry.elapsedMs ?? estimator.mergeStartedElapsedMs;
+    overlay.updateEta(null, '전체 남은 시간');
+    overlay.updateProgress(710, PDF_PROGRESS_TOTAL_UNITS, 'PDF 병합 준비 중...', { animationMs: 1000 });
+    return;
+  }
+
+  if (message.startsWith('pdf merge chunk')) {
+    const chunkIndex = Math.max(1, entry.chunkIndex ?? 1);
+    const chunkCount = Math.max(1, entry.chunkCount ?? chunkIndex);
+    const chunkBase = Math.max(0, chunkIndex - 1);
+    const chunkWeight = 1 / chunkCount;
+    const inChunkProgress = (() => {
+      if (message === 'pdf merge chunk started') return 0.02;
+      if (message === 'pdf merge chunk read') return 0.18;
+      if (message === 'pdf merge chunk loaded') return 0.82;
+      if (message === 'pdf merge chunk copied') return 0.93;
+      if (message === 'pdf merge chunk appended') return 1;
+      return 0.02;
+    })();
+    const units = 710 + Math.round(((chunkBase + inChunkProgress) * chunkWeight) * 240);
+    if (estimator.mergeStartedElapsedMs === undefined) {
+      estimator.mergeStartedElapsedMs = entry.elapsedMs ?? 0;
+    }
+    const mergeEtaSeconds = estimateRemainingSeconds({
+      startedElapsedMs: estimator.mergeStartedElapsedMs,
+      currentElapsedMs: entry.elapsedMs,
+      completed: chunkBase + inChunkProgress,
+      total: chunkCount,
+    });
+    const totalEtaSeconds = mergeEtaSeconds === null
+      ? estimateMergeAndSaveSeconds(chunkCount, chunkBase + inChunkProgress, estimator.stats)
+      : mergeEtaSeconds + estimator.stats.saveSeconds;
+    overlay.updateEta(totalEtaSeconds, '전체 남은 시간');
+    const animationMs = message === 'pdf merge chunk read' ? 14000 : 650;
+    overlay.updateProgress(
+      units,
+      PDF_PROGRESS_TOTAL_UNITS,
+      `PDF 병합 중... (청크 ${chunkIndex}/${chunkCount}, 병합된 쪽 ${entry.mergedPageCount ?? '-'})`,
+      { animationMs },
+    );
+    return;
+  }
+
+  if (message === 'pdf merge save started') {
+    overlay.updateEta(estimator.stats.saveSeconds, '전체 남은 시간');
+    overlay.updateProgress(
+      965,
+      PDF_PROGRESS_TOTAL_UNITS,
+      `PDF 저장 중... (${entry.pageCount ?? '-'}쪽)`,
+      { animationMs: 2800 },
+    );
+    return;
+  }
+
+  if (message === 'pdf merge save finished') {
+    overlay.updateEta(0, 'PDF 저장 남은 시간');
+    overlay.updateProgress(985, PDF_PROGRESS_TOTAL_UNITS, 'PDF 저장 완료 처리 중...', { animationMs: 500 });
+    return;
+  }
+
+  if (message === 'pdf merge finished' || message === 'chunk pdf cleanup finished') {
+    overlay.updateEta(0, '남은 시간');
+    overlay.updateProgress(995, PDF_PROGRESS_TOTAL_UNITS, 'PDF 열기 준비 중...', { animationMs: 500 });
+  }
+}
+
+function startPrintWorkerLogPolling(
+  jobId: string,
+  overlay: PrintProgressOverlay,
+): () => void {
+  let stopped = false;
+  let polling = false;
+  const estimator: PrintWorkerProgressEstimator = {
+    stats: loadPrintEstimateStats(),
+  };
+
+  const poll = async () => {
+    if (stopped || polling) return;
+    polling = true;
+    try {
+      const logText = await invoke('debug_read_print_worker_analysis_log', { jobId }) as string;
+      const entry = parseLatestWorkerAnalysisEntry(logText);
+      if (entry) {
+        updateOverlayFromWorkerLogEntry(overlay, entry, estimator);
+      }
+    } catch (error) {
+      console.warn('[print-pdf-analysis] worker log polling failed', error);
+    } finally {
+      polling = false;
+    }
+  };
+
+  const timer = window.setInterval(() => {
+    void poll();
+  }, 1000);
+  void poll();
+
+  return () => {
+    stopped = true;
+    window.clearInterval(timer);
+  };
 }
 
 function getCurrentPageFromStatusBar(): number {
@@ -47,50 +525,6 @@ function getCurrentPageFromStatusBar(): number {
   return Number.isFinite(currentPage) && currentPage > 0 ? currentPage : 1;
 }
 
-function parsePageRangeInput(
-  value: string,
-  maxPage: number,
-): { startPage: number; endPage: number } | null {
-  const normalized = value.trim().replace(/\s+/g, '');
-  if (!normalized) return null;
-
-  const rangeMatch = normalized.match(/^(\d+)-(\d+)$/);
-  if (rangeMatch) {
-    const startPage = Number.parseInt(rangeMatch[1], 10);
-    const endPage = Number.parseInt(rangeMatch[2], 10);
-    if (!Number.isFinite(startPage) || !Number.isFinite(endPage)) return null;
-    if (startPage < 1 || endPage < startPage) return null;
-    return {
-      startPage: Math.min(startPage, maxPage),
-      endPage: Math.min(endPage, maxPage),
-    };
-  }
-
-  const singleMatch = normalized.match(/^(\d+)$/);
-  if (singleMatch) {
-    const page = Number.parseInt(singleMatch[1], 10);
-    if (!Number.isFinite(page) || page < 1) return null;
-    const clampedPage = Math.min(page, maxPage);
-    return {
-      startPage: clampedPage,
-      endPage: clampedPage,
-    };
-  }
-
-  return null;
-}
-
-function isPdfChunkCursorCurrentDocument(
-  cursor: PdfChunkPreviewCursor | null,
-  services: Parameters<NonNullable<CommandDef['execute']>>[0],
-): cursor is PdfChunkPreviewCursor {
-  if (!cursor) return false;
-  return (
-    cursor.sourceFileName === services.wasm.fileName &&
-    cursor.totalPages === services.wasm.pageCount
-  );
-}
-
 async function previewCurrentDocPdfChunk(
   services: Parameters<NonNullable<CommandDef['execute']>>[0],
   params: {
@@ -98,8 +532,6 @@ async function previewCurrentDocPdfChunk(
     chunkSize?: number;
     batchSize?: number;
     svgBatchSize?: number;
-    openExternally?: boolean;
-    trackCursor?: boolean;
   } = {},
 ): Promise<void> {
   const wasm = services.wasm;
@@ -108,12 +540,10 @@ async function previewCurrentDocPdfChunk(
   }
 
   const startPage = Math.max(1, Math.min(params.startPage ?? 1, wasm.pageCount));
-  const chunkSize = Math.max(1, Math.round(params.chunkSize ?? DEFAULT_PDF_PREVIEW_CHUNK_SIZE));
+  const chunkSize = Math.max(1, Math.round(params.chunkSize ?? wasm.pageCount));
   const endPage = Math.min(wasm.pageCount, startPage + chunkSize - 1);
   const batchSize = Math.max(1, Math.round(params.batchSize ?? DEFAULT_PDF_WORKER_BATCH_SIZE));
   const svgBatchSize = Math.max(1, Math.round(params.svgBatchSize ?? DEFAULT_PDF_WORKER_SVG_BATCH_SIZE));
-  const openExternally = params.openExternally ?? false;
-  const trackCursor = params.trackCursor ?? true;
   const pageIndexes = Array.from(
     { length: endPage - startPage + 1 },
     (_, index) => startPage - 1 + index,
@@ -124,8 +554,24 @@ async function previewCurrentDocPdfChunk(
   const overlay = new PrintProgressOverlay();
   const abortSignal = overlay.show('PDF 미리보기 준비 중');
   const svgPages: string[] = [];
+  const jobId = `menu-pdf-preview-${Date.now()}`;
+  let stopWorkerLogPolling: (() => void) | null = null;
+  let cancelRequested = false;
+  const requestWorkerCancel = () => {
+    cancelRequested = true;
+    overlay.updateEta(null, '취소 처리');
+    overlay.updateProgress(
+      1,
+      PDF_PROGRESS_TOTAL_UNITS,
+      'PDF 작업을 취소하는 중입니다...',
+      { animationMs: 0 },
+    );
+    void invoke('debug_cancel_print_worker_pdf_export', { jobId })
+      .catch((error) => console.warn('[print-pdf-analysis] cancel request failed', error));
+  };
   const startedAt = performance.now();
   const svgStartedAt = performance.now();
+  abortSignal.addEventListener('abort', requestWorkerCancel, { once: true });
 
   try {
     for (let startIndex = 0; startIndex < pageIndexes.length; startIndex += svgBatchSize) {
@@ -143,10 +589,26 @@ async function previewCurrentDocPdfChunk(
 
       const completedPages = Math.min(startIndex + batchPageIndexes.length, pageIndexes.length);
       statusEl && renderPrintProgress(statusEl, completedPages, pageIndexes.length);
+      const progressUnits = Math.max(
+        1,
+        Math.round((completedPages / pageIndexes.length) * 320),
+      );
+      const svgElapsedSeconds = (performance.now() - svgStartedAt) / 1000;
+      const svgEtaSeconds = svgElapsedSeconds >= 3 && completedPages > 0 && completedPages < pageIndexes.length
+        ? ((pageIndexes.length - completedPages) / (completedPages / svgElapsedSeconds))
+        : null;
+      const estimateStats = loadPrintEstimateStats();
+      overlay.updateEta(
+        svgEtaSeconds === null
+          ? null
+          : svgEtaSeconds + estimateRemainingPostDataSeconds(pageIndexes.length, estimateStats),
+        '전체 남은 시간',
+      );
       overlay.updateProgress(
-        completedPages,
-        pageIndexes.length,
-        `PDF 미리보기 준비 중... (${startPage + completedPages - 1}/${endPage}페이지)`,
+        progressUnits,
+        PDF_PROGRESS_TOTAL_UNITS,
+        `PDF 데이터 준비 중... (${startPage + completedPages - 1}/${endPage}페이지)`,
+        { animationMs: 450 },
       );
 
       if (completedPages < pageIndexes.length) {
@@ -158,10 +620,15 @@ async function previewCurrentDocPdfChunk(
     const svgCharLength = svgPages.reduce((total, svg) => total + svg.length, 0);
     const firstPageInfo = wasm.getPageInfo(pageIndexes[0]);
     statusEl && renderPrintProgress(statusEl, pageIndexes.length, pageIndexes.length);
+    overlay.updateEta(
+      estimateRemainingPostDataSeconds(pageIndexes.length, loadPrintEstimateStats()),
+      '전체 남은 시간',
+    );
     overlay.updateProgress(
-      pageIndexes.length,
-      pageIndexes.length,
-      `PDF 생성 중... (${startPage}-${endPage}페이지)`,
+      330,
+      PDF_PROGRESS_TOTAL_UNITS,
+      `PDF 생성 작업 시작 중... (${startPage}-${endPage}페이지)`,
+      { animationMs: 900 },
     );
     console.log('[print-pdf-analysis] frontend before invoke', {
       startPage,
@@ -179,9 +646,10 @@ async function previewCurrentDocPdfChunk(
           : undefined,
     });
     const invokeStartedAt = performance.now();
+    stopWorkerLogPolling = startPrintWorkerLogPolling(jobId, overlay);
     const messages = await invoke('debug_run_print_worker_pdf_export_for_current_doc', {
       payload: {
-        jobId: `menu-pdf-preview-${Date.now()}`,
+        jobId,
         sourceFileName: wasm.fileName,
         widthPx: Math.max(1, Math.round(firstPageInfo.width)),
         heightPx: Math.max(1, Math.round(firstPageInfo.height)),
@@ -210,6 +678,10 @@ async function previewCurrentDocPdfChunk(
     const resultMessage = [...messages].reverse().find((message) => message.type === 'result')?.result;
     const outputPdfPath = resultMessage?.ok ? resultMessage.outputPdfPath : undefined;
     if (!outputPdfPath) {
+      if (resultMessage?.errorCode === 'CANCELLED') {
+        cancelRequested = true;
+        throw new Error(resultMessage.errorMessage ?? 'PDF 생성이 취소되었습니다.');
+      }
       throw new Error(
         resultMessage?.errorMessage
           ? `PDF 미리보기 생성 실패 (${resultMessage.errorCode ?? 'UNKNOWN'}): ${resultMessage.errorMessage}`
@@ -217,65 +689,40 @@ async function previewCurrentDocPdfChunk(
       );
     }
 
-    if (openExternally) {
-      await invoke('debug_open_generated_pdf', { path: outputPdfPath });
-    } else {
-      const bytes = await invoke('debug_read_generated_pdf', { path: outputPdfPath }) as number[];
-      const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
-      const canGoPrev = startPage > 1;
-      const canGoNext = endPage < wasm.pageCount;
-      await workerPdfPreview.open(blob, {
-        title: `${wasm.fileName} PDF 미리보기`,
-        statusText: `${startPage}-${endPage} / ${wasm.pageCount}쪽`,
-        canGoPrev,
-        canGoNext,
-        onPrev: canGoPrev
-          ? async () => {
-            await previewCurrentDocPdfChunk(services, {
-              startPage: Math.max(1, startPage - chunkSize),
-              chunkSize,
-              batchSize,
-              svgBatchSize,
-            });
-          }
-          : undefined,
-        onNext: canGoNext
-          ? async () => {
-            await previewCurrentDocPdfChunk(services, {
-              startPage: endPage + 1,
-              chunkSize,
-              batchSize,
-              svgBatchSize,
-            });
-          }
-          : undefined,
-      });
-    }
+    await updatePrintEstimateStatsFromWorkerLog(jobId);
 
-    if (trackCursor) {
-      currentPdfChunkCursor = {
-        sourceFileName: wasm.fileName,
-        startPage,
-        endPage,
-        nextStartPage: endPage + 1,
-        chunkSize,
-        batchSize,
-        svgBatchSize,
-        totalPages: wasm.pageCount,
-      };
-    }
+    const pdfBytes = await invoke('debug_read_generated_pdf', { path: outputPdfPath }) as number[];
+    const pdfBlob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+    await workerPdfPreview.open(pdfBlob, {
+      title: `${wasm.fileName} (${startPage}-${endPage})`,
+    });
 
+    stopWorkerLogPolling?.();
+    stopWorkerLogPolling = null;
+    abortSignal.removeEventListener('abort', requestWorkerCancel);
     statusEl && (statusEl.innerHTML = originalStatus);
     overlay.hide();
     showToast({
-      message: openExternally
-        ? `PDF ${startPage}-${endPage}페이지를 외부 뷰어로 열었습니다.`
-        : `PDF 미리보기 ${startPage}-${endPage}페이지를 열었습니다.`,
+      message: `PDF ${startPage}-${endPage}페이지를 앱 내부 뷰어로 열었습니다.`,
       durationMs: 3000,
     });
   } catch (error) {
+    stopWorkerLogPolling?.();
+    stopWorkerLogPolling = null;
+    abortSignal.removeEventListener('abort', requestWorkerCancel);
     statusEl && (statusEl.textContent = error instanceof Error ? error.message : String(error));
     overlay.hide();
+    if (
+      cancelRequested
+      || (error instanceof Error && error.message.includes('취소'))
+    ) {
+      statusEl && (statusEl.innerHTML = originalStatus);
+      showToast({
+        message: 'PDF 작업을 취소했습니다.',
+        durationMs: 2500,
+      });
+      return;
+    }
     throw error;
   }
 }
@@ -404,9 +851,6 @@ body[data-printing="true"] > :not(#tauri-print-root):not(script):not(style) {
 #tauri-print-root {
   display: none;
 }
-body[data-printing="true"] #tauri-print-root {
-  display: block;
-}
 body[data-printing="true"] {
   margin: 0 !important;
   padding: 0 !important;
@@ -431,13 +875,9 @@ body[data-printing="true"] {
   width: 100%;
   height: 100%;
 }
-@media screen {
+@media print {
   body[data-printing="true"] #tauri-print-root {
-    position: fixed;
-    inset: 0;
-    overflow: auto;
-    background: rgba(255, 255, 255, 0.98);
-    z-index: 99999;
+    display: block;
   }
 }
 `;
@@ -621,171 +1061,11 @@ export const fileCommands: CommandDef[] = [
           chunkSize: options.endPage - options.startPage + 1,
           batchSize: DEFAULT_PDF_WORKER_BATCH_SIZE,
           svgBatchSize: DEFAULT_PDF_WORKER_SVG_BATCH_SIZE,
-          openExternally: true,
-          trackCursor: false,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error('[file:print]', msg);
         alert(`인쇄 작업에 실패했습니다.\n${msg}`);
-      }
-    },
-  },
-  {
-    id: 'file:print-legacy',
-    label: '기존 인쇄 미리보기',
-    icon: 'icon-print',
-    canExecute: (ctx) => ctx.hasDocument,
-    async execute(services, params) {
-      try {
-        await runLegacyPrintPreview(services, params);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        alert(`기존 인쇄 미리보기에 실패했습니다.\n${msg}`);
-      }
-    },
-  },
-  {
-    id: 'file:pdf-preview-chunk',
-      label: 'PDF 미리보기 (10쪽)',
-    canExecute: (ctx) => ctx.hasDocument,
-    async execute(services) {
-      try {
-        await previewCurrentDocPdfChunk(services);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('[file:pdf-preview-chunk]', message);
-        alert(`PDF 미리보기에 실패했습니다.\n${message}`);
-      }
-    },
-  },
-  {
-    id: 'file:pdf-preview-current-chunk',
-      label: '현재 10쪽 PDF 미리보기',
-    canExecute: (ctx) => ctx.hasDocument,
-    async execute(services) {
-      const currentPage = getCurrentPageFromStatusBar();
-
-      try {
-        await previewCurrentDocPdfChunk(services, {
-          startPage: currentPage,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('[file:pdf-preview-current-chunk]', message);
-        alert(`현재 위치 PDF 미리보기에 실패했습니다.\n${message}`);
-      }
-    },
-  },
-  {
-    id: 'file:pdf-preview-range',
-    label: '페이지 범위 PDF 미리보기',
-    canExecute: (ctx) => ctx.hasDocument,
-    async execute(services) {
-      const maxPage = services.wasm.pageCount;
-      const defaultStartPage = getCurrentPageFromStatusBar();
-      const suggestedEndPage = Math.min(maxPage, defaultStartPage + DEFAULT_PDF_PREVIEW_CHUNK_SIZE - 1);
-      const input = window.prompt(
-        `PDF 미리보기할 페이지 범위를 입력하세요.\n예: ${defaultStartPage}-${suggestedEndPage} 또는 ${defaultStartPage}`,
-        `${defaultStartPage}-${suggestedEndPage}`,
-      );
-
-      if (!input) return;
-
-      const parsed = parsePageRangeInput(input, maxPage);
-      if (!parsed) {
-        alert('페이지 범위를 올바르게 입력해주세요. 예: 21-40 또는 35');
-        return;
-      }
-
-      try {
-        await previewCurrentDocPdfChunk(services, {
-          startPage: parsed.startPage,
-          chunkSize: parsed.endPage - parsed.startPage + 1,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('[file:pdf-preview-range]', message);
-        alert(`페이지 범위 PDF 미리보기에 실패했습니다.\n${message}`);
-      }
-      },
-    },
-    {
-      id: 'file:pdf-export-full',
-      label: '전체 인쇄용 PDF 생성',
-      icon: 'icon-print',
-      canExecute: (ctx) => ctx.hasDocument,
-      async execute(services) {
-        try {
-          await previewCurrentDocPdfChunk(services, {
-            startPage: 1,
-            chunkSize: services.wasm.pageCount,
-            batchSize: DEFAULT_PDF_WORKER_BATCH_SIZE,
-            svgBatchSize: DEFAULT_PDF_WORKER_SVG_BATCH_SIZE,
-            openExternally: true,
-            trackCursor: false,
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          console.error('[file:pdf-export-full]', message);
-          alert(`전체 인쇄용 PDF 생성에 실패했습니다.\n${message}`);
-        }
-      },
-    },
-    {
-      id: 'file:pdf-preview-next-chunk',
-      label: '다음 10쪽 PDF 미리보기',
-    canExecute: (ctx) => ctx.hasDocument,
-    async execute(services) {
-      if (!isPdfChunkCursorCurrentDocument(currentPdfChunkCursor, services)) {
-        currentPdfChunkCursor = null;
-          alert('먼저 [파일] → [PDF 미리보기 (10쪽)]를 실행해주세요.');
-        return;
-      }
-
-      if (currentPdfChunkCursor.nextStartPage > currentPdfChunkCursor.totalPages) {
-        alert('더 이상 미리보기할 다음 페이지 구간이 없습니다.');
-        return;
-      }
-
-      try {
-        await previewCurrentDocPdfChunk(services, {
-          startPage: currentPdfChunkCursor.nextStartPage,
-          chunkSize: currentPdfChunkCursor.chunkSize,
-          batchSize: currentPdfChunkCursor.batchSize,
-          svgBatchSize: currentPdfChunkCursor.svgBatchSize,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('[file:pdf-preview-next-chunk]', message);
-        alert(`다음 PDF 미리보기에 실패했습니다.\n${message}`);
-      }
-    },
-  },
-  {
-    id: 'file:pdf-preview-prev-chunk',
-      label: '이전 10쪽 PDF 미리보기',
-    canExecute: (ctx) => ctx.hasDocument,
-    async execute(services) {
-      const activeCursor = isPdfChunkCursorCurrentDocument(currentPdfChunkCursor, services)
-        ? currentPdfChunkCursor
-        : null;
-      const chunkSize = activeCursor?.chunkSize ?? DEFAULT_PDF_PREVIEW_CHUNK_SIZE;
-      const startPage = activeCursor
-        ? Math.max(1, activeCursor.startPage - chunkSize)
-        : Math.max(1, getCurrentPageFromStatusBar() - chunkSize);
-
-      try {
-        await previewCurrentDocPdfChunk(services, {
-          startPage,
-          chunkSize,
-          batchSize: activeCursor?.batchSize ?? DEFAULT_PDF_WORKER_BATCH_SIZE,
-          svgBatchSize: activeCursor?.svgBatchSize ?? DEFAULT_PDF_WORKER_SVG_BATCH_SIZE,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('[file:pdf-preview-prev-chunk]', message);
-        alert(`이전 PDF 미리보기에 실패했습니다.\n${message}`);
       }
     },
   },
