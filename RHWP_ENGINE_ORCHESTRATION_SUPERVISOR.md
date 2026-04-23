@@ -20,6 +20,10 @@ Reviews the current diff against the approved documents and gives a `Continue`, 
 
 Detects stalled work, unclear next actions, and silent waiting. It pushes the process toward the next concrete action without bypassing verification gates.
 
+### Baseline Comparison Agent
+
+Compares the updated app against the approved baseline app to verify that UI/UX and feature behavior remain equivalent from the user's point of view.
+
 ### Orchestration Supervisor
 
 Coordinates the entire workflow.
@@ -46,6 +50,7 @@ The supervisor must continuously use these documents:
 - `RHWP_ENGINE_COMPATIBILITY_CHECKLIST.md`
 - `RHWP_ENGINE_GUARDIAN_AGENT.md`
 - `RHWP_ENGINE_MOMENTUM_MONITOR.md`
+- `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md`
 - `RHWP_ENGINE_UPDATE_RUNBOOK.md`
 
 The supervisor must not rely on memory alone. Before each phase transition, it must re-check the relevant documents.
@@ -64,8 +69,9 @@ Every RHWP engine update should be run as a controlled loop:
 7. Request guardian review
 8. Resolve guardian risks
 9. Run momentum check if progress stalls
-10. Record result
-11. Commit only when the phase is stable
+10. Run baseline comparison before accepting the update
+11. Record result
+12. Commit only when the phase is stable
 ```
 
 The next phase is allowed only when both gates pass:
@@ -257,4 +263,6 @@ The guardian agent owns compliance review.
 
 The momentum monitor owns stalled-work detection.
 
-No RHWP engine update is considered controlled unless all four responsibilities are active and aligned.
+The baseline comparison agent owns baseline UI/UX and feature equivalence checks.
+
+No RHWP engine update is considered controlled unless all five responsibilities are active and aligned.

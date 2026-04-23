@@ -26,6 +26,10 @@ Controls phase sequencing, scope, and review timing.
 
 Detects stalled progress and prompts the next concrete action.
 
+### Baseline Comparison Agent
+
+Compares the updated app against the approved baseline app before an update is accepted.
+
 The momentum monitor does not override the supervisor or guardian. It keeps the work moving only inside the approved process.
 
 ## Required Documents
@@ -34,6 +38,7 @@ The momentum monitor must use these documents:
 
 - `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md`
 - `RHWP_ENGINE_GUARDIAN_AGENT.md`
+- `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md`
 - `RHWP_ENGINE_INTEGRATION_DEVELOPMENT_PLAN.md`
 - `RHWP_ENGINE_COMPATIBILITY_CHECKLIST.md`
 - `RHWP_ENGINE_UPDATE_RUNBOOK.md`

@@ -187,6 +187,7 @@ Record before/after values where possible.
 
 - [ ] `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` was read before implementation.
 - [ ] `RHWP_ENGINE_MOMENTUM_MONITOR.md` was read before implementation.
+- [ ] `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md` was read before implementation.
 - [ ] `RHWP_ENGINE_GUARDIAN_AGENT.md` was read before implementation.
 - [ ] Guardian review was performed after each phase.
 - [ ] Guardian review checked the approved requirements document.
@@ -207,6 +208,22 @@ Record before/after values where possible.
 - [ ] Momentum monitor did not bypass error verification.
 - [ ] Momentum monitor did not bypass feature preservation verification.
 - [ ] Momentum monitor did not bypass guardian review.
+
+## 16. Baseline Comparison
+
+- [ ] Baseline comparison was performed before accepting the update.
+- [ ] Updated app startup matches the baseline behavior.
+- [ ] Updated file menu matches the baseline expected menu structure.
+- [ ] Updated document loading behavior matches the baseline.
+- [ ] Updated rendering/scrolling behavior matches the baseline.
+- [ ] Updated remote link-drop behavior matches the baseline.
+- [ ] Updated print dialog behavior matches the baseline.
+- [ ] Updated PDF export behavior matches the baseline.
+- [ ] Updated in-app PDF viewer behavior matches the baseline.
+- [ ] Updated legacy print behavior matches the baseline.
+- [ ] Any intentional UI/UX difference is documented.
+- [ ] Any intentional feature difference is documented.
+- [ ] Baseline comparison decision is `Pass` or `Pass with documented exceptions`.
 
 ## Result
 

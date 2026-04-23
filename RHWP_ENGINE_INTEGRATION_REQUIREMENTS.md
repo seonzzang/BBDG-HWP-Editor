@@ -37,6 +37,7 @@ RHWP는 HWP/HWPX 파싱, 문서 모델, 페이지 계산, SVG 렌더링, hitTest
 8. 다음 단계 진행은 오류 검증과 기능 유지 검증이 모두 통과된 경우에만 허용한다.
 9. `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` 기준으로 작업 순서, 문서 확인, 단계 이동을 감독한다.
 10. `RHWP_ENGINE_MOMENTUM_MONITOR.md` 기준으로 작업 정체와 다음 행동 누락을 감지한다.
+11. `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md` 기준으로 기준 앱 대비 UI/UX와 기능 동등성을 확인한다.
 
 ## 계층 구분 요구사항
 
@@ -212,6 +213,7 @@ RHWP upstream 업데이트를 적용할 때 다음 순서를 따른다.
 - UI/UX 변경이 불가피한 경우 별도 사유를 문서화한다.
 - guardian review가 `Stop`이면 다음 단계로 진행하지 않는다.
 - 작업이 멈췄거나 다음 행동이 불명확하면 momentum monitor 기준으로 다음 최소 행동을 정한다.
+- 업데이트 수용 전 기준 앱과 변경 앱의 UI/UX 및 기능 동등성을 비교한다.
 
 ## 산출물 요구사항
 
@@ -223,4 +225,5 @@ RHWP upstream 업데이트를 적용할 때 다음 순서를 따른다.
 - 엔진 내부 수정 여부
 - 회귀 테스트 결과
 - guardian review 결과
+- baseline comparison 결과
 - 남은 위험 및 후속 작업

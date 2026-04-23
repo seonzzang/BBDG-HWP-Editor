@@ -24,6 +24,7 @@ The guardian agent must read and use these documents before reviewing any RHWP e
 - `RHWP_ENGINE_COMPATIBILITY_CHECKLIST.md`
 - `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md`
 - `RHWP_ENGINE_MOMENTUM_MONITOR.md`
+- `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md`
 - `RHWP_ENGINE_UPDATE_RUNBOOK.md`
 
 If any of these documents are missing or stale, the guardian agent must stop the update and request document repair before implementation continues.
@@ -172,6 +173,7 @@ Read the approved RHWP engine integration documents, especially:
 - RHWP_ENGINE_COMPATIBILITY_CHECKLIST.md
 - RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md
 - RHWP_ENGINE_MOMENTUM_MONITOR.md
+- RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md
 - RHWP_ENGINE_UPDATE_RUNBOOK.md
 
 Review the current diff and verify whether it preserves current BBDG features, UI/UX behavior, performance expectations, and the RHWP engine boundary.
