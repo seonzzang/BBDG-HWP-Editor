@@ -159,9 +159,19 @@ impl SvgRenderer {
                 }
                 // 이미지 (최상위)
                 if let Some(img) = &bg.image {
-                    let base64_data = base64::engine::general_purpose::STANDARD.encode(&img.data);
-                    let mime_type = detect_image_mime_type(&img.data);
-                    let data_uri = format!("data:{};base64,{}", mime_type, base64_data);
+                    let detected_mime = detect_image_mime_type(&img.data);
+                    // BMP → PNG 재인코딩 (브라우저 호환성)
+                    let (render_bytes, render_mime): (std::borrow::Cow<[u8]>, &str) =
+                        if detected_mime == "image/bmp" {
+                            match bmp_bytes_to_png_bytes(&img.data) {
+                                Some(png) => (std::borrow::Cow::Owned(png), "image/png"),
+                                None => (std::borrow::Cow::Borrowed(img.data.as_slice()), detected_mime),
+                            }
+                        } else {
+                            (std::borrow::Cow::Borrowed(img.data.as_slice()), detected_mime)
+                        };
+                    let base64_data = base64::engine::general_purpose::STANDARD.encode(&*render_bytes);
+                    let data_uri = format!("data:{};base64,{}", render_mime, base64_data);
                     self.output.push_str(&format!(
                         "<image x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" preserveAspectRatio=\"none\" href=\"{}\"/>\n",
                         node.bbox.x, node.bbox.y,
@@ -202,7 +212,7 @@ impl SvgRenderer {
                     };
                     let mut attrs = format!("font-family=\"{}\" font-size=\"{}\" fill=\"{}\" text-anchor=\"middle\" dominant-baseline=\"central\"",
                         escape_xml(&font_family), font_size, color);
-                    if run.style.bold { attrs.push_str(" font-weight=\"bold\""); }
+                    if run.style.is_visually_bold() { attrs.push_str(" font-weight=\"bold\""); }
                     if run.style.italic { attrs.push_str(" font-style=\"italic\""); }
                     for c in run.text.chars() {
                         if c == ' ' { continue; }
@@ -333,6 +343,25 @@ impl SvgRenderer {
             }
             RenderNodeType::FormObject(form) => {
                 self.render_form_object(form, &node.bbox);
+            }
+            RenderNodeType::RawSvg(r) => {
+                // Task #195 단계 8: OOXML 차트 SVG 조각 그대로 삽입
+                self.output.push_str(&r.svg);
+            }
+            RenderNodeType::Placeholder(ph) => {
+                // Task #195: 차트/OLE placeholder (점선 테두리 + 중앙 라벨)
+                let cx = node.bbox.x + node.bbox.width / 2.0;
+                let cy = node.bbox.y + node.bbox.height / 2.0;
+                let font_size = (node.bbox.width.min(node.bbox.height) * 0.06).clamp(12.0, 28.0);
+                self.output.push_str(&format!(
+                    "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"1\" stroke-dasharray=\"6 3\"/>\n",
+                    node.bbox.x, node.bbox.y, node.bbox.width, node.bbox.height,
+                    color_to_svg(ph.fill_color), color_to_svg(ph.stroke_color),
+                ));
+                self.output.push_str(&format!(
+                    "<text x=\"{:.2}\" y=\"{:.2}\" font-family=\"sans-serif\" font-size=\"{:.1}\" fill=\"{}\" text-anchor=\"middle\" dominant-baseline=\"central\">{}</text>\n",
+                    cx, cy, font_size, color_to_svg(ph.stroke_color), escape_xml(&ph.label),
+                ));
             }
             RenderNodeType::Body { clip_rect: Some(cr) } => {
                 let clip_id = format!("body-clip-{}", node.id);
@@ -836,6 +865,13 @@ impl SvgRenderer {
         if let Some(stroke) = style.stroke_color {
             attrs.push_str(&format!(" stroke=\"{}\" stroke-width=\"{}\"",
                 color_to_svg(stroke), style.stroke_width));
+            match style.stroke_dash {
+                StrokeDash::Dash => attrs.push_str(" stroke-dasharray=\"6 3\""),
+                StrokeDash::Dot => attrs.push_str(" stroke-dasharray=\"2 2\""),
+                StrokeDash::DashDot => attrs.push_str(" stroke-dasharray=\"6 3 2 3\""),
+                StrokeDash::DashDotDot => attrs.push_str(" stroke-dasharray=\"6 3 2 3 2 3\""),
+                _ => {}
+            }
         }
 
         if style.opacity < 1.0 {
@@ -999,9 +1035,15 @@ impl SvgRenderer {
         let mime_type = detect_image_mime_type(data);
 
         // WMF → SVG 변환 (브라우저는 WMF를 렌더링할 수 없으므로 SVG로 변환)
+        // BMP → PNG 변환 (브라우저는 SVG <image> 내부의 data:image/bmp 미지원)
         let (render_data, render_mime): (std::borrow::Cow<[u8]>, &str) = if mime_type == "image/x-wmf" {
             match convert_wmf_to_svg(data) {
                 Some(svg_bytes) => (std::borrow::Cow::Owned(svg_bytes), "image/svg+xml"),
+                None => (std::borrow::Cow::Borrowed(data), mime_type),
+            }
+        } else if mime_type == "image/bmp" {
+            match bmp_bytes_to_png_bytes(data) {
+                Some(png_bytes) => (std::borrow::Cow::Owned(png_bytes), "image/png"),
                 None => (std::borrow::Cow::Borrowed(data), mime_type),
             }
         } else {
@@ -1301,7 +1343,7 @@ impl SvgRenderer {
             format!("{},sans-serif", style.font_family)
         };
         let mut font_attrs = format!("font-family=\"{}\" font-size=\"{:.2}\"", escape_xml(&font_family_str), inner_font_size);
-        if style.bold { font_attrs.push_str(" font-weight=\"bold\""); }
+        if style.is_visually_bold() { font_attrs.push_str(" font-weight=\"bold\""); }
         if style.italic { font_attrs.push_str(" font-style=\"italic\""); }
 
         for (i, ch) in chars.iter().enumerate() {
@@ -1375,7 +1417,7 @@ impl SvgRenderer {
             format!("{},sans-serif", style.font_family)
         };
         let mut font_attrs = format!("font-family=\"{}\" font-size=\"{:.2}\"", escape_xml(&font_family_str), inner_font_size);
-        if style.bold { font_attrs.push_str(" font-weight=\"bold\""); }
+        if style.is_visually_bold() { font_attrs.push_str(" font-weight=\"bold\""); }
         if style.italic { font_attrs.push_str(" font-style=\"italic\""); }
 
         let cx = bbox_x + box_size / 2.0;
@@ -1692,8 +1734,10 @@ impl Renderer for SvgRenderer {
         self.overlay_table_bounds.clear();
         self.overlay_skip_depth = 0;
         self.overlay_page_section = -1;
+        // xmlns:xlink 필수: SVG 가 <img> 로 로드될 때(예: blob URL 미리보기)
+        // 엄격한 XML 파싱으로 인해 xmlns:xlink 미선언 시 <image xlink:href=...> 가 무시됨.
         self.output.push_str(&format!(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"0 0 {} {}\">\n",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{}\" height=\"{}\" viewBox=\"0 0 {} {}\">\n",
             width, height, width, height,
         ));
         self.defs_insert_pos = self.output.len();
@@ -1717,6 +1761,11 @@ impl Renderer for SvgRenderer {
     }
 
     fn draw_text(&mut self, text: &str, x: f64, y: f64, style: &TextStyle) {
+        // PUA 문자(U+F000~F0FF, Wingdings 등 심볼 폰트)를 유니코드 표준 문자로 변환
+        let text = &text.chars().map(|ch| {
+            crate::renderer::layout::map_pua_bullet_char(ch)
+        }).collect::<String>();
+
         let color = color_to_svg(style.color);
         let font_size = if style.font_size > 0.0 { style.font_size } else { 12.0 };
         let font_family = if style.font_family.is_empty() {
@@ -1734,7 +1783,7 @@ impl Renderer for SvgRenderer {
             "font-family=\"{}\" font-size=\"{}\"",
             escape_xml(&font_family), font_size,
         );
-        if style.bold {
+        if style.is_visually_bold() {
             base_attrs.push_str(" font-weight=\"bold\"");
         }
         if style.italic {
@@ -2063,6 +2112,19 @@ pub(crate) fn convert_wmf_to_svg(data: &[u8]) -> Option<Vec<u8>> {
     let player = SVGPlayer::new();
     let converter = WMFConverter::new(data, player);
     converter.run().ok()
+}
+
+/// BMP 바이트를 PNG 바이트로 재인코딩한다. 실패 시 None 반환.
+///
+/// 브라우저는 SVG `<image>` 내부의 `data:image/bmp` URI를 표준 지원하지 않으므로,
+/// SVG 임베딩 전에 PNG로 변환해 호환성을 확보한다.
+pub(crate) fn bmp_bytes_to_png_bytes(data: &[u8]) -> Option<Vec<u8>> {
+    use image::{ImageFormat, load_from_memory_with_format};
+    use std::io::Cursor;
+    let img = load_from_memory_with_format(data, ImageFormat::Bmp).ok()?;
+    let mut out = Vec::new();
+    img.write_to(&mut Cursor::new(&mut out), ImageFormat::Png).ok()?;
+    Some(out)
 }
 
 /// 이미지 데이터에서 MIME 타입 감지

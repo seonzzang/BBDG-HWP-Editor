@@ -24,6 +24,7 @@ pub mod crypto;
 pub mod doc_info;
 pub mod header;
 pub mod hwpx;
+pub mod ole_container;
 pub mod record;
 pub mod tags;
 
