@@ -25,6 +25,11 @@ BBDG HWP Editor
 - RHWP 호출은 Engine Adapter를 통한다.
 - RHWP Engine은 upstream 교체 가능 영역으로 유지한다.
 - 단, 엔진 교체 가능성은 현재 BBDG 기능 보존을 해치지 않는 범위에서만 추구한다.
+- 엔진 업데이트는 기능뿐 아니라 UI/UX 흐름도 보존해야 한다.
+- 변경은 단계별로 수행하고 각 단계마다 에러/성능/회귀를 검증한다.
+- 단계별 문서 준수 여부는 `RHWP_ENGINE_GUARDIAN_AGENT.md` 기준으로 검증한다.
+- 다음 단계 진행은 오류 검증과 기능 유지 검증을 모두 통과한 경우에만 허용한다.
+- 전체 작업 순서와 단계 이동은 `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` 기준으로 감독한다.
 
 ## 모듈 책임
 
@@ -176,6 +181,32 @@ npm run build
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
+### 문서 준수 테스트
+
+각 단계 종료 전 `RHWP_ENGINE_GUARDIAN_AGENT.md` 기준 guardian review를 수행한다.
+
+guardian review는 다음 문서를 기준으로 현재 diff를 검사한다.
+
+- `BBDG_CRITICAL_BRANCH_SNAPSHOT.md`
+- `RHWP_ENGINE_INTEGRATION_REQUIREMENTS.md`
+- `RHWP_ENGINE_INTEGRATION_DEVELOPMENT_SPEC.md`
+- `RHWP_ENGINE_INTEGRATION_DEVELOPMENT_PLAN.md`
+- `RHWP_ENGINE_API_INVENTORY.md`
+- `RHWP_ENGINE_COMPATIBILITY_CHECKLIST.md`
+- `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md`
+- `RHWP_ENGINE_UPDATE_RUNBOOK.md`
+
+guardian decision이 `Stop`이면 구현을 계속하지 않는다.
+
+### 단계 진행 게이트
+
+각 단계는 다음 두 검증을 모두 통과해야 완료된다.
+
+- 오류 검증: 빌드 오류, 런타임 오류, WASM 오류, worker 오류, 관련 console 오류가 없거나 원인이 문서화되어야 한다.
+- 기능 유지 검증: 현재 BBDG 기능, UI/UX 흐름, print/PDF/link-drop/document-load 동작이 유지되어야 한다.
+
+한쪽만 통과한 단계는 완료로 간주하지 않는다.
+
 ### 수동 테스트
 
 문서 로딩:
@@ -203,6 +234,64 @@ cargo check --manifest-path src-tauri/Cargo.toml
 - 편집기로 복귀
 - 기존 브라우저 인쇄
 
+### UI/UX 회귀 테스트
+
+확인 항목:
+- 파일 메뉴에는 사용자가 기대하는 인쇄 진입점이 유지되는가
+- 파일 메뉴에 불필요한 PDF 청크 미리보기 개발 메뉴가 다시 나타나지 않는가
+- 인쇄 대화창의 범위/방식 선택 위치가 유지되는가
+- 페이지 범위 숫자 입력창 클릭 시 `페이지 범위`가 자동 선택되는가
+- 끝 페이지 입력창에서 Enter로 인쇄가 실행되는가
+- PDF 진행 오버레이가 프리징처럼 보이지 않는가
+- 전체 남은 시간이 단계별 시간이 아니라 전체 작업 기준으로 표시되는가
+- 전체 남은 시간이 이전 작업 평균을 활용해 보정되는가
+- 취소 버튼이 실제 PDF 작업을 중단하는가
+- PDF 생성 후 앱 내부 PDF 뷰어가 열리는가
+- PDF 뷰어에서 편집기로 자연스럽게 복귀되는가
+- 기존 인쇄 선택 시 브라우저 인쇄 창이 열리는가
+
+### 업그레이드 기능 보존 테스트
+
+RHWP 엔진 업데이트 후 다음 업그레이드 기능이 모두 유지되는지 확인한다.
+
+- 원격 HWP/HWPX 링크 드롭
+- 링크 후보 분석
+- 응답 헤더 기반 문서 판별
+- 비문서 다운로드 차단
+- 임시 다운로드 정리
+- 반복 문서 교체 안정성
+- 웹폰트 실패 캐시
+- 인쇄 대화창 UX
+- 페이지 범위 자동 선택
+- 끝 페이지 Enter 실행
+- PDF 내보내기
+- PDF 청크 생성
+- PDF 병합
+- PDF 취소
+- 전체 남은 시간 ETA
+- ETA 학습
+- 내부 PDF 뷰어
+- 편집기로 복귀
+- 기존 인쇄 방식
+
+### 성능 회귀 테스트
+
+측정 항목:
+- 앱 시작 후 첫 문서 로딩 시간
+- 대형 문서 첫 페이지 표시 시간
+- 페이지 스크롤 반응성
+- PDF 데이터 준비 시간
+- PDF 생성 청크당 평균 시간
+- PDF 병합 청크당 평균 시간
+- PDF 저장 시간
+- 전체 PDF 작업 시간
+- 메모리 증가 추세
+
+성능 기준:
+- RHWP 엔진 업데이트 후 심각한 성능 저하가 발생하면 업데이트 완료로 간주하지 않는다.
+- 정확한 원인 분석 없이 추측성 최적화를 진행하지 않는다.
+- 성능 변화는 가능한 한 로그와 수치로 비교한다.
+
 ## 개발 금지 패턴
 
 금지:
@@ -227,6 +316,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 - adapter 수정 내역
 - 앱 기능 영향
 - 검증 결과
+- guardian review 결과
 - 임시 우회 또는 남은 리스크
 
 ## 완료 기준
@@ -234,7 +324,12 @@ cargo check --manifest-path src-tauri/Cargo.toml
 엔진 업데이트 작업은 다음 조건을 만족해야 완료된다.
 
 - 현재 구현된 BBDG 기능과 UX가 유지되어야 한다.
+- 업그레이드 기능 보존 테스트가 모두 통과해야 한다.
 - RHWP 코어 변경과 BBDG 앱 변경이 분리되어 있다.
 - 앱 주요 기능이 회귀 없이 동작한다.
+- UI/UX 주요 흐름이 회귀 없이 유지된다.
+- 대형 문서와 PDF 작업에서 심각한 성능 저하가 없다.
 - adapter 외 앱 전역에서 RHWP API 변경 여파가 확산되지 않았다.
+- guardian review 최종 decision이 `Continue`이다.
+- 오류 검증과 기능 유지 검증이 모두 통과했다.
 - 충돌/우회/미해결 리스크가 문서화되었다.

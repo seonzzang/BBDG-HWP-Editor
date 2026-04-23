@@ -12,11 +12,27 @@
 4. `wasm-bridge`를 명확한 adapter 계층으로 정리한다.
 5. RHWP 업데이트 절차를 반복 가능한 프로세스로 만든다.
 6. 회귀 테스트 체크리스트를 고정한다.
+7. `RHWP_ENGINE_GUARDIAN_AGENT.md` 기준으로 각 단계의 문서 준수 여부를 검증한다.
+8. `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` 기준으로 작업 순서와 단계 이동을 감독한다.
+
+모든 단계는 `작게 변경 → 에러 검증 → 기능 유지 검증 → 성능 검증 → UI/UX 검증 → 커밋 → 다음 단계` 순서로 진행한다.
+
+각 단계 종료 전에는 guardian review를 수행한다. guardian review가 `Stop`이면 다음 단계로 넘어가지 않는다.
+
+각 단계 시작 전에는 orchestration supervisor 기준으로 현재 phase, 작업 범위, 필수 문서, 검증 항목, 커밋 경계를 확인한다.
+
+다음 단계로 넘어가려면 반드시 두 가지 게이트가 모두 통과되어야 한다.
+
+- 오류 검증 통과
+- 기능 유지 검증 통과
+
+둘 중 하나라도 실패하면 현재 단계를 완료한 것으로 보지 않는다.
 
 ## Phase 1. 현황 감사
 
 목표:
 - RHWP 코어에 직접 들어간 BBDG성 변경을 식별한다.
+- 현재 업그레이드된 BBDG 기능 전체를 보존 체크리스트로 고정한다.
 
 작업:
 - `git log -- src pkg rhwp-studio/src/core/wasm-bridge.ts` 분석
@@ -29,9 +45,15 @@
 - 엔진 의존 API 목록
 - 코어 변경 리스크 목록
 - 앱 레이어 이전 가능 항목 목록
+- 업그레이드 기능 보존 체크리스트
+- guardian review 결과
 
 완료 기준:
 - 어떤 기능이 RHWP 코어에 의존하는지 한눈에 볼 수 있어야 한다.
+- 현재 UI/UX 기준 흐름이 문서화되어야 한다.
+- 오류 검증과 기능 유지 검증이 모두 통과해야 한다.
+- orchestration supervisor가 다음 단계 진행을 허용해야 한다.
+- guardian review가 `Continue` 또는 `Continue with caution`이어야 한다.
 
 ## Phase 2. 엔진 경계 고정
 
@@ -48,9 +70,13 @@
 산출물:
 - 안정 adapter API 목록
 - raw engine access 예외 목록
+- guardian review 결과
 
 완료 기준:
 - RHWP API 변경 시 수정 지점이 대부분 adapter로 제한되어야 한다.
+- 오류 검증과 기능 유지 검증이 모두 통과해야 한다.
+- orchestration supervisor가 다음 단계 진행을 허용해야 한다.
+- guardian review가 `Continue` 또는 `Continue with caution`이어야 한다.
 
 ## Phase 3. 과거 실험성 엔진 변경 정리
 
@@ -68,9 +94,13 @@
 - 제거된 실험성 API 목록
 - 유지해야 하는 엔진 API 목록
 - upstream PR 후보 목록
+- guardian review 결과
 
 완료 기준:
 - PDF/인쇄 기능이 RHWP 코어가 아니라 앱/worker 레이어에서 완결되어야 한다.
+- 오류 검증과 기능 유지 검증이 모두 통과해야 한다.
+- orchestration supervisor가 다음 단계 진행을 허용해야 한다.
+- guardian review가 `Continue` 또는 `Continue with caution`이어야 한다.
 
 ## Phase 4. RHWP 업데이트 리허설
 
@@ -83,14 +113,24 @@
 - 빌드 오류 확인
 - adapter 수정만으로 앱 빌드가 가능한지 확인
 - 핵심 수동 테스트 수행
+- UI/UX 회귀 테스트 수행
+- 대형 문서 성능 비교 수행
+- 업그레이드 기능 보존 체크리스트 전체 수행
 
 산출물:
 - 충돌 파일 목록
 - adapter 수정 목록
 - 회귀 테스트 결과
+- UI/UX 회귀 테스트 결과
+- 성능 비교 결과
+- 업그레이드 기능 보존 체크리스트 결과
+- guardian review 결과
 
 완료 기준:
 - RHWP 업데이트가 어떤 비용으로 가능한지 명확해야 한다.
+- 오류 검증과 기능 유지 검증이 모두 통과해야 한다.
+- orchestration supervisor가 다음 단계 진행을 허용해야 한다.
+- guardian review가 `Continue` 또는 `Continue with caution`이어야 한다.
 
 ## Phase 5. 업데이트 자동 체크 스크립트
 
@@ -115,9 +155,15 @@ cargo check --manifest-path src-tauri/Cargo.toml
 산출물:
 - 엔진 업데이트 체크리스트
 - 검증 명령 문서
+- UI/UX 회귀 체크리스트
+- 성능 측정 체크리스트
+- guardian review 결과
 
 완료 기준:
 - 업데이트 담당자가 매번 같은 순서로 검증할 수 있어야 한다.
+- 오류 검증과 기능 유지 검증이 모두 통과해야 한다.
+- orchestration supervisor가 다음 단계 진행을 허용해야 한다.
+- guardian review가 `Continue` 또는 `Continue with caution`이어야 한다.
 
 ## Phase 6. 운영 규칙 적용
 
@@ -133,9 +179,13 @@ cargo check --manifest-path src-tauri/Cargo.toml
 산출물:
 - 개발 규칙 업데이트
 - 엔진 수정 예외 기록 양식
+- guardian review 결과
 
 완료 기준:
 - 새 기능 개발 시 RHWP 코어 수정 여부를 먼저 검토하는 문화가 생겨야 한다.
+- 오류 검증과 기능 유지 검증이 모두 통과해야 한다.
+- orchestration supervisor가 다음 단계 진행을 허용해야 한다.
+- guardian review가 `Continue` 또는 `Continue with caution`이어야 한다.
 
 ## 우선순위
 
@@ -184,6 +234,30 @@ cargo check --manifest-path src-tauri/Cargo.toml
 - 수동 회귀 테스트 체크리스트 수행
 - 앱 레이어 기능은 엔진 업데이트 커밋과 분리
 
+### UI/UX 회귀
+
+영향:
+- 기능은 동작하지만 사용 흐름이 달라져 사용자가 혼란을 느낄 수 있음
+- 인쇄/PDF/뷰어 흐름이 기존보다 불편해질 수 있음
+
+대응:
+- 업데이트 전후 화면과 흐름을 비교
+- UI 변경은 엔진 업데이트와 별도 작업으로 분리
+- 불가피한 UI 변경은 사유와 영향을 문서화
+
+### 성능 회귀
+
+영향:
+- 대형 문서 로딩 지연
+- PDF 생성/병합 지연
+- 메모리 증가
+- 프리징처럼 보이는 UX 재발
+
+대응:
+- 단계별 성능 로그 확인
+- PDF 단계별 평균 시간 비교
+- 성능 저하 원인 확인 전 다음 단계 진행 금지
+
 ## 작업 완료 정의
 
 이 계획의 1차 완료 조건:
@@ -192,4 +266,6 @@ cargo check --manifest-path src-tauri/Cargo.toml
 - 개발계획 명세서 작성 완료
 - 엔진 경계 원칙 합의
 - 현재 업그레이드된 BBDG 기능 유지 원칙 합의
+- UI/UX 유지 원칙 합의
+- 단계별 에러/성능 검증 원칙 합의
 - 다음 RHWP 업데이트 시 적용 가능한 절차 확보

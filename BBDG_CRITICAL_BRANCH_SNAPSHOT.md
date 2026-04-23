@@ -27,6 +27,10 @@ It captures the current upgraded BBDG feature set before future RHWP engine inte
 The following BBDG features must be preserved after future RHWP engine updates:
 
 - Print dialog UX
+- Single `[File] -> [Print]` entry point
+- Print range selection
+- Page range input auto-select behavior
+- End page input Enter-to-print behavior
 - PDF export flow
 - Large document PDF chunk generation
 - PDF merge pipeline
@@ -38,9 +42,14 @@ The following BBDG features must be preserved after future RHWP engine updates:
 - Return from PDF viewer to editor
 - Legacy browser print option inside the print dialog
 - Remote HWP/HWPX link drop support
+- Remote link candidate detection
+- Header-based remote document detection
+- Non-document download rejection before WASM load
 - Temporary remote download cleanup
 - Web font load retry suppression
 - WASM document replacement stability improvements
+- Pre-load input/hitTest warning suppression
+- Removal of obsolete PDF chunk preview menu entries
 
 ## Engine Integration Principle
 
@@ -60,4 +69,3 @@ The intended long-term direction is:
 The current working baseline was therefore pushed to:
 
 `origin/bbdg-rebuild-0.7.32`
-
