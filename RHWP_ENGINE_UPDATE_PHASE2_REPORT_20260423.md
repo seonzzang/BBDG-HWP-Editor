@@ -48,4 +48,4 @@ Phase 2 is allowed to proceed only as a narrow renderer-layout update. Broader u
 
 ## Resulting Version
 
-- BBDG HWP Editor version: `0.7.135`
+- BBDG HWP Editor version: `0.7.136`
