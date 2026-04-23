@@ -13,6 +13,7 @@ import { PrintProgressOverlay } from '@/ui/print-progress-overlay';
 import { PdfPreviewController } from '@/pdf/pdf-preview-controller';
 import { invoke } from '@tauri-apps/api/core';
 import { showToast } from '@/ui/toast';
+import { showPrintOptionsDialog } from '@/ui/print-options-dialog';
 
 const DEFAULT_SVG_BATCH_SIZE = 50;
 const DEFAULT_DOM_INSERT_BATCH_SIZE = 50;
@@ -578,13 +579,26 @@ export const fileCommands: CommandDef[] = [
     async execute(services) {
       const currentPage = getCurrentPageFromStatusBar();
       try {
+        const options = await showPrintOptionsDialog(currentPage, services.wasm.pageCount);
+        if (!options) return;
+
+        if (options.mode === 'legacy') {
+          await runLegacyPrintPreview(services);
+          return;
+        }
+
         await previewCurrentDocPdfChunk(services, {
-          startPage: currentPage,
+          startPage: options.startPage,
+          chunkSize: options.endPage - options.startPage + 1,
+          batchSize: DEFAULT_PDF_WORKER_BATCH_SIZE,
+          svgBatchSize: DEFAULT_PDF_WORKER_SVG_BATCH_SIZE,
+          openExternally: true,
+          trackCursor: false,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error('[file:print]', msg);
-        alert(`PDF 인쇄 미리보기에 실패했습니다.\n${msg}`);
+        alert(`인쇄 작업에 실패했습니다.\n${msg}`);
       }
     },
   },
