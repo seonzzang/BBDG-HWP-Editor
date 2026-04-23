@@ -196,8 +196,7 @@ function buildPdfHtmlDocument(
 }
 
 function getWorkerChunkSize(totalPages: number): number {
-  if (totalPages >= 1000) return 50;
-  if (totalPages >= 500) return 75;
+  if (totalPages >= 500) return 100;
   if (totalPages >= 200) return 100;
   return totalPages;
 }
@@ -406,16 +405,52 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
     });
     const { PDFDocument } = await loadPdfLib();
     const mergedDocument = await PDFDocument.create();
-    for (const chunkPdfPath of chunkPdfPaths) {
+    for (const [chunkIndex, chunkPdfPath] of chunkPdfPaths.entries()) {
+      const mergeChunkStartedAt = Date.now();
+      await appendAnalysisLog(request, 'pdf merge chunk started', {
+        chunkIndex: chunkIndex + 1,
+        chunkCount: chunkPdfPaths.length,
+        chunkPdfPath,
+      });
       const chunkBytes = await readFile(chunkPdfPath);
+      await appendAnalysisLog(request, 'pdf merge chunk read', {
+        chunkIndex: chunkIndex + 1,
+        readMs: Date.now() - mergeChunkStartedAt,
+        chunkBytes: chunkBytes.length,
+      });
+      const loadStartedAt = Date.now();
       const chunkDocument = await PDFDocument.load(chunkBytes);
+      await appendAnalysisLog(request, 'pdf merge chunk loaded', {
+        chunkIndex: chunkIndex + 1,
+        loadMs: Date.now() - loadStartedAt,
+        pageCount: chunkDocument.getPageCount(),
+      });
+      const copyStartedAt = Date.now();
       const copiedPages = await mergedDocument.copyPages(chunkDocument, chunkDocument.getPageIndices());
+      await appendAnalysisLog(request, 'pdf merge chunk copied', {
+        chunkIndex: chunkIndex + 1,
+        copyMs: Date.now() - copyStartedAt,
+        copiedPageCount: copiedPages.length,
+      });
       for (const copiedPage of copiedPages) {
         mergedDocument.addPage(copiedPage);
       }
+      await appendAnalysisLog(request, 'pdf merge chunk appended', {
+        chunkIndex: chunkIndex + 1,
+        chunkElapsedMs: Date.now() - mergeChunkStartedAt,
+        mergedPageCount: mergedDocument.getPageCount(),
+      });
     }
 
+    await appendAnalysisLog(request, 'pdf merge save started', {
+      pageCount: mergedDocument.getPageCount(),
+    });
+    const saveStartedAt = Date.now();
     const mergedBytes = await mergedDocument.save();
+    await appendAnalysisLog(request, 'pdf merge save finished', {
+      saveMs: Date.now() - saveStartedAt,
+      mergedBytes: mergedBytes.length,
+    });
     await writeFile(request.outputPdfPath, mergedBytes);
     await appendAnalysisLog(request, 'pdf merge finished', {
       mergeMs: Date.now() - mergeStartedAt,
