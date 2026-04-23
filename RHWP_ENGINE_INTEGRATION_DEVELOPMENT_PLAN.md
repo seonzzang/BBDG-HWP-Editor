@@ -14,12 +14,15 @@
 6. 회귀 테스트 체크리스트를 고정한다.
 7. `RHWP_ENGINE_GUARDIAN_AGENT.md` 기준으로 각 단계의 문서 준수 여부를 검증한다.
 8. `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` 기준으로 작업 순서와 단계 이동을 감독한다.
+9. `RHWP_ENGINE_MOMENTUM_MONITOR.md` 기준으로 작업 정체 여부와 다음 행동을 확인한다.
 
 모든 단계는 `작게 변경 → 에러 검증 → 기능 유지 검증 → 성능 검증 → UI/UX 검증 → 커밋 → 다음 단계` 순서로 진행한다.
 
 각 단계 종료 전에는 guardian review를 수행한다. guardian review가 `Stop`이면 다음 단계로 넘어가지 않는다.
 
 각 단계 시작 전에는 orchestration supervisor 기준으로 현재 phase, 작업 범위, 필수 문서, 검증 항목, 커밋 경계를 확인한다.
+
+작업이 멈췄거나 다음 행동이 불명확하면 momentum monitor 기준으로 현재 phase, 정체 위험, 다음 최소 행동, 필요한 게이트를 확인한다.
 
 다음 단계로 넘어가려면 반드시 두 가지 게이트가 모두 통과되어야 한다.
 

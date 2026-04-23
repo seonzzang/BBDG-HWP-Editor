@@ -30,6 +30,7 @@ BBDG HWP Editor
 - 단계별 문서 준수 여부는 `RHWP_ENGINE_GUARDIAN_AGENT.md` 기준으로 검증한다.
 - 다음 단계 진행은 오류 검증과 기능 유지 검증을 모두 통과한 경우에만 허용한다.
 - 전체 작업 순서와 단계 이동은 `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` 기준으로 감독한다.
+- 작업 정체와 다음 행동 누락은 `RHWP_ENGINE_MOMENTUM_MONITOR.md` 기준으로 점검한다.
 
 ## 모듈 책임
 
@@ -194,6 +195,7 @@ guardian review는 다음 문서를 기준으로 현재 diff를 검사한다.
 - `RHWP_ENGINE_API_INVENTORY.md`
 - `RHWP_ENGINE_COMPATIBILITY_CHECKLIST.md`
 - `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md`
+- `RHWP_ENGINE_MOMENTUM_MONITOR.md`
 - `RHWP_ENGINE_UPDATE_RUNBOOK.md`
 
 guardian decision이 `Stop`이면 구현을 계속하지 않는다.

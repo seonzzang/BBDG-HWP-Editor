@@ -186,6 +186,7 @@ Record before/after values where possible.
 ## 14. Guardian Review
 
 - [ ] `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` was read before implementation.
+- [ ] `RHWP_ENGINE_MOMENTUM_MONITOR.md` was read before implementation.
 - [ ] `RHWP_ENGINE_GUARDIAN_AGENT.md` was read before implementation.
 - [ ] Guardian review was performed after each phase.
 - [ ] Guardian review checked the approved requirements document.
@@ -197,6 +198,15 @@ Record before/after values where possible.
 - [ ] Guardian review checked performance preservation.
 - [ ] Guardian review checked upgraded feature preservation.
 - [ ] Final guardian decision is `Continue`.
+
+## 15. Momentum Monitor
+
+- [ ] Current phase was identified.
+- [ ] Current blocker was identified if progress stalled.
+- [ ] Next concrete action was defined.
+- [ ] Momentum monitor did not bypass error verification.
+- [ ] Momentum monitor did not bypass feature preservation verification.
+- [ ] Momentum monitor did not bypass guardian review.
 
 ## Result
 

@@ -57,7 +57,13 @@ RHWP_ENGINE_GUARDIAN_AGENT.md
 RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md
 ```
 
-The orchestration supervisor controls phase sequencing. The guardian review is required before implementation starts and after each update phase.
+7. Read the momentum monitor document.
+
+```text
+RHWP_ENGINE_MOMENTUM_MONITOR.md
+```
+
+The orchestration supervisor controls phase sequencing. The momentum monitor detects stalled progress. The guardian review is required before implementation starts and after each update phase.
 
 Every phase must pass both gates before moving forward:
 
@@ -65,6 +71,8 @@ Every phase must pass both gates before moving forward:
 - Feature preservation verification
 
 If either gate fails, stay in the current phase and fix the issue first.
+
+If progress stalls, run a momentum check before continuing.
 
 ## Step 1. Create Update Branch
 
