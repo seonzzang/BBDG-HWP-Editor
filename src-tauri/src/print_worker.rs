@@ -249,13 +249,22 @@ pub fn run_print_worker_pdf_export(
     request: &PrintJobRequest,
     timeout: Duration,
 ) -> Result<Vec<PrintWorkerMessage>, String> {
+    let started_at = Instant::now();
     let script_path = print_worker_script_path()?;
     if !script_path.exists() {
         return Err(format!("print worker script not found: {}", script_path.display()));
     }
 
+    let manifest_started_at = Instant::now();
     let manifest_path = write_print_job_manifest(request)?;
-    let started_at = Instant::now();
+    eprintln!(
+        "[print-pdf-analysis] rust run_print_worker_pdf_export manifest_ready job_id={} pages={} manifest_ms={}",
+        request.job_id,
+        request.page_count,
+        manifest_started_at.elapsed().as_millis()
+    );
+
+    let spawn_started_at = Instant::now();
     let mut child = Command::new("node")
         .arg("--experimental-strip-types")
         .arg(script_path)
@@ -266,7 +275,13 @@ pub fn run_print_worker_pdf_export(
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|error| format!("print worker pdf spawn failed: {error}"))?;
+    eprintln!(
+        "[print-pdf-analysis] rust run_print_worker_pdf_export worker_spawned job_id={} spawn_ms={}",
+        request.job_id,
+        spawn_started_at.elapsed().as_millis()
+    );
 
+    let wait_started_at = Instant::now();
     let status = loop {
         match child
             .try_wait()
@@ -289,6 +304,12 @@ pub fn run_print_worker_pdf_export(
             }
         }
     };
+    eprintln!(
+        "[print-pdf-analysis] rust run_print_worker_pdf_export worker_finished job_id={} wait_ms={} total_elapsed_ms={}",
+        request.job_id,
+        wait_started_at.elapsed().as_millis(),
+        started_at.elapsed().as_millis()
+    );
 
     let stdout = child
         .stdout
@@ -299,15 +320,28 @@ pub fn run_print_worker_pdf_export(
         .take()
         .ok_or_else(|| "print worker pdf stderr pipe is missing".to_string())?;
 
+    let stdout_read_started_at = Instant::now();
     let mut stdout_output = String::new();
     BufReader::new(stdout)
         .read_to_string(&mut stdout_output)
         .map_err(|error| format!("print worker pdf stdout read failed: {error}"))?;
+    let stdout_read_elapsed_ms = stdout_read_started_at.elapsed().as_millis();
 
+    let stderr_read_started_at = Instant::now();
     let mut stderr_output = String::new();
     BufReader::new(stderr)
         .read_to_string(&mut stderr_output)
         .map_err(|error| format!("print worker pdf stderr read failed: {error}"))?;
+    let stderr_read_elapsed_ms = stderr_read_started_at.elapsed().as_millis();
+    eprintln!(
+        "[print-pdf-analysis] rust run_print_worker_pdf_export output_read job_id={} stdout_bytes={} stderr_bytes={} stdout_read_ms={} stderr_read_ms={} total_elapsed_ms={}",
+        request.job_id,
+        stdout_output.len(),
+        stderr_output.len(),
+        stdout_read_elapsed_ms,
+        stderr_read_elapsed_ms,
+        started_at.elapsed().as_millis()
+    );
 
     let _ = std::fs::remove_file(&manifest_path);
 
@@ -325,6 +359,12 @@ pub fn run_print_worker_pdf_export(
     }
 
     let messages = parse_worker_messages(&stdout_output)?;
+    eprintln!(
+        "[print-pdf-analysis] rust run_print_worker_pdf_export parsed_messages job_id={} message_count={} total_elapsed_ms={}",
+        request.job_id,
+        messages.len(),
+        started_at.elapsed().as_millis()
+    );
     if let Some(PrintWorkerMessage::Result { result }) = messages.last() {
         if result.ok {
             if let Some(output_pdf_path) = &result.output_pdf_path {

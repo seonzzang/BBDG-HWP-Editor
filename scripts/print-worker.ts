@@ -1,5 +1,5 @@
 import { createInterface } from 'node:readline';
-import { access, readFile } from 'node:fs/promises';
+import { access, appendFile, readFile } from 'node:fs/promises';
 import { stdin, stdout, stderr } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { constants as fsConstants } from 'node:fs';
@@ -29,6 +29,21 @@ function writeResult(result: PrintJobResult): void {
     result,
   });
 }
+
+async function appendAnalysisLog(request: PrintJobRequest, message: string, details: Record<string, unknown> = {}): Promise<void> {
+  const logPath = resolve(request.tempDir, 'print-worker-analysis.log');
+  const payload = {
+    at: new Date().toISOString(),
+    elapsedMs: Date.now() - analysisStartedAt,
+    jobId: request.jobId,
+    message,
+    ...details,
+  };
+
+  await appendFile(logPath, `${JSON.stringify(payload)}\n`, 'utf8').catch(() => undefined);
+}
+
+let analysisStartedAt = Date.now();
 
 function getWorkspaceRoot(): string {
   const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -187,10 +202,16 @@ async function launchBrowserForJob(): Promise<{
 }
 
 async function handlePdfJob(request: PrintJobRequest): Promise<void> {
+  analysisStartedAt = Date.now();
   const startedAt = Date.now();
   const totalPages = request.svgPagePaths.length;
   const batchSize = Math.max(1, request.batchSize);
   const svgMarkupPages: string[] = [];
+  await appendAnalysisLog(request, 'pdf job started', {
+    totalPages,
+    batchSize,
+    outputPdfPath: request.outputPdfPath,
+  });
 
   writeProgress({
     jobId: request.jobId,
@@ -201,7 +222,13 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
     message: `PDF worker spawned for ${request.sourceFileName}`,
   });
 
+  await appendAnalysisLog(request, 'launching browser');
+  const browserStartedAt = Date.now();
   const { browser, executablePath } = await launchBrowserForJob();
+  await appendAnalysisLog(request, 'browser launched', {
+    executablePath,
+    browserLaunchMs: Date.now() - browserStartedAt,
+  });
   try {
     writeProgress({
       jobId: request.jobId,
@@ -212,6 +239,7 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       message: `Browser ready: ${executablePath}`,
     });
 
+    const svgReadStartedAt = Date.now();
     for (let start = 0; start < totalPages; start += batchSize) {
       const batchPaths = request.svgPagePaths.slice(start, start + batchSize);
       const batchSvgMarkup = await Promise.all(
@@ -228,20 +256,51 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
         batchIndex: Math.floor(start / batchSize) + 1,
         message: `Loaded ${completedPages}/${totalPages} SVG pages`,
       });
+      await appendAnalysisLog(request, 'svg batch loaded', {
+        completedPages,
+        totalPages,
+        batchIndex: Math.floor(start / batchSize) + 1,
+        batchReadMs: Date.now() - svgReadStartedAt,
+        loadedSvgChars: svgMarkupPages.reduce((total, svg) => total + svg.length, 0),
+      });
 
       if (request.debugDelayMs && request.debugDelayMs > 0) {
         await sleep(request.debugDelayMs);
       }
     }
+    await appendAnalysisLog(request, 'all svg pages loaded', {
+      readAllSvgMs: Date.now() - svgReadStartedAt,
+      svgCount: svgMarkupPages.length,
+      totalSvgChars: svgMarkupPages.reduce((total, svg) => total + svg.length, 0),
+    });
 
+    const pageStartedAt = Date.now();
     const page = await browser.newPage();
+    await appendAnalysisLog(request, 'browser page created', {
+      newPageMs: Date.now() - pageStartedAt,
+    });
     await page.setViewport({
       width: request.pageSize.widthPx,
       height: request.pageSize.heightPx,
       deviceScaleFactor: 1,
     });
-    await page.setContent(buildPdfHtmlDocument(request, svgMarkupPages), {
+    await appendAnalysisLog(request, 'building html document');
+    const htmlStartedAt = Date.now();
+    const htmlDocument = buildPdfHtmlDocument(request, svgMarkupPages);
+    await appendAnalysisLog(request, 'html document built', {
+      htmlBuildMs: Date.now() - htmlStartedAt,
+      htmlChars: htmlDocument.length,
+      approxHtmlBytes: htmlDocument.length * 2,
+    });
+
+    await appendAnalysisLog(request, 'page.setContent started');
+    const setContentStartedAt = Date.now();
+    await page.setContent(htmlDocument, {
       waitUntil: 'load',
+      timeout: 300_000,
+    });
+    await appendAnalysisLog(request, 'page.setContent finished', {
+      setContentMs: Date.now() - setContentStartedAt,
     });
 
     writeProgress({
@@ -253,6 +312,8 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       message: `Writing PDF to ${request.outputPdfPath}`,
     });
 
+    await appendAnalysisLog(request, 'page.pdf started');
+    const pdfStartedAt = Date.now();
     await page.pdf({
       path: request.outputPdfPath,
       width: `${request.pageSize.widthPx}px`,
@@ -266,7 +327,13 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       printBackground: true,
       preferCSSPageSize: true,
     });
+    await appendAnalysisLog(request, 'page.pdf finished', {
+      pdfWriteMs: Date.now() - pdfStartedAt,
+    });
     await page.close();
+    await appendAnalysisLog(request, 'browser page closed', {
+      durationMs: Date.now() - startedAt,
+    });
 
     writeResult({
       jobId: request.jobId,
@@ -276,6 +343,10 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    await appendAnalysisLog(request, 'pdf job failed', {
+      errorMessage: message,
+      durationMs: Date.now() - startedAt,
+    });
     writeResult({
       jobId: request.jobId,
       ok: false,
@@ -286,6 +357,9 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
     });
   } finally {
     await browser.close().catch(() => undefined);
+    await appendAnalysisLog(request, 'browser closed', {
+      durationMs: Date.now() - startedAt,
+    });
   }
 }
 

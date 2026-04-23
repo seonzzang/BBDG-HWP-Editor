@@ -124,6 +124,8 @@ async function previewCurrentDocPdfChunk(
   const overlay = new PrintProgressOverlay();
   const abortSignal = overlay.show('PDF 미리보기 준비 중');
   const svgPages: string[] = [];
+  const startedAt = performance.now();
+  const svgStartedAt = performance.now();
 
   try {
     for (let startIndex = 0; startIndex < pageIndexes.length; startIndex += svgBatchSize) {
@@ -152,6 +154,8 @@ async function previewCurrentDocPdfChunk(
       }
     }
 
+    const svgExtractElapsedMs = Math.round(performance.now() - svgStartedAt);
+    const svgCharLength = svgPages.reduce((total, svg) => total + svg.length, 0);
     const firstPageInfo = wasm.getPageInfo(pageIndexes[0]);
     statusEl && renderPrintProgress(statusEl, pageIndexes.length, pageIndexes.length);
     overlay.updateProgress(
@@ -159,6 +163,22 @@ async function previewCurrentDocPdfChunk(
       pageIndexes.length,
       `PDF 생성 중... (${startPage}-${endPage}페이지)`,
     );
+    console.log('[print-pdf-analysis] frontend before invoke', {
+      startPage,
+      endPage,
+      pageCount: pageIndexes.length,
+      batchSize,
+      svgBatchSize,
+      svgExtractElapsedMs,
+      svgCount: svgPages.length,
+      svgCharLength,
+      approxSvgBytes: svgCharLength * 2,
+      heapUsedBytes:
+        typeof performance !== 'undefined' && 'memory' in performance
+          ? (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory?.usedJSHeapSize
+          : undefined,
+    });
+    const invokeStartedAt = performance.now();
     const messages = await invoke('debug_run_print_worker_pdf_export_for_current_doc', {
       payload: {
         jobId: `menu-pdf-preview-${Date.now()}`,
@@ -177,6 +197,15 @@ async function previewCurrentDocPdfChunk(
         errorMessage?: string;
       };
     }>;
+    const invokeElapsedMs = Math.round(performance.now() - invokeStartedAt);
+    console.log('[print-pdf-analysis] frontend after invoke', {
+      startPage,
+      endPage,
+      pageCount: pageIndexes.length,
+      invokeElapsedMs,
+      totalElapsedMs: Math.round(performance.now() - startedAt),
+      messageCount: messages.length,
+    });
 
     const resultMessage = [...messages].reverse().find((message) => message.type === 'result')?.result;
     const outputPdfPath = resultMessage?.ok ? resultMessage.outputPdfPath : undefined;

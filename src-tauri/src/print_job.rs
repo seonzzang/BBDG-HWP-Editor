@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,11 +107,23 @@ pub fn create_print_job_request_from_svg_pages(
     batch_size: Option<u32>,
     svg_pages: &[String],
 ) -> Result<PrintJobRequest, String> {
+    let started_at = Instant::now();
     let temp_dir = std::env::temp_dir().join(job_id);
     fs::create_dir_all(&temp_dir)
         .map_err(|error| format!("print worker temp dir create failed: {error}"))?;
 
+    let svg_write_started_at = Instant::now();
     let svg_page_paths = write_svg_pages(&temp_dir, svg_pages)?;
+    let svg_write_elapsed_ms = svg_write_started_at.elapsed().as_millis();
+    let total_svg_chars: usize = svg_pages.iter().map(|svg| svg.len()).sum();
+    eprintln!(
+        "[print-pdf-analysis] rust create_print_job_request_from_svg_pages job_id={} pages={} svg_chars={} svg_write_ms={} total_request_prep_ms={}",
+        job_id,
+        page_count,
+        total_svg_chars,
+        svg_write_elapsed_ms,
+        started_at.elapsed().as_millis()
+    );
 
     Ok(PrintJobRequest {
         job_id: job_id.to_string(),
@@ -135,12 +148,20 @@ pub fn create_print_job_request_from_svg_pages(
 }
 
 pub fn write_print_job_manifest(request: &PrintJobRequest) -> Result<PathBuf, String> {
+    let started_at = Instant::now();
     let manifest_path = PathBuf::from(&request.temp_dir).join("print-job.json");
     let payload = serde_json::to_string_pretty(request)
         .map_err(|error| format!("print job manifest serialize failed: {error}"))?;
 
-    fs::write(&manifest_path, payload)
+    fs::write(&manifest_path, &payload)
         .map_err(|error| format!("print job manifest write failed: {error}"))?;
+
+    eprintln!(
+        "[print-pdf-analysis] rust write_print_job_manifest job_id={} payload_bytes={} manifest_write_ms={}",
+        request.job_id,
+        payload.len(),
+        started_at.elapsed().as_millis()
+    );
 
     Ok(manifest_path)
 }
