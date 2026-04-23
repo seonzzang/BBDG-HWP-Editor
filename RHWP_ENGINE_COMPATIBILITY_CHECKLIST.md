@@ -188,6 +188,7 @@ Record before/after values where possible.
 - [ ] `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` was read before implementation.
 - [ ] `RHWP_ENGINE_MOMENTUM_MONITOR.md` was read before implementation.
 - [ ] `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md` was read before implementation.
+- [ ] `RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md` was read before implementation.
 - [ ] `RHWP_ENGINE_GUARDIAN_AGENT.md` was read before implementation.
 - [ ] Guardian review was performed after each phase.
 - [ ] Guardian review checked the approved requirements document.
@@ -211,6 +212,8 @@ Record before/after values where possible.
 
 ## 16. Baseline Comparison
 
+- [ ] App control verification was attempted where practical.
+- [ ] Any user-assisted checks were clearly marked.
 - [ ] Baseline comparison was performed before accepting the update.
 - [ ] Updated app startup matches the baseline behavior.
 - [ ] Updated file menu matches the baseline expected menu structure.

@@ -32,6 +32,7 @@ BBDG HWP Editor
 - 전체 작업 순서와 단계 이동은 `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` 기준으로 감독한다.
 - 작업 정체와 다음 행동 누락은 `RHWP_ENGINE_MOMENTUM_MONITOR.md` 기준으로 점검한다.
 - 변경 앱의 UI/UX와 기능 동등성은 `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md` 기준으로 비교한다.
+- 가능한 앱 직접 조작 검증은 `RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md` 기준으로 수행한다.
 
 ## 모듈 책임
 
@@ -198,6 +199,7 @@ guardian review는 다음 문서를 기준으로 현재 diff를 검사한다.
 - `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md`
 - `RHWP_ENGINE_MOMENTUM_MONITOR.md`
 - `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md`
+- `RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md`
 - `RHWP_ENGINE_UPDATE_RUNBOOK.md`
 
 guardian decision이 `Stop`이면 구현을 계속하지 않는다.

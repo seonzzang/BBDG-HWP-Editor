@@ -16,6 +16,7 @@
 8. `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` 기준으로 작업 순서와 단계 이동을 감독한다.
 9. `RHWP_ENGINE_MOMENTUM_MONITOR.md` 기준으로 작업 정체 여부와 다음 행동을 확인한다.
 10. `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md` 기준으로 기준 앱 대비 UI/UX와 기능 동등성을 확인한다.
+11. `RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md` 기준으로 가능한 범위에서 앱 직접 조작 검증을 수행한다.
 
 모든 단계는 `작게 변경 → 에러 검증 → 기능 유지 검증 → 성능 검증 → UI/UX 검증 → 커밋 → 다음 단계` 순서로 진행한다.
 
@@ -26,6 +27,8 @@
 작업이 멈췄거나 다음 행동이 불명확하면 momentum monitor 기준으로 현재 phase, 정체 위험, 다음 최소 행동, 필요한 게이트를 확인한다.
 
 업데이트 수용 전에는 baseline comparison 기준으로 현재 기준 앱과 변경 앱의 UI/UX 및 기능 동등성을 확인한다.
+
+앱 직접 조작이 가능한 영역은 app control verification 기준으로 자동 클릭, 입력, 스크린샷, 로그 확인을 수행하고 자동화가 어려운 영역은 사용자 보조 확인으로 표시한다.
 
 다음 단계로 넘어가려면 반드시 두 가지 게이트가 모두 통과되어야 한다.
 

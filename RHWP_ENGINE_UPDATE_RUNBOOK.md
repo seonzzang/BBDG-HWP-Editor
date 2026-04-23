@@ -69,7 +69,13 @@ RHWP_ENGINE_MOMENTUM_MONITOR.md
 RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md
 ```
 
-The orchestration supervisor controls phase sequencing. The momentum monitor detects stalled progress. The baseline comparison agent verifies updated-app behavior against the approved baseline. The guardian review is required before implementation starts and after each update phase.
+9. Read the app control verification document.
+
+```text
+RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md
+```
+
+The orchestration supervisor controls phase sequencing. The momentum monitor detects stalled progress. The app control verification agent operates the app where practical. The baseline comparison agent verifies updated-app behavior against the approved baseline. The guardian review is required before implementation starts and after each update phase.
 
 Every phase must pass both gates before moving forward:
 
@@ -80,7 +86,7 @@ If either gate fails, stay in the current phase and fix the issue first.
 
 If progress stalls, run a momentum check before continuing.
 
-Before accepting the update, run baseline comparison.
+Before accepting the update, run app control verification where practical and then run baseline comparison.
 
 ## Step 1. Create Update Branch
 

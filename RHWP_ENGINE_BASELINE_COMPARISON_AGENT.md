@@ -19,6 +19,8 @@ Its job is to compare:
 
 It is the final practical check that the update did not quietly change the product.
 
+When direct app operation is possible, use `RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md` to perform controlled UI interaction, screenshot capture, and console/log checks.
+
 ## Baseline Source
 
 The comparison baseline is:
@@ -52,6 +54,10 @@ Detects stalled work and pushes the next concrete action.
 
 Compares the updated app against the approved baseline app and reports UI/UX or feature drift.
 
+### App Control Verification Agent
+
+Attempts to operate the app directly where practical and reports which UI/UX checks were automated versus user-assisted.
+
 ## Required Documents
 
 The baseline comparison agent must use:
@@ -61,6 +67,7 @@ The baseline comparison agent must use:
 - `RHWP_ENGINE_COMPATIBILITY_CHECKLIST.md`
 - `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md`
 - `RHWP_ENGINE_GUARDIAN_AGENT.md`
+- `RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md`
 
 It should also reference:
 
