@@ -1,6 +1,6 @@
 {
   "name": "rhwp-studio",
-  "version": "0.7.124",
+  "version": "0.7.125",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -20,6 +20,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
+    "pdf-lib": "^1.17.1",
     "pdfkit": "^0.18.0",
     "svg-to-pdfkit": "^0.1.8"
   }

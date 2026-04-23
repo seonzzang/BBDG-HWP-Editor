@@ -1,5 +1,5 @@
 import { createInterface } from 'node:readline';
-import { access, appendFile, readFile } from 'node:fs/promises';
+import { access, appendFile, readFile, unlink, writeFile } from 'node:fs/promises';
 import { stdin, stdout, stderr } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { constants as fsConstants } from 'node:fs';
@@ -60,6 +60,19 @@ async function loadPuppeteerCore(): Promise<typeof import('puppeteer-core')> {
     'esm',
     'puppeteer',
     'puppeteer-core.js',
+  );
+
+  return import(pathToFileURL(modulePath).href);
+}
+
+async function loadPdfLib(): Promise<typeof import('pdf-lib')> {
+  const modulePath = resolve(
+    getWorkspaceRoot(),
+    'rhwp-studio',
+    'node_modules',
+    'pdf-lib',
+    'cjs',
+    'index.js',
   );
 
   return import(pathToFileURL(modulePath).href);
@@ -182,6 +195,13 @@ function buildPdfHtmlDocument(
 </html>`;
 }
 
+function getWorkerChunkSize(totalPages: number): number {
+  if (totalPages >= 1000) return 50;
+  if (totalPages >= 500) return 75;
+  if (totalPages >= 200) return 100;
+  return totalPages;
+}
+
 async function launchBrowserForJob(): Promise<{
   browser: import('puppeteer-core').Browser;
   executablePath: string;
@@ -207,9 +227,12 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
   const totalPages = request.svgPagePaths.length;
   const batchSize = Math.max(1, request.batchSize);
   const svgMarkupPages: string[] = [];
+  const workerChunkSize = Math.max(1, getWorkerChunkSize(totalPages));
+  const chunkPdfPaths: string[] = [];
   await appendAnalysisLog(request, 'pdf job started', {
     totalPages,
     batchSize,
+    workerChunkSize,
     outputPdfPath: request.outputPdfPath,
   });
 
@@ -284,23 +307,88 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       height: request.pageSize.heightPx,
       deviceScaleFactor: 1,
     });
-    await appendAnalysisLog(request, 'building html document');
-    const htmlStartedAt = Date.now();
-    const htmlDocument = buildPdfHtmlDocument(request, svgMarkupPages);
-    await appendAnalysisLog(request, 'html document built', {
-      htmlBuildMs: Date.now() - htmlStartedAt,
-      htmlChars: htmlDocument.length,
-      approxHtmlBytes: htmlDocument.length * 2,
-    });
 
-    await appendAnalysisLog(request, 'page.setContent started');
-    const setContentStartedAt = Date.now();
-    await page.setContent(htmlDocument, {
-      waitUntil: 'load',
-      timeout: 300_000,
-    });
-    await appendAnalysisLog(request, 'page.setContent finished', {
-      setContentMs: Date.now() - setContentStartedAt,
+    const totalChunkCount = Math.ceil(totalPages / workerChunkSize);
+    for (let chunkStart = 0; chunkStart < totalPages; chunkStart += workerChunkSize) {
+      const chunkIndex = Math.floor(chunkStart / workerChunkSize);
+      const chunkPages = svgMarkupPages.slice(chunkStart, chunkStart + workerChunkSize);
+      const chunkStartPage = chunkStart + 1;
+      const chunkEndPage = chunkStart + chunkPages.length;
+      const chunkPdfPath = resolve(
+        request.tempDir,
+        `chunk-${String(chunkIndex + 1).padStart(4, '0')}.pdf`,
+      );
+
+      await appendAnalysisLog(request, 'building html document chunk', {
+        chunkIndex: chunkIndex + 1,
+        totalChunkCount,
+        chunkStartPage,
+        chunkEndPage,
+        chunkPageCount: chunkPages.length,
+      });
+      const htmlStartedAt = Date.now();
+      const htmlDocument = buildPdfHtmlDocument(request, chunkPages);
+      await appendAnalysisLog(request, 'html document chunk built', {
+        chunkIndex: chunkIndex + 1,
+        htmlBuildMs: Date.now() - htmlStartedAt,
+        htmlChars: htmlDocument.length,
+        approxHtmlBytes: htmlDocument.length * 2,
+      });
+
+      await appendAnalysisLog(request, 'page.setContent chunk started', {
+        chunkIndex: chunkIndex + 1,
+        chunkStartPage,
+        chunkEndPage,
+      });
+      const setContentStartedAt = Date.now();
+      await page.setContent(htmlDocument, {
+        waitUntil: 'load',
+        timeout: 300_000,
+      });
+      await appendAnalysisLog(request, 'page.setContent chunk finished', {
+        chunkIndex: chunkIndex + 1,
+        setContentMs: Date.now() - setContentStartedAt,
+      });
+
+      writeProgress({
+        jobId: request.jobId,
+        phase: 'writing-pdf',
+        completedPages: chunkEndPage,
+        totalPages,
+        batchIndex: chunkIndex + 1,
+        message: `PDF 청크 생성 중... (${chunkStartPage}-${chunkEndPage}페이지)`,
+      });
+
+      await appendAnalysisLog(request, 'page.pdf chunk started', {
+        chunkIndex: chunkIndex + 1,
+        chunkPdfPath,
+      });
+      const pdfStartedAt = Date.now();
+      await page.pdf({
+        path: chunkPdfPath,
+        width: `${request.pageSize.widthPx}px`,
+        height: `${request.pageSize.heightPx}px`,
+        margin: {
+          top: '0px',
+          right: '0px',
+          bottom: '0px',
+          left: '0px',
+        },
+        printBackground: true,
+        preferCSSPageSize: true,
+      });
+      chunkPdfPaths.push(chunkPdfPath);
+      await appendAnalysisLog(request, 'page.pdf chunk finished', {
+        chunkIndex: chunkIndex + 1,
+        pdfWriteMs: Date.now() - pdfStartedAt,
+        chunkPdfPath,
+      });
+    }
+
+    await page.close();
+    await appendAnalysisLog(request, 'browser page closed after chunk rendering', {
+      totalChunkCount,
+      durationMs: Date.now() - startedAt,
     });
 
     writeProgress({
@@ -308,31 +396,38 @@ async function handlePdfJob(request: PrintJobRequest): Promise<void> {
       phase: 'writing-pdf',
       completedPages: totalPages,
       totalPages,
-      batchIndex: Math.ceil(totalPages / batchSize),
-      message: `Writing PDF to ${request.outputPdfPath}`,
+      batchIndex: totalChunkCount,
+      message: `PDF 병합 중... (${chunkPdfPaths.length}개 청크)`,
     });
 
-    await appendAnalysisLog(request, 'page.pdf started');
-    const pdfStartedAt = Date.now();
-    await page.pdf({
-      path: request.outputPdfPath,
-      width: `${request.pageSize.widthPx}px`,
-      height: `${request.pageSize.heightPx}px`,
-      margin: {
-        top: '0px',
-        right: '0px',
-        bottom: '0px',
-        left: '0px',
-      },
-      printBackground: true,
-      preferCSSPageSize: true,
+    const mergeStartedAt = Date.now();
+    await appendAnalysisLog(request, 'pdf merge started', {
+      chunkCount: chunkPdfPaths.length,
     });
-    await appendAnalysisLog(request, 'page.pdf finished', {
-      pdfWriteMs: Date.now() - pdfStartedAt,
+    const { PDFDocument } = await loadPdfLib();
+    const mergedDocument = await PDFDocument.create();
+    for (const chunkPdfPath of chunkPdfPaths) {
+      const chunkBytes = await readFile(chunkPdfPath);
+      const chunkDocument = await PDFDocument.load(chunkBytes);
+      const copiedPages = await mergedDocument.copyPages(chunkDocument, chunkDocument.getPageIndices());
+      for (const copiedPage of copiedPages) {
+        mergedDocument.addPage(copiedPage);
+      }
+    }
+
+    const mergedBytes = await mergedDocument.save();
+    await writeFile(request.outputPdfPath, mergedBytes);
+    await appendAnalysisLog(request, 'pdf merge finished', {
+      mergeMs: Date.now() - mergeStartedAt,
+      outputPdfPath: request.outputPdfPath,
+      mergedBytes: mergedBytes.length,
     });
-    await page.close();
-    await appendAnalysisLog(request, 'browser page closed', {
-      durationMs: Date.now() - startedAt,
+
+    for (const chunkPdfPath of chunkPdfPaths) {
+      await unlink(chunkPdfPath).catch(() => undefined);
+    }
+    await appendAnalysisLog(request, 'chunk pdf cleanup finished', {
+      chunkCount: chunkPdfPaths.length,
     });
 
     writeResult({
