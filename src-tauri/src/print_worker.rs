@@ -60,6 +60,39 @@ fn print_worker_cancel_path(job_id: &str) -> Result<PathBuf, String> {
     Ok(print_worker_temp_dir(job_id)?.join(PRINT_WORKER_CANCEL_FILE_NAME))
 }
 
+fn cleanup_print_worker_temp_output_path_inner(path: &Path) -> Result<(), String> {
+    let canonical_target = path
+        .canonicalize()
+        .map_err(|error| format!("print worker output path 확인 실패: {error}"))?;
+
+    let temp_root = std::env::temp_dir();
+    let canonical_temp_root = temp_root.canonicalize().unwrap_or(temp_root);
+    if !canonical_target.starts_with(&canonical_temp_root) {
+        return Err("허용되지 않은 print worker 임시 파일 경로입니다.".to_string());
+    }
+
+    let file_name = canonical_target
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "print worker output file name을 확인할 수 없습니다.".to_string())?;
+    if file_name != "output.pdf" && file_name != "sample.pdf" {
+        return Err("print worker 출력 PDF 경로 형식이 올바르지 않습니다.".to_string());
+    }
+
+    let parent = canonical_target
+        .parent()
+        .ok_or_else(|| "print worker 임시 디렉터리를 확인할 수 없습니다.".to_string())?;
+    if !parent.join("print-worker-analysis.log").exists() {
+        return Err("print worker 임시 디렉터리 확인에 실패했습니다.".to_string());
+    }
+
+    let _ = std::fs::remove_file(&canonical_target);
+    let _ = std::fs::remove_file(parent.join(PRINT_WORKER_CANCEL_FILE_NAME));
+    std::fs::remove_dir_all(parent)
+        .map_err(|error| format!("print worker 임시 디렉터리 삭제 실패: {error}"))?;
+    Ok(())
+}
+
 fn parse_worker_messages(stdout_output: &str) -> Result<Vec<PrintWorkerMessage>, String> {
     let mut messages = Vec::new();
     for line in stdout_output.lines() {
@@ -475,6 +508,11 @@ pub fn debug_read_generated_pdf(path: String) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
+pub fn cleanup_print_worker_temp_output_path(path: String) -> Result<(), String> {
+    cleanup_print_worker_temp_output_path_inner(Path::new(&path))
+}
+
+#[tauri::command]
 pub fn debug_read_print_worker_analysis_log(job_id: String) -> Result<String, String> {
     let log_path = print_worker_temp_dir(&job_id)?.join("print-worker-analysis.log");
     if !log_path.exists() {
@@ -556,5 +594,36 @@ mod tests {
         assert!(messages.len() >= 2);
         assert!(matches!(messages.first(), Some(PrintWorkerMessage::Progress { .. })));
         assert!(matches!(messages.last(), Some(PrintWorkerMessage::Result { .. })));
+    }
+
+    #[test]
+    fn cleanup_print_worker_temp_output_path_removes_worker_temp_dir() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "current-doc-pdf-unit-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).expect("create temp dir");
+        let output_path = temp_dir.join("output.pdf");
+        std::fs::write(&output_path, b"%PDF-test").expect("write output pdf");
+        std::fs::write(temp_dir.join("print-worker-analysis.log"), b"log").expect("write log");
+
+        cleanup_print_worker_temp_output_path_inner(&output_path).expect("cleanup should succeed");
+
+        assert!(!temp_dir.exists());
+    }
+
+    #[test]
+    fn cleanup_print_worker_temp_output_path_rejects_non_temp_path() {
+        let outside_path = workspace_root()
+            .expect("workspace root")
+            .join("do-not-delete-output.pdf");
+        std::fs::write(&outside_path, b"%PDF-test").expect("write outside file");
+
+        let error = cleanup_print_worker_temp_output_path_inner(&outside_path)
+            .expect_err("cleanup should reject non-temp path");
+        assert!(error.contains("허용되지 않은"));
+
+        let _ = std::fs::remove_file(&outside_path);
     }
 }

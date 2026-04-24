@@ -1,5 +1,9 @@
 # RHWP Engine Update Runbook
 
+Project:
+- `RHWP Integration Preservation Framework`
+- `RHWP 엔진 통합 보존 프레임워크`
+
 ## Purpose
 
 This runbook describes how to update the RHWP engine used by BBDG HWP Editor while preserving the current BBDG feature set and UI/UX behavior.
@@ -88,6 +92,37 @@ If progress stalls, run a momentum check before continuing.
 
 Before accepting the update, run app control verification where practical and then run baseline comparison.
 
+## Update Monitoring Rule
+
+RHWP upstream 업데이트는 가능한 한 즉시 확인하고, 즉시 반영 가능성을 검토한다.
+
+이 프로젝트는 RHWP 업데이트를 오래 쌓아두었다가 한 번에 몰아서 처리하는 방식을 기본 전략으로 삼지 않는다.
+
+운영 원칙:
+
+1. upstream 변경은 확인 가능한 시점에 바로 fetch/확인한다.
+2. target branch(`main`, 필요 시 `devel`)의 새 커밋을 빠르게 확인한다.
+3. 영향 범위가 작으면 가능한 한 빠르게 반영 브랜치를 만든다.
+4. 즉시 반영이 어렵다면 blocker와 보류 사유를 문서화한다.
+5. 보류 상태라도 “확인 완료 / 영향 분석 완료 / 반영 보류” 상태가 남아 있어야 한다.
+
+권장 확인 명령:
+
+```bash
+git fetch upstream
+git show --no-patch --oneline upstream/main
+git show --no-patch --oneline upstream/devel
+```
+
+권장 기록 항목:
+
+- 확인 일시
+- 확인한 upstream branch/commit
+- 영향 범위
+- 즉시 반영 가능 여부
+- 보류 사유
+- 다음 확인 또는 반영 액션
+
 ## Step 1. Create Update Branch
 
 Create a dedicated branch. Do not update engine directly on the critical branch.
@@ -113,6 +148,15 @@ If upstream uses `devel` as integration target, inspect that branch too:
 ```bash
 git show --no-patch --oneline upstream/devel
 ```
+
+Do not stop at fetch only.
+
+Immediately record:
+
+- whether the update is engine-relevant
+- whether BBDG app/pipeline conflicts are expected
+- whether the update should enter the next integration branch now
+- whether the update is blocked and why
 
 ## Step 3. Apply Engine Update
 

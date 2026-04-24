@@ -1,0 +1,1 @@
+& {  = @('./src-tauri/ensure-vite-dev-server.ps1', './ensure-vite-dev-server.ps1'); foreach ( in ) { if (Test-Path ) { & ; exit  } }; throw 'ensure-vite-dev-server.ps1 not found' }

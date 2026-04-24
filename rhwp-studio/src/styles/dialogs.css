@@ -868,6 +868,14 @@
     #eef3f9;
 }
 
+body.pdf-preview-active #studio-root {
+  visibility: hidden;
+}
+
+body.pdf-preview-active .pdf-preview-shell {
+  visibility: visible;
+}
+
 .pdf-preview-header {
   display: flex;
   align-items: center;

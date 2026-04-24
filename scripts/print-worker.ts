@@ -101,26 +101,28 @@ async function loadPdfLib(): Promise<typeof import('pdf-lib')> {
   return import(pathToFileURL(modulePath).href);
 }
 
-async function detectBrowserExecutablePath(): Promise<string | null> {
+async function getBrowserExecutableCandidates(): Promise<string[]> {
   const configuredPath = process.env.BBDG_PUPPETEER_EXECUTABLE_PATH;
   const candidates = [
     configuredPath,
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   ].filter((value): value is string => Boolean(value));
+
+  const resolved: string[] = [];
 
   for (const candidate of candidates) {
     try {
       await access(candidate, fsConstants.X_OK);
-      return candidate;
+      resolved.push(candidate);
     } catch {
       // 다음 후보 검사
     }
   }
 
-  return null;
+  return resolved;
 }
 
 async function handleJob(request: PrintJobRequest): Promise<void> {
@@ -228,19 +230,36 @@ async function launchBrowserForJob(): Promise<{
   browser: import('puppeteer-core').Browser;
   executablePath: string;
 }> {
-  const executablePath = await detectBrowserExecutablePath();
-  if (!executablePath) {
+  const executableCandidates = await getBrowserExecutableCandidates();
+  if (executableCandidates.length === 0) {
     throw new Error('사용 가능한 Chromium/Edge/Chrome 실행 파일을 찾지 못했습니다.');
   }
 
   const puppeteer = await loadPuppeteerCore();
-  const browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: ['--disable-gpu', '--no-first-run', '--no-default-browser-check'],
-  });
+  let lastError: unknown = null;
 
-  return { browser, executablePath };
+  for (const executablePath of executableCandidates) {
+    try {
+      const browser = await puppeteer.launch({
+        executablePath,
+        headless: true,
+        args: [
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--no-first-run',
+          '--no-default-browser-check',
+        ],
+      });
+
+      return { browser, executablePath };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('사용 가능한 브라우저 실행 파일을 찾았지만 모두 launch에 실패했습니다.');
 }
 
 async function handlePdfJob(request: PrintJobRequest): Promise<void> {
@@ -559,8 +578,8 @@ async function handleProbeJob(): Promise<void> {
     message: 'Puppeteer runtime probe started',
   });
 
-  const executablePath = await detectBrowserExecutablePath();
-  if (!executablePath) {
+  const executableCandidates = await getBrowserExecutableCandidates();
+  if (executableCandidates.length === 0) {
     writeResult({
       jobId,
       ok: false,
@@ -577,17 +596,13 @@ async function handleProbeJob(): Promise<void> {
     completedPages: 0,
     totalPages: 0,
     batchIndex: 0,
-    message: `Browser executable detected: ${executablePath}`,
+    message: `Browser executable candidates: ${executableCandidates.join(' | ')}`,
   });
 
   let browser: import('puppeteer-core').Browser | null = null;
   try {
-    const puppeteer = await loadPuppeteerCore();
-    browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: ['--disable-gpu', '--no-first-run', '--no-default-browser-check'],
-    });
+    const launched = await launchBrowserForJob();
+    browser = launched.browser;
 
     const page = await browser.newPage();
     await page.goto('about:blank');
@@ -598,13 +613,13 @@ async function handleProbeJob(): Promise<void> {
       completedPages: 0,
       totalPages: 0,
       batchIndex: 0,
-      message: `Puppeteer runtime ready with ${executablePath}`,
+      message: `Puppeteer runtime ready with ${launched.executablePath}`,
     });
 
     writeResult({
       jobId,
       ok: true,
-      outputPdfPath: executablePath,
+      outputPdfPath: launched.executablePath,
       durationMs: Date.now() - startedAt,
     });
   } catch (error) {

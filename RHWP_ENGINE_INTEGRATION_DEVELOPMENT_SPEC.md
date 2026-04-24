@@ -1,5 +1,9 @@
 # RHWP Engine Integration Development Specification
 
+Project:
+- `RHWP Integration Preservation Framework`
+- `RHWP 엔진 통합 보존 프레임워크`
+
 ## 목적
 
 `RHWP_ENGINE_INTEGRATION_REQUIREMENTS.md`의 요구사항을 실제 코드 구조와 개발 규칙으로 구체화한다.

@@ -1,5 +1,9 @@
 # RHWP Engine Baseline Comparison Agent
 
+Project:
+- `RHWP Integration Preservation Framework`
+- `RHWP 엔진 통합 보존 프레임워크`
+
 ## Purpose
 
 This document defines the baseline comparison agent role for RHWP engine update work.

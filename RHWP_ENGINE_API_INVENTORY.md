@@ -234,3 +234,99 @@ When RHWP API changes:
 
 This document should be expanded during Phase 1 by automatically listing every `this.doc.*` and `HwpDocument.*` usage in `wasm-bridge.ts`.
 
+## Current Adapter Usage Snapshot
+
+Updated during current refactoring pass.
+
+The following counts show where `wasm.*` adapter calls are currently concentrated in `rhwp-studio/src/**`.
+
+### Top WasmBridge Call Hotspots
+
+- `engine/input-handler.ts`: 79
+- `engine/command.ts`: 59
+- `engine/input-handler-keyboard.ts`: 55
+- `engine/cursor.ts`: 38
+- `engine/input-handler-text.ts`: 26
+- `command/commands/table.ts`: 22
+- `engine/input-handler-mouse.ts`: 20
+- `view/canvas-view.ts`: 19
+- `command/commands/page.ts`: 19
+- `command/commands/insert.ts`: 18
+
+Interpretation:
+
+- High counts under `engine/*` are expected and currently acceptable because editing, cursor movement, hit testing, and selection depend heavily on the adapter boundary.
+- High counts under `command/commands/*` are acceptable but should be watched so command files do not become a second adapter layer.
+- New product behavior should not bypass `WasmBridge` and should not import raw RHWP WASM directly.
+
+### Top `services.wasm.*` Hotspots
+
+These are command/dialog areas most tightly coupled to the adapter through command services.
+
+- `command/commands/table.ts`: 22
+- `command/commands/page.ts`: 19
+- `command/commands/insert.ts`: 18
+- `command/commands/view.ts`: 8
+- `command/commands/format.ts`: 4
+- `ui/bookmark-dialog.ts`: 4
+- `command/commands/edit.ts`: 3
+- `ui/find-dialog.ts`: 3
+- `ui/goto-dialog.ts`: 3
+- `command/commands/file.ts`: 2
+
+Interpretation:
+
+- `table`, `page`, and `insert` are the heaviest command-side consumers and should be treated as high-risk during RHWP engine updates.
+- `file.ts` is now low-count after refactoring, which is good and should be preserved.
+
+## Boundary Conclusion
+
+Current boundary posture is acceptable:
+
+- raw RHWP WASM stays concentrated in `rhwp-studio/src/core/wasm-bridge.ts`
+- app/services/UI mostly depend on `WasmBridge`
+- the next structural risk is not raw engine leakage but adapter surface size and concentration in a few high-traffic engine files
+
+## Next Inventory Expansion
+
+The next useful expansion is:
+
+- classify `WasmBridge` methods by functional domain
+  - document lifecycle
+  - rendering/layout
+  - text editing
+  - table/cell
+  - shape/picture
+  - header/footer
+  - search/bookmark/field
+- mark each method as
+  - `core RHWP stable`
+  - `BBDG critical`
+  - `optional / feature-gated`
+
+## RHWP Raw Bypass Candidates
+
+The following paths currently touch RHWP WASM more directly than normal app code.
+They are not all violations, but they must be treated as explicit boundary exceptions.
+
+### Confirmed Direct RHWP Import Points
+
+- `rhwp-studio/src/core/wasm-bridge.ts`
+  - primary adapter boundary
+  - expected and allowed
+- `rhwp-studio/src/hwpctl/index.ts`
+  - dynamically imports `@wasm/rhwp.js`
+  - creates `HwpDocument.createEmpty()` for compatibility-layer usage
+  - allowed as a compatibility exception, but should remain isolated under `hwpctl`
+
+### Notes
+
+- Search also finds many comment-only references to `rhwp` in `hwpctl/actions/*`; these are documentation/mapping comments, not runtime bypasses.
+- No new direct `@wasm/rhwp.js` imports were found under `app`, `print`, `ui`, `engine`, or `command` during this pass.
+
+### Boundary Rule From This Snapshot
+
+- New BBDG product code must not import `@wasm/rhwp.js` directly.
+- If a new exception is unavoidable, it must be recorded in this inventory and justified as either:
+  - adapter boundary infrastructure, or
+  - compatibility-layer infrastructure.

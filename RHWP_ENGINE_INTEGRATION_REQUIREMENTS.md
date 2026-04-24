@@ -1,5 +1,9 @@
 # RHWP Engine Integration Requirements
 
+Project:
+- `RHWP Integration Preservation Framework`
+- `RHWP 엔진 통합 보존 프레임워크`
+
 ## 목적
 
 BBDG HWP Editor가 RHWP 엔진의 향후 업데이트를 충돌 없이 받아들이면서, BBDG 전용 UX/인쇄/파일 처리 기능을 안정적으로 유지할 수 있도록 엔진 통합 요구사항을 정의한다.
@@ -28,17 +32,18 @@ RHWP는 HWP/HWPX 파싱, 문서 모델, 페이지 계산, SVG 렌더링, hitTest
 
 0. 지금까지 BBDG HWP Editor에 구현한 기능과 UX는 RHWP 엔진 업데이트 이후에도 유지한다.
 1. RHWP 코어는 가능한 한 수정하지 않는다.
-2. BBDG 전용 기능은 앱, Tauri, worker, adapter 레이어에 구현한다.
-3. 엔진 API 접근은 `wasm-bridge` 같은 단일 어댑터 경계를 통해 수행한다.
-4. RHWP 업데이트 시 BBDG 기능이 자동 유지되도록 엔진 의존도를 낮춘다.
-5. 엔진 수정이 필요하면 upstream RHWP에 반영 가능한 일반 기능으로 설계한다.
-6. 모든 변경은 작은 단계로 나누고, 단계마다 에러/성능/기능/UI 회귀를 검증한다.
-7. 모든 단계는 `RHWP_ENGINE_GUARDIAN_AGENT.md` 기준 guardian review를 통과해야 한다.
-8. 다음 단계 진행은 오류 검증과 기능 유지 검증이 모두 통과된 경우에만 허용한다.
-9. `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` 기준으로 작업 순서, 문서 확인, 단계 이동을 감독한다.
-10. `RHWP_ENGINE_MOMENTUM_MONITOR.md` 기준으로 작업 정체와 다음 행동 누락을 감지한다.
-11. `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md` 기준으로 기준 앱 대비 UI/UX와 기능 동등성을 확인한다.
-12. `RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md` 기준으로 가능한 범위에서 앱 직접 조작 검증을 수행한다.
+2. RHWP upstream 엔진 업데이트는 확인 가능한 즉시 검토하고 반영 가능성을 평가한다.
+3. BBDG 전용 기능은 앱, Tauri, worker, adapter 레이어에 구현한다.
+4. 엔진 API 접근은 `wasm-bridge` 같은 단일 어댑터 경계를 통해 수행한다.
+5. RHWP 업데이트 시 BBDG 기능이 자동 유지되도록 엔진 의존도를 낮춘다.
+6. 엔진 수정이 필요하면 upstream RHWP에 반영 가능한 일반 기능으로 설계한다.
+7. 모든 변경은 작은 단계로 나누고, 단계마다 에러/성능/기능/UI 회귀를 검증한다.
+8. 모든 단계는 `RHWP_ENGINE_GUARDIAN_AGENT.md` 기준 guardian review를 통과해야 한다.
+9. 다음 단계 진행은 오류 검증과 기능 유지 검증이 모두 통과된 경우에만 허용한다.
+10. `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md` 기준으로 작업 순서, 문서 확인, 단계 이동을 감독한다.
+11. `RHWP_ENGINE_MOMENTUM_MONITOR.md` 기준으로 작업 정체와 다음 행동 누락을 감지한다.
+12. `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md` 기준으로 기준 앱 대비 UI/UX와 기능 동등성을 확인한다.
+13. `RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md` 기준으로 가능한 범위에서 앱 직접 조작 검증을 수행한다.
 
 ## 계층 구분 요구사항
 
@@ -146,12 +151,21 @@ RHWP 엔진 업데이트 후에도 사용자가 보는 BBDG HWP Editor의 화면
 
 RHWP upstream 업데이트를 적용할 때 다음 순서를 따른다.
 
-1. RHWP upstream 변경사항을 별도 브랜치에서 가져온다.
-2. `src`, `pkg`, `Cargo.toml`, generated bindings 변화를 확인한다.
-3. BBDG 앱 레이어 변경과 충돌 여부를 확인한다.
-4. `wasm-bridge`에서 깨진 API를 흡수한다.
-5. 앱 기능 회귀 테스트를 수행한다.
-6. 엔진 내부 패치가 필요한 경우 별도 패치 파일 또는 upstream PR 후보로 분리한다.
+1. RHWP upstream 변경사항은 확인 가능한 즉시 fetch/확인 대상에 올린다.
+2. 변경 감지 후 가능한 빠르게 영향 범위를 검토한다.
+3. RHWP upstream 변경사항을 별도 브랜치에서 가져온다.
+4. `src`, `pkg`, `Cargo.toml`, generated bindings 변화를 확인한다.
+5. BBDG 앱 레이어 변경과 충돌 여부를 확인한다.
+6. `wasm-bridge`에서 깨진 API를 흡수한다.
+7. 앱 기능 회귀 테스트를 수행한다.
+8. 엔진 내부 패치가 필요한 경우 별도 패치 파일 또는 upstream PR 후보로 분리한다.
+
+추가 요구사항:
+
+- upstream 변경을 장기간 방치하지 않는다.
+- 즉시 반영이 어렵다면 blocker, 영향 범위, 보류 사유를 문서화한다.
+- “나중에 몰아서 업데이트”를 기본 전략으로 삼지 않는다.
+- RHWP 엔진 업데이트 확인은 선택 작업이 아니라 상시 유지 작업으로 취급한다.
 
 ## 금지 요구사항
 

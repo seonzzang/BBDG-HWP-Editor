@@ -1,5 +1,9 @@
 # RHWP Engine Guardian Agent
 
+Project:
+- `RHWP Integration Preservation Framework`
+- `RHWP 엔진 통합 보존 프레임워크`
+
 ## Purpose
 
 This document defines the verification agent role that guards RHWP engine update work.
@@ -23,6 +27,7 @@ The guardian agent must read and use these documents before reviewing any RHWP e
 - `RHWP_ENGINE_API_INVENTORY.md`
 - `RHWP_ENGINE_COMPATIBILITY_CHECKLIST.md`
 - `RHWP_ENGINE_ORCHESTRATION_SUPERVISOR.md`
+- `RHWP_ENGINE_APPROVAL_GATE_AGENT.md`
 - `RHWP_ENGINE_MOMENTUM_MONITOR.md`
 - `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md`
 - `RHWP_ENGINE_UPDATE_RUNBOOK.md`
@@ -46,6 +51,8 @@ Only then proceed
 ```
 
 This is intentionally slower than unguarded coding. The goal is to avoid a quiet regression that becomes expensive later.
+
+After guardian review, the final handoff to the next step may be delegated to the approval gate agent, but only if the guardian result is not `Stop`.
 
 ## What The Guardian Must Check
 

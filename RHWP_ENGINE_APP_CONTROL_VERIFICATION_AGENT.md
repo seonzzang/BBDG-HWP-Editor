@@ -1,5 +1,9 @@
 # RHWP Engine App Control Verification Agent
 
+Project:
+- `RHWP Integration Preservation Framework`
+- `RHWP 엔진 통합 보존 프레임워크`
+
 ## Purpose
 
 This document defines the app control verification agent role for RHWP engine update work.

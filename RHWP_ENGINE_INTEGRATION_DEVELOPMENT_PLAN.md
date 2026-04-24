@@ -1,5 +1,9 @@
 # RHWP Engine Integration Development Plan
 
+Project:
+- `RHWP Integration Preservation Framework`
+- `RHWP 엔진 통합 보존 프레임워크`
+
 ## 목적
 
 향후 RHWP 엔진 업데이트를 BBDG HWP Editor에 안정적으로 반영하기 위한 단계별 개발 계획을 정의한다.

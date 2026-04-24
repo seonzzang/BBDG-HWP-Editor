@@ -10,12 +10,20 @@
  *   node e2e/text-flow.test.mjs --mode=headless  # headless Chrome
  */
 import puppeteer from 'puppeteer-core';
+import path from 'path';
+import { existsSync } from 'fs';
 import { TestReporter } from './report-generator.mjs';
 
 const CHROME_PATH = '/home/edward/.cache/puppeteer/chrome/linux-146.0.7680.31/chrome-linux64/chrome';
 const CHROME_CDP = process.env.CHROME_CDP || 'http://172.21.192.1:19222';
 const VITE_URL = process.env.VITE_URL || 'http://localhost:7700';
 const REPORT_DIR = '../output/e2e';
+const WINDOWS_BROWSER_CANDIDATES = [
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+];
 
 /** CLI 인수에서 --mode=host|headless 파싱 */
 function parseMode() {
@@ -25,6 +33,10 @@ function parseMode() {
 }
 
 const MODE = parseMode();
+
+function findWindowsBrowserPath() {
+  return WINDOWS_BROWSER_CANDIDATES.find(candidate => existsSync(candidate)) || null;
+}
 
 // ─── 내장 리포터 (runTest에서 자동 사용) ─────────────────
 
@@ -51,12 +63,26 @@ export async function launchBrowser() {
   }
   // 호스트 Chrome CDP에 연결
   console.log(`  [browser] 호스트 Chrome CDP 연결 (${CHROME_CDP})`);
-  const browser = await puppeteer.connect({
-    browserURL: CHROME_CDP,
-    defaultViewport: null,
-  });
-  browser._isRemote = true;
-  return browser;
+  try {
+    const browser = await puppeteer.connect({
+      browserURL: CHROME_CDP,
+      defaultViewport: null,
+    });
+    browser._isRemote = true;
+    return browser;
+  } catch (error) {
+    const executablePath = findWindowsBrowserPath();
+    if (!executablePath) {
+      throw error;
+    }
+
+    console.warn(`  [browser] 호스트 CDP 연결 실패, 로컬 브라우저로 폴백 (${executablePath})`);
+    return await puppeteer.launch({
+      headless: true,
+      executablePath,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+    });
+  }
 }
 
 /** 테스트용 페이지 생성 + 크기 설정
@@ -142,6 +168,31 @@ export async function loadHwpFile(page, filename) {
       if (!docInfo) return { error: 'loadDocument returned null' };
       window.__canvasView?.loadDocument?.();
       return { pageCount: docInfo.pageCount };
+    } catch (e) {
+      return { error: e.message || String(e) };
+    }
+  }, filename);
+  if (result.error) throw new Error(`파일 로드 실패 (${filename}): ${result.error}`);
+  await page.waitForSelector(CANVAS_SELECTOR, { timeout: 10000 });
+  await page.evaluate(() => new Promise(r => setTimeout(r, 1500)));
+  return result;
+}
+
+/** 앱의 실제 open-document-bytes 경로를 통해 문서를 로드한다 */
+export async function loadHwpFileViaApp(page, filename) {
+  const result = await page.evaluate(async (fname) => {
+    try {
+      const resp = await fetch(`/samples/${fname}`);
+      if (!resp.ok) return { error: `HTTP ${resp.status}` };
+      const buf = await resp.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      await window.__eventBus?.emit('open-document-bytes', {
+        bytes,
+        fileName: fname,
+        fileHandle: null,
+      });
+      const pageCount = window.__wasm?.pageCount ?? 0;
+      return { pageCount };
     } catch (e) {
       return { error: e.message || String(e) };
     }
@@ -275,7 +326,7 @@ export function assert(condition, message) {
  */
 function getReportFilename() {
   const scriptPath = process.argv[1] || 'unknown';
-  const basename = scriptPath.split('/').pop().replace(/\.test\.mjs$/, '');
+  const basename = path.basename(scriptPath).replace(/\.test\.mjs$/, '');
   return `${basename}-report.html`;
 }
 

@@ -1,48 +1,141 @@
 import init, { HwpDocument, version } from '@wasm/rhwp.js';
-import type { DocumentInfo, PageInfo, PageDef, SectionDef, CursorRect, HitTestResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, NavContextEntry, FieldInfoResult, BookmarkInfo } from './types';
-
-/** HWPX 비표준 감지 경고 리포트 (#177). */
-export interface ValidationReport {
-  /** 경고 총 개수 */
-  count: number;
-  /** 경고 종류별 요약 (key: 한국어 설명, value: 개수) */
-  summary: Record<string, number>;
-  /** 개별 경고 목록 */
-  warnings: Array<{
-    section: number;
-    paragraph: number;
-    kind: 'LinesegArrayEmpty' | 'LinesegUncomputed' | 'LinesegTextRunReflow';
-    cell: { ctrl: number; row: number; col: number; innerPara: number } | null;
-  }>;
-}
-import { resolveFont, fontFamilyWithFallback } from './font-substitution';
-import { REGISTERED_FONTS } from './font-loader';
+import type { DocumentInfo, PageInfo, PageDef, SectionDef, CursorRect, HitTestResult, LineInfo, TableDimensions, CellInfo, CellBbox, CellProperties, TableProperties, DocumentPosition, MoveVerticalResult, SelectionRect, CharProperties, ParaProperties, CellPathEntry, NavContextEntry, FieldInfoResult, BookmarkInfo, PageOfPositionResult, ReplaceAllResult, ReplaceResult, SearchResult } from './types';
+import type { ValidationReport } from './wasm-bridge-types';
+import {
+  createNewDocumentState,
+  getPageCountOrReset,
+  getValidationWarnings as getValidationWarningsDocument,
+  loadDocumentState,
+  reflowLinesegs as reflowLinesegsDocument,
+} from './wasm-bridge-document';
+import { substituteCssFontFamily } from './wasm-bridge-fonts';
+import {
+  addBookmark as addBookmarkField,
+  clearActiveField as clearActiveFieldField,
+  deleteBookmark as deleteBookmarkField,
+  getBookmarks as getBookmarksField,
+  getClickHereProps as getClickHerePropsField,
+  getFieldInfoAt as getFieldInfoAtField,
+  getFieldList as getFieldListField,
+  getFieldValue as getFieldValueField,
+  getFieldValueByName as getFieldValueByNameField,
+  getPageOfPosition as getPageOfPositionField,
+  getPositionOfPage as getPositionOfPageField,
+  removeFieldAt as removeFieldAtField,
+  renameBookmark as renameBookmarkField,
+  replaceAll as replaceAllField,
+  replaceText as replaceTextField,
+  searchText as searchTextField,
+  setActiveField as setActiveFieldField,
+  setFieldValue as setFieldValueField,
+  setFieldValueByName as setFieldValueByNameField,
+  updateClickHereProps as updateClickHerePropsField,
+} from './wasm-bridge-fields';
+import {
+  applyCellStyle as applyCellStyleFormatting,
+  applyCharFormat as applyCharFormatFormatting,
+  applyCharFormatInCell as applyCharFormatInCellFormatting,
+  applyHfTemplate as applyHfTemplateFormatting,
+  applyParaFormat as applyParaFormatFormatting,
+  applyParaFormatInCell as applyParaFormatInCellFormatting,
+  applyParaFormatInHf as applyParaFormatInHfFormatting,
+  applyStyle as applyStyleFormatting,
+  createNumbering as createNumberingFormatting,
+  createStyle as createStyleFormatting,
+  deleteStyle as deleteStyleFormatting,
+  ensureDefaultBullet as ensureDefaultBulletFormatting,
+  ensureDefaultNumbering as ensureDefaultNumberingFormatting,
+  findOrCreateFontId as findOrCreateFontIdFormatting,
+  findOrCreateFontIdForLang as findOrCreateFontIdForLangFormatting,
+  getBulletList as getBulletListFormatting,
+  getCellCharPropertiesAt as getCellCharPropertiesAtFormatting,
+  getCellParaPropertiesAt as getCellParaPropertiesAtFormatting,
+  getCellStyleAt as getCellStyleAtFormatting,
+  getCharPropertiesAt as getCharPropertiesAtFormatting,
+  getNumberingList as getNumberingListFormatting,
+  getParaPropertiesAt as getParaPropertiesAtFormatting,
+  getParaPropertiesInHf as getParaPropertiesInHfFormatting,
+  getStyleAt as getStyleAtFormatting,
+  getStyleDetail as getStyleDetailFormatting,
+  getStyleList as getStyleListFormatting,
+  insertFieldInHf as insertFieldInHfFormatting,
+  setNumberingRestart as setNumberingRestartFormatting,
+  updateStyle as updateStyleFormatting,
+  updateStyleShapes as updateStyleShapesFormatting,
+} from './wasm-bridge-formatting';
+import {
+  getFormObjectAt as getFormObjectAtForm,
+  getFormObjectInfo as getFormObjectInfoForm,
+  getFormValue as getFormValueForm,
+  setFormValue as setFormValueForm,
+  setFormValueInCell as setFormValueInCellForm,
+} from './wasm-bridge-form';
+import {
+  discardSnapshot as discardSnapshotView,
+  getShowControlCodes as getShowControlCodesView,
+  getShowTransparentBorders as getShowTransparentBordersView,
+  restoreSnapshot as restoreSnapshotView,
+  saveSnapshot as saveSnapshotView,
+  setClipEnabled as setClipEnabledView,
+  setShowControlCodes as setShowControlCodesView,
+  setShowParagraphMarks as setShowParagraphMarksView,
+  setShowTransparentBorders as setShowTransparentBordersView,
+} from './wasm-bridge-view';
+import {
+  createHeaderFooter as createHeaderFooterHf,
+  deleteHeaderFooter as deleteHeaderFooterHf,
+  deleteTextInHeaderFooter as deleteTextInHeaderFooterHf,
+  getCursorRectInHeaderFooter as getCursorRectInHeaderFooterHf,
+  getHeaderFooter as getHeaderFooterHf,
+  getHeaderFooterList as getHeaderFooterListHf,
+  getHeaderFooterParaInfo as getHeaderFooterParaInfoHf,
+  hitTestHeaderFooter as hitTestHeaderFooterHf,
+  hitTestInHeaderFooter as hitTestInHeaderFooterHf,
+  insertTextInHeaderFooter as insertTextInHeaderFooterHf,
+  mergeParagraphInHeaderFooter as mergeParagraphInHeaderFooterHf,
+  navigateHeaderFooterByPage as navigateHeaderFooterByPageHf,
+  splitParagraphInHeaderFooter as splitParagraphInHeaderFooterHf,
+  toggleHideHeaderFooter as toggleHideHeaderFooterHf,
+} from './wasm-bridge-header-footer';
+import {
+  getPageDef as getPageDefPaging,
+  getPageInfo as getPageInfoPaging,
+  getSectionDef as getSectionDefPaging,
+  isPagingFinished as isPagingFinishedPaging,
+  renderPageSvg as renderPageSvgPaging,
+  renderPageToCanvas as renderPageToCanvasPaging,
+  setPageDef as setPageDefPaging,
+  setSectionDef as setSectionDefPaging,
+  setSectionDefAll as setSectionDefAllPaging,
+  startProgressivePaging as startProgressivePagingPaging,
+  stepProgressivePaging as stepProgressivePagingPaging,
+  supportsProgressivePaging as supportsProgressivePagingPaging,
+} from './wasm-bridge-paging';
+import {
+  clipboardHasControl as clipboardHasControlSelection,
+  copyControl as copyControlSelection,
+  copySelection as copySelectionSelection,
+  copySelectionInCell as copySelectionInCellSelection,
+  deleteRange as deleteRangeSelection,
+  deleteRangeInCell as deleteRangeInCellSelection,
+  exportControlHtml as exportControlHtmlSelection,
+  exportSelectionHtml as exportSelectionHtmlSelection,
+  exportSelectionInCellHtml as exportSelectionInCellHtmlSelection,
+  getClipboardText as getClipboardTextSelection,
+  getControlImageData as getControlImageDataSelection,
+  getControlImageMime as getControlImageMimeSelection,
+  getSelectionRects as getSelectionRectsSelection,
+  getSelectionRectsInCell as getSelectionRectsInCellSelection,
+  hasInternalClipboard as hasInternalClipboardSelection,
+  pasteControl as pasteControlSelection,
+  pasteHtml as pasteHtmlSelection,
+  pasteHtmlInCell as pasteHtmlInCellSelection,
+  pasteInternal as pasteInternalSelection,
+  pasteInternalInCell as pasteInternalInCellSelection,
+} from './wasm-bridge-selection';
 import type { FileSystemFileHandleLike } from '@/command/file-system-access';
 
-/**
- * CSS font 문자열에서 font-family를 추출하여 폰트 치환을 적용한다.
- *
- * 입력: 'bold 14.5px "안상수2006가는", sans-serif'
- * 출력: 'bold 14.5px "돋움", sans-serif'
- */
-function substituteCssFontFamily(cssFont: string): string {
-  const pxIdx = cssFont.indexOf('px ');
-  if (pxIdx < 0) return cssFont;
-
-  const prefix = cssFont.substring(0, pxIdx + 3);
-  const familyPart = cssFont.substring(pxIdx + 3);
-
-  const match = familyPart.match(/^"([^"]+)"/);
-  if (!match) return cssFont;
-
-  const fontName = match[1];
-  if (REGISTERED_FONTS.has(fontName)) return cssFont;
-
-  const resolved = resolveFont(fontName, 0, 0);
-  if (resolved === fontName) return cssFont;
-
-  return prefix + fontFamilyWithFallback(resolved);
-}
+export type { ValidationReport } from './wasm-bridge-types';
 
 export class WasmBridge {
   private doc: HwpDocument | null = null;
@@ -50,6 +143,46 @@ export class WasmBridge {
   private initialized = false;
   private _fileName = 'document.hwp';
   private _currentFileHandle: FileSystemFileHandleLike | null = null;
+
+  private requireDoc(): HwpDocument {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return this.doc;
+  }
+
+  private withDoc<T>(callback: (doc: HwpDocument) => T): T {
+    return callback(this.requireDoc());
+  }
+
+  private withOptionalDoc<T>(fallback: T, callback: (doc: HwpDocument) => T): T {
+    if (!this.doc) return fallback;
+    return callback(this.doc);
+  }
+
+  private parseDocJson<T>(callback: (doc: HwpDocument) => string): T {
+    return this.withDoc((doc) => JSON.parse(callback(doc)));
+  }
+
+  private parseOptionalDocJson<T>(fallback: T, callback: (doc: HwpDocument) => string): T {
+    return this.withOptionalDoc(fallback, (doc) => JSON.parse(callback(doc)));
+  }
+
+  private getOptionalDocMethod<T extends (...args: any[]) => any>(methodName: string): T | null {
+    if (!this.doc) return null;
+    const candidate = (this.doc as any)[methodName];
+    return typeof candidate === 'function' ? candidate.bind(this.doc) as T : null;
+  }
+
+  private callOptionalDocMethod<T>(methodName: string, fallback: T, ...args: any[]): T {
+    const method = this.getOptionalDocMethod<(...callArgs: any[]) => T>(methodName);
+    if (!method) return fallback;
+    return method(...args);
+  }
+
+  private parseOptionalDocMethodJson<T>(methodName: string, fallback: T, ...args: any[]): T {
+    const method = this.getOptionalDocMethod<(...callArgs: any[]) => string>(methodName);
+    if (!method) return fallback;
+    return JSON.parse(method(...args));
+  }
 
   private freeDocument(doc: HwpDocument | null, reason: string): void {
     if (!doc) return;
@@ -87,41 +220,25 @@ export class WasmBridge {
   }
 
   loadDocument(data: Uint8Array, fileName?: string): DocumentInfo {
-    const previousDoc = this.doc;
-    this.doc = null;
-    if (previousDoc) {
-      // 연속 링크 드롭/문서 교체 시 일부 문서에서 free()가 불안정해
-      // 즉시 해제 대신 은퇴 목록으로 넘기고, 앱 종료 시 정리한다.
-      this.retiredDocs.push(previousDoc);
-    }
-    this._fileName = fileName ?? 'document.hwp';
-    this._currentFileHandle = null;
-    let nextDoc: HwpDocument | null = null;
-    try {
-      nextDoc = new HwpDocument(data);
-      nextDoc.convertToEditable();
-      nextDoc.setFileName(this._fileName);
-      const info: DocumentInfo = JSON.parse(nextDoc.getDocumentInfo());
-      this.doc = nextDoc;
-      console.log(`[WasmBridge] 문서 로드: ${info.pageCount}페이지`);
-      return info;
-    } catch (error) {
-      this.freeDocument(nextDoc, 'load-failure');
-      throw error;
-    }
+    const nextState = loadDocumentState(
+      this.doc,
+      this.retiredDocs,
+      data,
+      fileName,
+      this.freeDocument.bind(this),
+    );
+    this.doc = nextState.doc;
+    this._fileName = nextState.fileName;
+    this._currentFileHandle = nextState.currentFileHandle;
+    return nextState.info;
   }
 
   createNewDocument(): DocumentInfo {
-    if (!this.doc) {
-      // 아직 WASM 객체가 없으면 더미로 생성 (createEmpty → 즉시 교체)
-      this.doc = HwpDocument.createEmpty();
-    }
-    const info: DocumentInfo = JSON.parse(this.doc.createBlankDocument());
-    this._fileName = '새 문서.hwp';
-    this._currentFileHandle = null;
-    this.doc.setFileName(this._fileName);
-    console.log(`[WasmBridge] 새 문서 생성: ${info.pageCount}페이지`);
-    return info;
+    const nextState = createNewDocumentState(this.doc);
+    this.doc = nextState.doc;
+    this._fileName = nextState.fileName;
+    this._currentFileHandle = nextState.currentFileHandle;
+    return nextState.info;
   }
 
   get fileName(): string {
@@ -145,222 +262,161 @@ export class WasmBridge {
   }
 
   exportHwp(): Uint8Array {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.exportHwp();
+    return this.withDoc((doc) => doc.exportHwp());
   }
 
   exportHwpx(): Uint8Array {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.exportHwpx();
+    return this.withDoc((doc) => doc.exportHwpx());
   }
 
   getSourceFormat(): string {
-    return this.doc?.getSourceFormat?.() ?? 'hwp';
+    return this.withOptionalDoc('hwp', (doc) => doc.getSourceFormat?.() ?? 'hwp');
   }
 
   /** HWPX 비표준 감지 경고 조회 (#177). */
   getValidationWarnings(): ValidationReport {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    const raw = (this.doc as any).getValidationWarnings?.();
-    if (!raw) return { count: 0, summary: {}, warnings: [] };
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return { count: 0, summary: {}, warnings: [] };
-    }
+    return getValidationWarningsDocument(this.requireDoc());
   }
 
   /** 사용자 명시 요청에 의한 lineseg reflow (#177). 반환: reflow된 문단 수. */
   reflowLinesegs(): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).reflowLinesegs?.() ?? 0;
+    return reflowLinesegsDocument(this.requireDoc());
   }
 
   get pageCount(): number {
-    if (!this.doc) return 0;
-    try {
-      return this.doc.pageCount();
-    } catch (error) {
-      console.warn('[WasmBridge] pageCount 조회 실패, 문서 참조를 초기화합니다', error);
+    return getPageCountOrReset(this.doc, () => {
       this.doc = null;
-      return 0;
-    }
+    });
   }
 
   supportsProgressivePaging(): boolean {
-    const doc = this.doc as any;
-    return !!doc
-      && typeof doc.startProgressivePaging === 'function'
-      && typeof doc.stepProgressivePaging === 'function'
-      && typeof doc.isPagingFinished === 'function';
+    return supportsProgressivePagingPaging(this.doc);
   }
 
   startProgressivePaging(): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    const doc = this.doc as any;
-    if (typeof doc.startProgressivePaging !== 'function') {
-      throw new Error('현재 WASM 빌드는 증분 페이징을 지원하지 않습니다');
-    }
-    doc.startProgressivePaging();
+    startProgressivePagingPaging(this.requireDoc());
   }
 
   stepProgressivePaging(chunkSize: number): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    const doc = this.doc as any;
-    if (typeof doc.stepProgressivePaging !== 'function') {
-      throw new Error('현재 WASM 빌드는 증분 페이징을 지원하지 않습니다');
-    }
-    return doc.stepProgressivePaging(chunkSize);
+    return stepProgressivePagingPaging(this.requireDoc(), chunkSize);
   }
 
   isPagingFinished(): boolean {
-    if (!this.doc) return true;
-    const doc = this.doc as any;
-    if (typeof doc.isPagingFinished !== 'function') {
-      return true;
-    }
-    return doc.isPagingFinished();
+    return isPagingFinishedPaging(this.doc);
   }
 
   getPageInfo(pageNum: number): PageInfo {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getPageInfo(pageNum));
+    return getPageInfoPaging(this.parseDocJson.bind(this), pageNum);
   }
 
   getPageDef(sectionIdx: number): PageDef {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getPageDef(sectionIdx));
+    return getPageDefPaging(this.parseDocJson.bind(this), sectionIdx);
   }
 
   setPageDef(sectionIdx: number, pageDef: PageDef): { ok: boolean; pageCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.setPageDef(sectionIdx, JSON.stringify(pageDef)));
+    return setPageDefPaging(this.parseDocJson.bind(this), sectionIdx, pageDef);
   }
 
   getSectionDef(sectionIdx: number): SectionDef {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getSectionDef(sectionIdx));
+    return getSectionDefPaging(this.parseDocJson.bind(this), sectionIdx);
   }
 
   setSectionDef(sectionIdx: number, sectionDef: SectionDef): { ok: boolean; pageCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.setSectionDef(sectionIdx, JSON.stringify(sectionDef)));
+    return setSectionDefPaging(this.parseDocJson.bind(this), sectionIdx, sectionDef);
   }
 
   setSectionDefAll(sectionDef: SectionDef): { ok: boolean; pageCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.setSectionDefAll(JSON.stringify(sectionDef)));
+    return setSectionDefAllPaging(this.parseDocJson.bind(this), sectionDef);
   }
 
   renderPageToCanvas(pageNum: number, canvas: HTMLCanvasElement, scale = 1.0): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    this.doc.renderPageToCanvas(pageNum, canvas, scale);
+    renderPageToCanvasPaging(this.withDoc.bind(this), pageNum, canvas, scale);
   }
 
   renderPageSvg(pageNum: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.renderPageSvg(pageNum);
+    return renderPageSvgPaging(this.withDoc.bind(this), pageNum);
   }
 
   getCursorRect(sec: number, para: number, charOffset: number): CursorRect {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCursorRect(sec, para, charOffset));
+    return this.parseDocJson((doc) => doc.getCursorRect(sec, para, charOffset));
   }
 
   hitTest(pageNum: number, x: number, y: number): HitTestResult {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.hitTest(pageNum, x, y));
+    return this.parseDocJson((doc) => doc.hitTest(pageNum, x, y));
   }
 
   insertText(sec: number, para: number, charOffset: number, text: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.insertText(sec, para, charOffset, text);
+    return this.withDoc((doc) => doc.insertText(sec, para, charOffset, text));
   }
 
   deleteText(sec: number, para: number, charOffset: number, count: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.deleteText(sec, para, charOffset, count);
+    return this.withDoc((doc) => doc.deleteText(sec, para, charOffset, count));
   }
 
   splitParagraph(sec: number, para: number, charOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.splitParagraph(sec, para, charOffset);
+    return this.withDoc((doc) => doc.splitParagraph(sec, para, charOffset));
   }
 
   insertPageBreak(sec: number, para: number, charOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).insertPageBreak(sec, para, charOffset);
+    return (this.requireDoc() as any).insertPageBreak(sec, para, charOffset);
   }
 
   insertColumnBreak(sec: number, para: number, charOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).insertColumnBreak(sec, para, charOffset);
+    return (this.requireDoc() as any).insertColumnBreak(sec, para, charOffset);
   }
 
   setColumnDef(sec: number, columnCount: number, columnType: number, sameWidth: number, spacingHu: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).setColumnDef(sec, columnCount, columnType, sameWidth, spacingHu);
+    return (this.requireDoc() as any).setColumnDef(sec, columnCount, columnType, sameWidth, spacingHu);
   }
 
   mergeParagraph(sec: number, para: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.mergeParagraph(sec, para);
+    return this.withDoc((doc) => doc.mergeParagraph(sec, para));
   }
 
   splitParagraphInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.splitParagraphInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset);
+    return this.withDoc((doc) => doc.splitParagraphInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset));
   }
 
   mergeParagraphInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.mergeParagraphInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx);
+    return this.withDoc((doc) => doc.mergeParagraphInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx));
   }
 
   getTextRange(sec: number, para: number, charOffset: number, count: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getTextRange(sec, para, charOffset, count);
+    return this.withDoc((doc) => doc.getTextRange(sec, para, charOffset, count));
   }
 
   getParagraphLength(sec: number, para: number): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getParagraphLength(sec, para);
+    return this.withDoc((doc) => doc.getParagraphLength(sec, para));
   }
 
   getParagraphCount(sec: number): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getParagraphCount(sec);
+    return this.withDoc((doc) => doc.getParagraphCount(sec));
   }
 
   /** 문단에 텍스트박스 Shape 컨트롤이 있으면 control_index, 없으면 -1 */
   getTextBoxControlIndex(sec: number, para: number): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getTextBoxControlIndex(sec, para);
+    return this.withDoc((doc) => doc.getTextBoxControlIndex(sec, para));
   }
 
   /** 문서 트리에서 다음 편집 가능한 컨트롤/본문을 찾는다. delta=+1(앞)/-1(뒤) */
   findNextEditableControl(sec: number, para: number, ctrlIdx: number, delta: number): { type: string; sec: number; para: number; ci: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.findNextEditableControl(sec, para, ctrlIdx, delta));
+    return this.parseDocJson((doc) => doc.findNextEditableControl(sec, para, ctrlIdx, delta));
   }
 
   /** 커서에서 이전 방향으로 가장 가까운 선택 가능 컨트롤을 찾는다 (F11 키) */
   findNearestControlBackward(sec: number, para: number, charOffset: number): { type: string; sec: number; para: number; ci: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.findNearestControlBackward(sec, para, charOffset));
+    return this.parseDocJson((doc) => doc.findNearestControlBackward(sec, para, charOffset));
   }
 
   /** 현재 위치 이후의 가장 가까운 선택 가능 컨트롤 (Shift+F11) */
   findNearestControlForward(sec: number, para: number, charOffset: number): { type: string; sec: number; para: number; ci: number; charPos?: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).findNearestControlForward(sec, para, charOffset));
+    return JSON.parse((this.requireDoc() as any).findNearestControlForward(sec, para, charOffset));
   }
 
   /** 문단 내 컨트롤의 텍스트 위치 배열 반환 */
   getControlTextPositions(sec: number, para: number): number[] {
-    if (!this.doc) return [];
     try {
-      return JSON.parse((this.doc as any).getControlTextPositions(sec, para));
+      return this.parseOptionalDocJson([], (doc) => (doc as any).getControlTextPositions(sec, para));
     } catch { return []; }
   }
 
@@ -369,171 +425,140 @@ export class WasmBridge {
     sec: number, para: number, charOffset: number, delta: number,
     contextJson: string,
   ): { type: string; sec: number; para: number; charOffset: number; context: NavContextEntry[] } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.navigateNextEditable(sec, para, charOffset, delta, contextJson));
+    return this.parseDocJson((doc) => doc.navigateNextEditable(sec, para, charOffset, delta, contextJson));
   }
 
   // ─── 셀 편집 API ─────────────────────────────────────────
 
   getCursorRectInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number): CursorRect {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCursorRectInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset));
+    return this.parseDocJson((doc) => doc.getCursorRectInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset));
   }
 
   insertTextInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number, text: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.insertTextInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset, text);
+    return this.withDoc((doc) => doc.insertTextInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset, text));
   }
 
   deleteTextInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number, count: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.deleteTextInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset, count);
+    return this.withDoc((doc) => doc.deleteTextInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset, count));
   }
 
   // ─── 중첩 표 path 기반 편집 API ──────────────────────────
 
   insertTextInCellByPath(sec: number, parentPara: number, pathJson: string, charOffset: number, text: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).insertTextInCellByPath(sec, parentPara, pathJson, charOffset, text);
+    return (this.requireDoc() as any).insertTextInCellByPath(sec, parentPara, pathJson, charOffset, text);
   }
 
   deleteTextInCellByPath(sec: number, parentPara: number, pathJson: string, charOffset: number, count: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).deleteTextInCellByPath(sec, parentPara, pathJson, charOffset, count);
+    return (this.requireDoc() as any).deleteTextInCellByPath(sec, parentPara, pathJson, charOffset, count);
   }
 
   splitParagraphInCellByPath(sec: number, parentPara: number, pathJson: string, charOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).splitParagraphInCellByPath(sec, parentPara, pathJson, charOffset);
+    return (this.requireDoc() as any).splitParagraphInCellByPath(sec, parentPara, pathJson, charOffset);
   }
 
   mergeParagraphInCellByPath(sec: number, parentPara: number, pathJson: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).mergeParagraphInCellByPath(sec, parentPara, pathJson);
+    return (this.requireDoc() as any).mergeParagraphInCellByPath(sec, parentPara, pathJson);
   }
 
   getTextInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number, count: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getTextInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset, count);
+    return this.withDoc((doc) => doc.getTextInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset, count));
   }
 
   getTextInCellByPath(sec: number, parentPara: number, pathJson: string, charOffset: number, count: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).getTextInCellByPath(sec, parentPara, pathJson, charOffset, count);
+    return (this.requireDoc() as any).getTextInCellByPath(sec, parentPara, pathJson, charOffset, count);
   }
 
   getCellParagraphLength(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getCellParagraphLength(sec, parentPara, controlIdx, cellIdx, cellParaIdx);
+    return this.withDoc((doc) => doc.getCellParagraphLength(sec, parentPara, controlIdx, cellIdx, cellParaIdx));
   }
 
   getCellParagraphCount(sec: number, parentPara: number, controlIdx: number, cellIdx: number): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getCellParagraphCount(sec, parentPara, controlIdx, cellIdx);
+    return this.withDoc((doc) => doc.getCellParagraphCount(sec, parentPara, controlIdx, cellIdx));
   }
 
   getCellParagraphCountByPath(sec: number, parentPara: number, pathJson: string): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getCellParagraphCountByPath(sec, parentPara, pathJson);
+    return this.withDoc((doc) => doc.getCellParagraphCountByPath(sec, parentPara, pathJson));
   }
 
   getCellParagraphLengthByPath(sec: number, parentPara: number, pathJson: string): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getCellParagraphLengthByPath(sec, parentPara, pathJson);
+    return this.withDoc((doc) => doc.getCellParagraphLengthByPath(sec, parentPara, pathJson));
   }
 
   getCellTextDirection(sec: number, parentPara: number, controlIdx: number, cellIdx: number): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getCellTextDirection(sec, parentPara, controlIdx, cellIdx);
+    return this.withDoc((doc) => doc.getCellTextDirection(sec, parentPara, controlIdx, cellIdx));
   }
 
   // ─── 커서 이동 API ─────────────────────────────────────────
 
   getLineInfo(sec: number, para: number, charOffset: number): LineInfo {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getLineInfo(sec, para, charOffset));
+    return this.parseDocJson((doc) => doc.getLineInfo(sec, para, charOffset));
   }
 
   getLineInfoInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number): LineInfo {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getLineInfoInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset));
+    return this.parseDocJson((doc) => doc.getLineInfoInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset));
   }
 
   getCaretPosition(): DocumentPosition | null {
-    if (!this.doc) return null;
     try {
-      return JSON.parse(this.doc.getCaretPosition());
+      return this.parseOptionalDocJson<DocumentPosition | null>(null, (doc) => doc.getCaretPosition());
     } catch {
       return null;
     }
   }
 
   getTableDimensions(sec: number, parentPara: number, controlIdx: number): TableDimensions {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getTableDimensions(sec, parentPara, controlIdx));
+    return this.parseDocJson((doc) => doc.getTableDimensions(sec, parentPara, controlIdx));
   }
 
   getCellInfo(sec: number, parentPara: number, controlIdx: number, cellIdx: number): CellInfo {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCellInfo(sec, parentPara, controlIdx, cellIdx));
+    return this.parseDocJson((doc) => doc.getCellInfo(sec, parentPara, controlIdx, cellIdx));
   }
 
   getTableCellBboxes(sec: number, parentPara: number, controlIdx: number, pageHint?: number): CellBbox[] {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getTableCellBboxes(sec, parentPara, controlIdx, pageHint ?? undefined));
+    return this.parseDocJson((doc) => doc.getTableCellBboxes(sec, parentPara, controlIdx, pageHint ?? undefined));
   }
 
   getTableBBox(sec: number, parentPara: number, controlIdx: number): { pageIndex: number; x: number; y: number; width: number; height: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getTableBBox(sec, parentPara, controlIdx));
+    return this.parseDocJson((doc) => doc.getTableBBox(sec, parentPara, controlIdx));
   }
 
   deleteTableControl(sec: number, parentPara: number, controlIdx: number): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.deleteTableControl(sec, parentPara, controlIdx));
+    return this.parseDocJson((doc) => doc.deleteTableControl(sec, parentPara, controlIdx));
   }
 
   getCellProperties(sec: number, parentPara: number, controlIdx: number, cellIdx: number): CellProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCellProperties(sec, parentPara, controlIdx, cellIdx));
+    return this.parseDocJson((doc) => doc.getCellProperties(sec, parentPara, controlIdx, cellIdx));
   }
 
   setCellProperties(sec: number, parentPara: number, controlIdx: number, cellIdx: number, props: Partial<CellProperties>): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.setCellProperties(sec, parentPara, controlIdx, cellIdx, JSON.stringify(props)));
+    return this.parseDocJson((doc) => doc.setCellProperties(sec, parentPara, controlIdx, cellIdx, JSON.stringify(props)));
   }
 
   resizeTableCells(
     sec: number, parentPara: number, controlIdx: number,
     updates: Array<{ cellIdx: number; widthDelta?: number; heightDelta?: number }>,
   ): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.resizeTableCells(sec, parentPara, controlIdx, JSON.stringify(updates)));
+    return this.parseDocJson((doc) => doc.resizeTableCells(sec, parentPara, controlIdx, JSON.stringify(updates)));
   }
 
   moveTableOffset(sec: number, parentPara: number, controlIdx: number, deltaH: number, deltaV: number): { ok: boolean; ppi: number; ci: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.moveTableOffset(sec, parentPara, controlIdx, deltaH, deltaV));
+    return this.parseDocJson((doc) => doc.moveTableOffset(sec, parentPara, controlIdx, deltaH, deltaV));
   }
 
   getTableProperties(sec: number, parentPara: number, controlIdx: number): TableProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getTableProperties(sec, parentPara, controlIdx));
+    return this.parseDocJson((doc) => doc.getTableProperties(sec, parentPara, controlIdx));
   }
 
   setTableProperties(sec: number, parentPara: number, controlIdx: number, props: Partial<TableProperties>): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.setTableProperties(sec, parentPara, controlIdx, JSON.stringify(props)));
+    return this.parseDocJson((doc) => doc.setTableProperties(sec, parentPara, controlIdx, JSON.stringify(props)));
   }
 
   mergeTableCells(sec: number, parentPara: number, controlIdx: number, startRow: number, startCol: number, endRow: number, endCol: number): { ok: boolean; cellCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.mergeTableCells(sec, parentPara, controlIdx, startRow, startCol, endRow, endCol));
+    return this.parseDocJson((doc) => doc.mergeTableCells(sec, parentPara, controlIdx, startRow, startCol, endRow, endCol));
   }
 
   splitTableCell(sec: number, parentPara: number, controlIdx: number, row: number, col: number): { ok: boolean; cellCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.splitTableCell(sec, parentPara, controlIdx, row, col));
+    return this.parseDocJson((doc) => doc.splitTableCell(sec, parentPara, controlIdx, row, col));
   }
 
   splitTableCellInto(
@@ -542,9 +567,8 @@ export class WasmBridge {
     nRows: number, mCols: number,
     equalRowHeight: boolean, mergeFirst: boolean,
   ): { ok: boolean; cellCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).splitTableCellInto(sec, parentPara, controlIdx, row, col, nRows, mCols, equalRowHeight, mergeFirst));
+    return JSON.parse((this.requireDoc() as any).splitTableCellInto(sec, parentPara, controlIdx, row, col, nRows, mCols, equalRowHeight, mergeFirst));
   }
 
   splitTableCellsInRange(
@@ -552,146 +576,119 @@ export class WasmBridge {
     startRow: number, startCol: number, endRow: number, endCol: number,
     nRows: number, mCols: number, equalRowHeight: boolean,
   ): { ok: boolean; cellCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).splitTableCellsInRange(sec, parentPara, controlIdx, startRow, startCol, endRow, endCol, nRows, mCols, equalRowHeight));
+    return JSON.parse((this.requireDoc() as any).splitTableCellsInRange(sec, parentPara, controlIdx, startRow, startCol, endRow, endCol, nRows, mCols, equalRowHeight));
   }
 
   insertTableRow(sec: number, parentPara: number, controlIdx: number, rowIdx: number, below: boolean): { ok: boolean; rowCount: number; colCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.insertTableRow(sec, parentPara, controlIdx, rowIdx, below));
+    return this.parseDocJson((doc) => doc.insertTableRow(sec, parentPara, controlIdx, rowIdx, below));
   }
 
   insertTableColumn(sec: number, parentPara: number, controlIdx: number, colIdx: number, right: boolean): { ok: boolean; rowCount: number; colCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.insertTableColumn(sec, parentPara, controlIdx, colIdx, right));
+    return this.parseDocJson((doc) => doc.insertTableColumn(sec, parentPara, controlIdx, colIdx, right));
   }
 
   deleteTableRow(sec: number, parentPara: number, controlIdx: number, rowIdx: number): { ok: boolean; rowCount: number; colCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.deleteTableRow(sec, parentPara, controlIdx, rowIdx));
+    return this.parseDocJson((doc) => doc.deleteTableRow(sec, parentPara, controlIdx, rowIdx));
   }
 
   deleteTableColumn(sec: number, parentPara: number, controlIdx: number, colIdx: number): { ok: boolean; rowCount: number; colCount: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.deleteTableColumn(sec, parentPara, controlIdx, colIdx));
+    return this.parseDocJson((doc) => doc.deleteTableColumn(sec, parentPara, controlIdx, colIdx));
   }
 
   createTable(sec: number, para: number, charOffset: number, rows: number, cols: number): { ok: boolean; paraIdx: number; controlIdx: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.createTable(sec, para, charOffset, rows, cols));
+    return this.parseDocJson((doc) => doc.createTable(sec, para, charOffset, rows, cols));
   }
 
   evaluateTableFormula(sec: number, parentPara: number, controlIdx: number,
     targetRow: number, targetCol: number, formula: string, writeResult: boolean): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.evaluateTableFormula(sec, parentPara, controlIdx, targetRow, targetCol, formula, writeResult);
+    return this.withDoc((doc) => doc.evaluateTableFormula(sec, parentPara, controlIdx, targetRow, targetCol, formula, writeResult));
   }
 
   insertPicture(sec: number, paraIdx: number, charOffset: number,
                 imageData: Uint8Array, width: number, height: number,
                 naturalWidthPx: number, naturalHeightPx: number,
                 extension: string, description: string = ''): { ok: boolean; paraIdx: number; controlIdx: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.insertPicture(sec, paraIdx, charOffset, imageData, width, height, naturalWidthPx, naturalHeightPx, extension, description));
+    return this.parseDocJson((doc) => doc.insertPicture(sec, paraIdx, charOffset, imageData, width, height, naturalWidthPx, naturalHeightPx, extension, description));
   }
 
   // ── 그림 속성 API ─────────────────────────────────────
   getPageControlLayout(pageNum: number): { controls: import('./types').ControlLayoutItem[] } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getPageControlLayout(pageNum));
+    return this.parseDocJson((doc) => doc.getPageControlLayout(pageNum));
   }
 
   getPictureProperties(sec: number, para: number, ci: number): import('./types').PictureProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getPictureProperties(sec, para, ci));
+    return this.parseDocJson((doc) => doc.getPictureProperties(sec, para, ci));
   }
 
   setPictureProperties(sec: number, para: number, ci: number, props: Record<string, unknown>): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.setPictureProperties(sec, para, ci, JSON.stringify(props)));
+    return this.parseDocJson((doc) => doc.setPictureProperties(sec, para, ci, JSON.stringify(props)));
   }
 
   // ── 수식 속성 API ─────────────────────────────────────
   getEquationProperties(sec: number, para: number, ci: number, cellIdx?: number, cellParaIdx?: number): import('./types').EquationProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getEquationProperties(sec, para, ci, cellIdx ?? -1, cellParaIdx ?? -1));
+    return this.parseDocJson((doc) => doc.getEquationProperties(sec, para, ci, cellIdx ?? -1, cellParaIdx ?? -1));
   }
 
   setEquationProperties(sec: number, para: number, ci: number, cellIdx: number | undefined, cellParaIdx: number | undefined, props: Record<string, unknown>): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.setEquationProperties(sec, para, ci, cellIdx ?? -1, cellParaIdx ?? -1, JSON.stringify(props)));
+    return this.parseDocJson((doc) => doc.setEquationProperties(sec, para, ci, cellIdx ?? -1, cellParaIdx ?? -1, JSON.stringify(props)));
   }
 
   renderEquationPreview(script: string, fontSizeHwpunit: number, color: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.renderEquationPreview(script, fontSizeHwpunit, color);
+    return this.withDoc((doc) => doc.renderEquationPreview(script, fontSizeHwpunit, color));
   }
 
   deletePictureControl(sec: number, para: number, ci: number): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.deletePictureControl(sec, para, ci));
+    return this.parseDocJson((doc) => doc.deletePictureControl(sec, para, ci));
   }
 
   createShapeControl(params: Record<string, unknown>): { ok: boolean; paraIdx: number; controlIdx: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.createShapeControl(JSON.stringify(params)));
+    return this.parseDocJson((doc) => doc.createShapeControl(JSON.stringify(params)));
   }
 
   getShapeProperties(sec: number, para: number, ci: number): import('./types').ShapeProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getShapeProperties(sec, para, ci));
+    return this.parseDocJson((doc) => doc.getShapeProperties(sec, para, ci));
   }
 
   setShapeProperties(sec: number, para: number, ci: number, props: Record<string, unknown>): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.setShapeProperties(sec, para, ci, JSON.stringify(props)));
+    return this.parseDocJson((doc) => doc.setShapeProperties(sec, para, ci, JSON.stringify(props)));
   }
 
   deleteShapeControl(sec: number, para: number, ci: number): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.deleteShapeControl(sec, para, ci));
+    return this.parseDocJson((doc) => doc.deleteShapeControl(sec, para, ci));
   }
 
   changeShapeZOrder(sec: number, para: number, ci: number, operation: string): { ok: boolean; zOrder?: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.changeShapeZOrder(sec, para, ci, operation));
+    return this.parseDocJson((doc) => doc.changeShapeZOrder(sec, para, ci, operation));
   }
 
   groupShapes(sec: number, targets: { paraIdx: number; controlIdx: number }[]): { ok: boolean; paraIdx: number; controlIdx: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     const json = JSON.stringify({ sectionIdx: sec, targets });
-    return JSON.parse((this.doc as any).groupShapes(json));
+    return JSON.parse((this.requireDoc() as any).groupShapes(json));
   }
 
   insertFootnote(sec: number, para: number, charOffset: number): { ok: boolean; paraIdx: number; controlIdx: number; footnoteNumber: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).insertFootnote(sec, para, charOffset));
+    return JSON.parse((this.requireDoc() as any).insertFootnote(sec, para, charOffset));
   }
 
   getFootnoteInfo(sec: number, para: number, controlIdx: number): { ok: boolean; paraCount: number; totalTextLen: number; number: number; texts: string[] } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).getFootnoteInfo(sec, para, controlIdx));
+    return JSON.parse((this.requireDoc() as any).getFootnoteInfo(sec, para, controlIdx));
   }
 
   insertTextInFootnote(sec: number, para: number, controlIdx: number, fnParaIdx: number, charOffset: number, text: string): { ok: boolean; charOffset: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).insertTextInFootnote(sec, para, controlIdx, fnParaIdx, charOffset, text));
+    return JSON.parse((this.requireDoc() as any).insertTextInFootnote(sec, para, controlIdx, fnParaIdx, charOffset, text));
   }
 
   deleteTextInFootnote(sec: number, para: number, controlIdx: number, fnParaIdx: number, charOffset: number, count: number): { ok: boolean; charOffset: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).deleteTextInFootnote(sec, para, controlIdx, fnParaIdx, charOffset, count));
+    return JSON.parse((this.requireDoc() as any).deleteTextInFootnote(sec, para, controlIdx, fnParaIdx, charOffset, count));
   }
 
   splitParagraphInFootnote(sec: number, para: number, controlIdx: number, fnParaIdx: number, charOffset: number): { ok: boolean; fnParaIndex: number; charOffset: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).splitParagraphInFootnote(sec, para, controlIdx, fnParaIdx, charOffset));
+    return JSON.parse((this.requireDoc() as any).splitParagraphInFootnote(sec, para, controlIdx, fnParaIdx, charOffset));
   }
 
   mergeParagraphInFootnote(sec: number, para: number, controlIdx: number, fnParaIdx: number): { ok: boolean; fnParaIndex: number; charOffset: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).mergeParagraphInFootnote(sec, para, controlIdx, fnParaIdx));
+    return JSON.parse((this.requireDoc() as any).mergeParagraphInFootnote(sec, para, controlIdx, fnParaIdx));
   }
 
   getPageFootnoteInfo(pageNum: number, footnoteIndex: number): { ok: boolean; sectionIdx: number; paraIdx: number; controlIdx: number; sourceType: string } | null {
@@ -729,8 +726,7 @@ export class WasmBridge {
   }
 
   ungroupShape(sec: number, para: number, ci: number): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).ungroupShape(sec, para, ci));
+    return JSON.parse((this.requireDoc() as any).ungroupShape(sec, para, ci));
   }
 
   moveVertical(
@@ -739,8 +735,7 @@ export class WasmBridge {
     parentPara: number, controlIdx: number,
     cellIdx: number, cellParaIdx: number,
   ): MoveVerticalResult {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.moveVertical(
+    return this.parseDocJson((doc) => doc.moveVertical(
       sec, para, charOffset, delta, preferredX,
       parentPara, controlIdx, cellIdx, cellParaIdx,
     ));
@@ -749,31 +744,26 @@ export class WasmBridge {
   // ─── 경로 기반 중첩 표 API ─────────────────────────────
 
   getCursorRectByPath(sec: number, parentPara: number, pathJson: string, charOffset: number): CursorRect {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCursorRectByPath(sec, parentPara, pathJson, charOffset));
+    return this.parseDocJson((doc) => doc.getCursorRectByPath(sec, parentPara, pathJson, charOffset));
   }
 
   getCellInfoByPath(sec: number, parentPara: number, pathJson: string): CellInfo {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCellInfoByPath(sec, parentPara, pathJson));
+    return this.parseDocJson((doc) => doc.getCellInfoByPath(sec, parentPara, pathJson));
   }
 
   getTableDimensionsByPath(sec: number, parentPara: number, pathJson: string): TableDimensions {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getTableDimensionsByPath(sec, parentPara, pathJson));
+    return this.parseDocJson((doc) => doc.getTableDimensionsByPath(sec, parentPara, pathJson));
   }
 
   getTableCellBboxesByPath(sec: number, parentPara: number, pathJson: string): CellBbox[] {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getTableCellBboxesByPath(sec, parentPara, pathJson));
+    return this.parseDocJson((doc) => doc.getTableCellBboxesByPath(sec, parentPara, pathJson));
   }
 
   moveVerticalByPath(
     sec: number, parentPara: number, pathJson: string,
     charOffset: number, delta: number, preferredX: number,
   ): MoveVerticalResult {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.moveVerticalByPath(
+    return this.parseDocJson((doc) => doc.moveVerticalByPath(
       sec, parentPara, pathJson, charOffset, delta, preferredX,
     ));
   }
@@ -781,403 +771,315 @@ export class WasmBridge {
   // ─── Selection API ──────────────────────────────────────
 
   getSelectionRects(sec: number, startPara: number, startOffset: number, endPara: number, endOffset: number): SelectionRect[] {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getSelectionRects(sec, startPara, startOffset, endPara, endOffset));
+    return getSelectionRectsSelection(this.parseDocJson.bind(this), sec, startPara, startOffset, endPara, endOffset);
   }
 
   getSelectionRectsInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, startCellPara: number, startOffset: number, endCellPara: number, endOffset: number): SelectionRect[] {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getSelectionRectsInCell(sec, parentPara, controlIdx, cellIdx, startCellPara, startOffset, endCellPara, endOffset));
+    return getSelectionRectsInCellSelection(this.parseDocJson.bind(this), sec, parentPara, controlIdx, cellIdx, startCellPara, startOffset, endCellPara, endOffset);
   }
 
   deleteRange(sec: number, startPara: number, startOffset: number, endPara: number, endOffset: number): { ok: boolean; paraIdx: number; charOffset: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.deleteRange(sec, startPara, startOffset, endPara, endOffset));
+    return deleteRangeSelection(this.parseDocJson.bind(this), sec, startPara, startOffset, endPara, endOffset);
   }
 
   deleteRangeInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, startCellPara: number, startOffset: number, endCellPara: number, endOffset: number): { ok: boolean; paraIdx: number; charOffset: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.deleteRangeInCell(sec, parentPara, controlIdx, cellIdx, startCellPara, startOffset, endCellPara, endOffset));
+    return deleteRangeInCellSelection(this.parseDocJson.bind(this), sec, parentPara, controlIdx, cellIdx, startCellPara, startOffset, endCellPara, endOffset);
   }
 
   // ─── 클립보드 API ──────────────────────────────────────
 
   copySelection(sec: number, startPara: number, startOffset: number, endPara: number, endOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.copySelection(sec, startPara, startOffset, endPara, endOffset);
+    return copySelectionSelection(this.withDoc.bind(this), sec, startPara, startOffset, endPara, endOffset);
   }
 
   copySelectionInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, startCellPara: number, startOffset: number, endCellPara: number, endOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.copySelectionInCell(sec, parentPara, controlIdx, cellIdx, startCellPara, startOffset, endCellPara, endOffset);
+    return copySelectionInCellSelection(this.withDoc.bind(this), sec, parentPara, controlIdx, cellIdx, startCellPara, startOffset, endCellPara, endOffset);
   }
 
   pasteInternal(sec: number, para: number, charOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.pasteInternal(sec, para, charOffset);
+    return pasteInternalSelection(this.withDoc.bind(this), sec, para, charOffset);
   }
 
   pasteInternalInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.pasteInternalInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset);
+    return pasteInternalInCellSelection(this.withDoc.bind(this), sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset);
   }
 
   hasInternalClipboard(): boolean {
-    if (!this.doc) return false;
-    return this.doc.hasInternalClipboard();
+    return hasInternalClipboardSelection(this.withOptionalDoc.bind(this));
   }
 
   getClipboardText(): string {
-    if (!this.doc) return '';
-    return this.doc.getClipboardText();
+    return getClipboardTextSelection(this.withOptionalDoc.bind(this));
   }
 
   copyControl(sec: number, para: number, ci: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.copyControl(sec, para, ci);
+    return copyControlSelection(this.withDoc.bind(this), sec, para, ci);
   }
 
   exportControlHtml(sec: number, para: number, ci: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.exportControlHtml(sec, para, ci);
+    return exportControlHtmlSelection(this.withDoc.bind(this), sec, para, ci);
   }
 
   getControlImageData(sec: number, para: number, ci: number): Uint8Array {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getControlImageData(sec, para, ci);
+    return getControlImageDataSelection(this.withDoc.bind(this), sec, para, ci);
   }
 
   getControlImageMime(sec: number, para: number, ci: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getControlImageMime(sec, para, ci);
+    return getControlImageMimeSelection(this.withDoc.bind(this), sec, para, ci);
   }
 
   clipboardHasControl(): boolean {
-    if (!this.doc) return false;
-    return this.doc.clipboardHasControl();
+    return clipboardHasControlSelection(this.withOptionalDoc.bind(this));
   }
 
   pasteControl(sec: number, para: number, charOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.pasteControl(sec, para, charOffset);
+    return pasteControlSelection(this.withDoc.bind(this), sec, para, charOffset);
   }
 
   exportSelectionHtml(sec: number, startPara: number, startOffset: number, endPara: number, endOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.exportSelectionHtml(sec, startPara, startOffset, endPara, endOffset);
+    return exportSelectionHtmlSelection(this.withDoc.bind(this), sec, startPara, startOffset, endPara, endOffset);
   }
 
   exportSelectionInCellHtml(sec: number, parentPara: number, controlIdx: number, cellIdx: number, startCellPara: number, startOffset: number, endCellPara: number, endOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.exportSelectionInCellHtml(sec, parentPara, controlIdx, cellIdx, startCellPara, startOffset, endCellPara, endOffset);
+    return exportSelectionInCellHtmlSelection(this.withDoc.bind(this), sec, parentPara, controlIdx, cellIdx, startCellPara, startOffset, endCellPara, endOffset);
   }
 
   pasteHtml(sec: number, para: number, charOffset: number, html: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.pasteHtml(sec, para, charOffset, html);
+    return pasteHtmlSelection(this.withDoc.bind(this), sec, para, charOffset, html);
   }
 
   pasteHtmlInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number, html: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.pasteHtmlInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset, html);
+    return pasteHtmlInCellSelection(this.withDoc.bind(this), sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset, html);
   }
 
   // ─── CharShape (서식) API ──────────────────────────────
 
   getCharPropertiesAt(sec: number, para: number, charOffset: number): CharProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCharPropertiesAt(sec, para, charOffset));
+    return getCharPropertiesAtFormatting(this.parseDocJson.bind(this), sec, para, charOffset);
   }
 
   getCellCharPropertiesAt(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number): CharProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCellCharPropertiesAt(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset));
+    return getCellCharPropertiesAtFormatting(this.parseDocJson.bind(this), sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset);
   }
 
   applyCharFormat(sec: number, para: number, startOffset: number, endOffset: number, propsJson: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.applyCharFormat(sec, para, startOffset, endOffset, propsJson);
+    return applyCharFormatFormatting(this.withDoc.bind(this), sec, para, startOffset, endOffset, propsJson);
   }
 
   applyCharFormatInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, startOffset: number, endOffset: number, propsJson: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.applyCharFormatInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, startOffset, endOffset, propsJson);
+    return applyCharFormatInCellFormatting(this.withDoc.bind(this), sec, parentPara, controlIdx, cellIdx, cellParaIdx, startOffset, endOffset, propsJson);
   }
 
   findOrCreateFontId(name: string): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.findOrCreateFontId(name);
+    return findOrCreateFontIdFormatting(this.withDoc.bind(this), name);
   }
 
   findOrCreateFontIdForLang(lang: number, name: string): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).findOrCreateFontIdForLang(lang, name) as number;
+    return findOrCreateFontIdForLangFormatting(this.requireDoc.bind(this), lang, name);
   }
 
   // ─── 문단 서식 API ──────────────────────────────────────
 
   getParaPropertiesAt(sec: number, para: number): ParaProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getParaPropertiesAt(sec, para));
+    return getParaPropertiesAtFormatting(this.parseDocJson.bind(this), sec, para);
   }
 
   getCellParaPropertiesAt(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number): ParaProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCellParaPropertiesAt(sec, parentPara, controlIdx, cellIdx, cellParaIdx));
+    return getCellParaPropertiesAtFormatting(this.parseDocJson.bind(this), sec, parentPara, controlIdx, cellIdx, cellParaIdx);
   }
 
   setNumberingRestart(sec: number, para: number, mode: number, startNum: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return (this.doc as any).setNumberingRestart(sec, para, mode, startNum);
+    return setNumberingRestartFormatting(this.requireDoc.bind(this), sec, para, mode, startNum);
   }
 
   applyParaFormat(sec: number, para: number, propsJson: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.applyParaFormat(sec, para, propsJson);
+    return applyParaFormatFormatting(this.withDoc.bind(this), sec, para, propsJson);
   }
 
   applyParaFormatInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, propsJson: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.applyParaFormatInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, propsJson);
+    return applyParaFormatInCellFormatting(this.withDoc.bind(this), sec, parentPara, controlIdx, cellIdx, cellParaIdx, propsJson);
   }
 
   /** 머리말/꼬리말 문단의 문단 속성을 조회한다 */
   getParaPropertiesInHf(sec: number, isHeader: boolean, applyTo: number, hfParaIdx: number): ParaProperties {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getParaPropertiesInHf(sec, isHeader, applyTo, hfParaIdx));
+    return getParaPropertiesInHfFormatting(this.parseDocJson.bind(this), sec, isHeader, applyTo, hfParaIdx);
   }
 
   /** 머리말/꼬리말 문단에 문단 서식을 적용한다 */
   applyParaFormatInHf(sec: number, isHeader: boolean, applyTo: number, hfParaIdx: number, propsJson: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.applyParaFormatInHf(sec, isHeader, applyTo, hfParaIdx, propsJson);
+    return applyParaFormatInHfFormatting(this.withDoc.bind(this), sec, isHeader, applyTo, hfParaIdx, propsJson);
   }
 
   /** 머리말/꼬리말 문단에 필드 마커를 삽입한다 (1=쪽번호, 2=총쪽수, 3=파일이름) */
   insertFieldInHf(sec: number, isHeader: boolean, applyTo: number, hfParaIdx: number, charOffset: number, fieldType: number): { ok: boolean; charOffset: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.insertFieldInHf(sec, isHeader, applyTo, hfParaIdx, charOffset, fieldType));
+    return insertFieldInHfFormatting(this.parseDocJson.bind(this), sec, isHeader, applyTo, hfParaIdx, charOffset, fieldType);
   }
 
   applyHfTemplate(sec: number, isHeader: boolean, applyTo: number, templateId: number): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.applyHfTemplate(sec, isHeader, applyTo, templateId));
+    return applyHfTemplateFormatting(this.parseDocJson.bind(this), sec, isHeader, applyTo, templateId);
   }
 
   // ─── 스타일 API ──────────────────────────────────────
 
   getStyleList(): Array<{ id: number; name: string; englishName: string; type: number; nextStyleId: number; paraShapeId: number; charShapeId: number }> {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).getStyleList());
+    return getStyleListFormatting(this.requireDoc.bind(this));
   }
 
   getStyleDetail(styleId: number): { charProps: import('./types').CharProperties; paraProps: import('./types').ParaProperties } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).getStyleDetail(styleId));
+    return getStyleDetailFormatting(this.requireDoc.bind(this), styleId);
   }
 
   updateStyle(styleId: number, json: string): boolean {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.doc as any).updateStyle(styleId, json);
+    return updateStyleFormatting(this.requireDoc.bind(this), styleId, json);
   }
 
   updateStyleShapes(styleId: number, charModsJson: string, paraModsJson: string): boolean {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.doc as any).updateStyleShapes(styleId, charModsJson, paraModsJson);
+    return updateStyleShapesFormatting(this.requireDoc.bind(this), styleId, charModsJson, paraModsJson);
   }
 
   createStyle(json: string): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.doc as any).createStyle(json);
+    return createStyleFormatting(this.requireDoc.bind(this), json);
   }
 
   deleteStyle(styleId: number): boolean {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.doc as any).deleteStyle(styleId);
+    return deleteStyleFormatting(this.requireDoc.bind(this), styleId);
   }
 
   // ─── 번호/글머리표 API ─────────────────────────────────
 
   getNumberingList(): Array<{ id: number; levelFormats: string[]; startNumber: number }> {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).getNumberingList());
+    return getNumberingListFormatting(this.requireDoc.bind(this));
   }
 
   getBulletList(): Array<{ id: number; char: string; rawCode: number }> {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).getBulletList());
+    return getBulletListFormatting(this.requireDoc.bind(this));
   }
 
   ensureDefaultNumbering(): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.doc as any).ensureDefaultNumbering();
+    return ensureDefaultNumberingFormatting(this.requireDoc.bind(this));
   }
 
   createNumbering(json: string): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.doc as any).createNumbering(json);
+    return createNumberingFormatting(this.requireDoc.bind(this), json);
   }
 
   ensureDefaultBullet(bulletChar: string): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.doc as any).ensureDefaultBullet(bulletChar);
+    return ensureDefaultBulletFormatting(this.requireDoc.bind(this), bulletChar);
   }
 
   getStyleAt(sec: number, para: number): { id: number; name: string } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).getStyleAt(sec, para));
+    return getStyleAtFormatting(this.requireDoc.bind(this), sec, para);
   }
 
   getCellStyleAt(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number): { id: number; name: string } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).getCellStyleAt(sec, parentPara, controlIdx, cellIdx, cellParaIdx));
+    return getCellStyleAtFormatting(this.requireDoc.bind(this), sec, parentPara, controlIdx, cellIdx, cellParaIdx);
   }
 
   applyStyle(sec: number, para: number, styleId: number): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).applyStyle(sec, para, styleId));
+    return applyStyleFormatting(this.requireDoc.bind(this), sec, para, styleId);
   }
 
   applyCellStyle(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, styleId: number): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return JSON.parse((this.doc as any).applyCellStyle(sec, parentPara, controlIdx, cellIdx, cellParaIdx, styleId));
+    return applyCellStyleFormatting(this.requireDoc.bind(this), sec, parentPara, controlIdx, cellIdx, cellParaIdx, styleId);
   }
 
   // ─── 보기 옵션 API ──────────────────────────────────
 
   setShowParagraphMarks(enabled: boolean): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    this.doc.setShowParagraphMarks(enabled);
+    setShowParagraphMarksView(this.withDoc.bind(this), enabled);
   }
 
   /** 조판부호 표시 여부 반환 */
   getShowControlCodes(): boolean {
-    if (!this.doc) return false;
-    return (this.doc as any).getShowControlCodes();
+    return getShowControlCodesView(this.withOptionalDoc.bind(this));
   }
 
   setShowControlCodes(enabled: boolean): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    this.doc.setShowControlCodes(enabled);
+    setShowControlCodesView(this.withDoc.bind(this), enabled);
   }
 
   getShowTransparentBorders(): boolean {
-    if (!this.doc) return false;
-    return this.doc.getShowTransparentBorders();
+    return getShowTransparentBordersView(this.withOptionalDoc.bind(this));
   }
 
   setShowTransparentBorders(enabled: boolean): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    this.doc.setShowTransparentBorders(enabled);
+    setShowTransparentBordersView(this.withDoc.bind(this), enabled);
   }
 
   setClipEnabled(enabled: boolean): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    this.doc.setClipEnabled(enabled);
+    setClipEnabledView(this.withDoc.bind(this), enabled);
   }
 
   // ─── Undo/Redo 스냅샷 API ──────────────────────────
 
   saveSnapshot(): number {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.saveSnapshot();
+    return saveSnapshotView(this.withDoc.bind(this));
   }
 
   restoreSnapshot(id: number): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    this.doc.restoreSnapshot(id);
+    restoreSnapshotView(this.withDoc.bind(this), id);
   }
 
   discardSnapshot(id: number): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    this.doc.discardSnapshot(id);
+    discardSnapshotView(this.withDoc.bind(this), id);
   }
 
   // ─── 머리말/꼬리말 API ──────────────────────────────────
 
   getHeaderFooter(sectionIdx: number, isHeader: boolean, applyTo: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getHeaderFooter(sectionIdx, isHeader, applyTo);
+    return getHeaderFooterHf(this.withDoc.bind(this), sectionIdx, isHeader, applyTo);
   }
 
   createHeaderFooter(sectionIdx: number, isHeader: boolean, applyTo: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.createHeaderFooter(sectionIdx, isHeader, applyTo);
+    return createHeaderFooterHf(this.withDoc.bind(this), sectionIdx, isHeader, applyTo);
   }
 
   insertTextInHeaderFooter(sec: number, isHeader: boolean, applyTo: number, hfParaIdx: number, charOffset: number, text: string): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.insertTextInHeaderFooter(sec, isHeader, applyTo, hfParaIdx, charOffset, text);
+    return insertTextInHeaderFooterHf(this.withDoc.bind(this), sec, isHeader, applyTo, hfParaIdx, charOffset, text);
   }
 
   deleteTextInHeaderFooter(sec: number, isHeader: boolean, applyTo: number, hfParaIdx: number, charOffset: number, count: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.deleteTextInHeaderFooter(sec, isHeader, applyTo, hfParaIdx, charOffset, count);
+    return deleteTextInHeaderFooterHf(this.withDoc.bind(this), sec, isHeader, applyTo, hfParaIdx, charOffset, count);
   }
 
   splitParagraphInHeaderFooter(sec: number, isHeader: boolean, applyTo: number, hfParaIdx: number, charOffset: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.splitParagraphInHeaderFooter(sec, isHeader, applyTo, hfParaIdx, charOffset);
+    return splitParagraphInHeaderFooterHf(this.withDoc.bind(this), sec, isHeader, applyTo, hfParaIdx, charOffset);
   }
 
   mergeParagraphInHeaderFooter(sec: number, isHeader: boolean, applyTo: number, hfParaIdx: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.mergeParagraphInHeaderFooter(sec, isHeader, applyTo, hfParaIdx);
+    return mergeParagraphInHeaderFooterHf(this.withDoc.bind(this), sec, isHeader, applyTo, hfParaIdx);
   }
 
   getHeaderFooterParaInfo(sec: number, isHeader: boolean, applyTo: number, hfParaIdx: number): string {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return this.doc.getHeaderFooterParaInfo(sec, isHeader, applyTo, hfParaIdx);
+    return getHeaderFooterParaInfoHf(this.withDoc.bind(this), sec, isHeader, applyTo, hfParaIdx);
   }
 
   getCursorRectInHeaderFooter(sec: number, isHeader: boolean, applyTo: number, hfParaIdx: number, charOffset: number, preferredPage = -1): CursorRect {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getCursorRectInHeaderFooter(sec, isHeader, applyTo, hfParaIdx, charOffset, preferredPage));
+    return getCursorRectInHeaderFooterHf(this.parseDocJson.bind(this), sec, isHeader, applyTo, hfParaIdx, charOffset, preferredPage);
   }
 
   hitTestHeaderFooter(pageNum: number, x: number, y: number): { hit: boolean; isHeader?: boolean; sectionIndex?: number; applyTo?: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.hitTestHeaderFooter(pageNum, x, y));
+    return hitTestHeaderFooterHf(this.parseDocJson.bind(this), pageNum, x, y);
   }
 
   hitTestInHeaderFooter(pageNum: number, isHeader: boolean, x: number, y: number): { hit: boolean; paraIndex?: number; charOffset?: number; cursorRect?: { pageIndex: number; x: number; y: number; height: number } } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.hitTestInHeaderFooter(pageNum, isHeader, x, y));
+    return hitTestInHeaderFooterHf(this.parseDocJson.bind(this), pageNum, isHeader, x, y);
   }
 
   deleteHeaderFooter(sectionIdx: number, isHeader: boolean, applyTo: number): void {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    this.doc.deleteHeaderFooter(sectionIdx, isHeader, applyTo);
+    deleteHeaderFooterHf(this.withDoc.bind(this), sectionIdx, isHeader, applyTo);
   }
 
   getHeaderFooterList(currentSectionIdx: number, currentIsHeader: boolean, currentApplyTo: number): { ok: boolean; items: { sectionIdx: number; isHeader: boolean; applyTo: number; label: string }[]; currentIndex: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.getHeaderFooterList(currentSectionIdx, currentIsHeader, currentApplyTo));
+    return getHeaderFooterListHf(this.parseDocJson.bind(this), currentSectionIdx, currentIsHeader, currentApplyTo);
   }
 
   toggleHideHeaderFooter(pageIndex: number, isHeader: boolean): { hidden: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.toggleHideHeaderFooter(pageIndex, isHeader));
+    return toggleHideHeaderFooterHf(this.parseDocJson.bind(this), pageIndex, isHeader);
   }
 
   navigateHeaderFooterByPage(currentPage: number, isHeader: boolean, direction: number): { ok: boolean; pageIndex?: number; sectionIdx?: number; isHeader?: boolean; applyTo?: number } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse(this.doc.navigateHeaderFooterByPage(currentPage, isHeader, direction));
+    return navigateHeaderFooterByPageHf(this.parseDocJson.bind(this), currentPage, isHeader, direction);
   }
 
   // ─── 필드 API (Task 230) ─────────────────────────────────
@@ -1192,108 +1094,57 @@ export class WasmBridge {
     value: string;
     location: { sectionIndex: number; paraIndex: number; path?: Array<any> };
   }> {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).getFieldList());
+    return getFieldListField(this.requireDoc());
   }
 
   /** field_id로 필드 값을 조회한다. */
   getFieldValue(fieldId: number): { ok: boolean; value: string } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).getFieldValue(fieldId));
+    return getFieldValueField(this.requireDoc(), fieldId);
   }
 
   /** 필드 이름으로 값을 조회한다. */
   getFieldValueByName(name: string): { ok: boolean; fieldId: number; value: string } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).getFieldValueByName(name));
+    return getFieldValueByNameField(this.requireDoc(), name);
   }
 
   /** field_id로 필드 값을 설정한다. */
   setFieldValue(fieldId: number, value: string): { ok: boolean; fieldId: number; oldValue: string; newValue: string } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).setFieldValue(fieldId, value));
+    return setFieldValueField(this.requireDoc(), fieldId, value);
   }
 
   /** 필드 이름으로 값을 설정한다. */
   setFieldValueByName(name: string, value: string): { ok: boolean; fieldId: number; oldValue: string; newValue: string } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    return JSON.parse((this.doc as any).setFieldValueByName(name, value));
+    return setFieldValueByNameField(this.requireDoc(), name, value);
   }
 
   /** 커서 위치의 필드 범위 정보를 조회한다. */
   getFieldInfoAt(pos: DocumentPosition): FieldInfoResult {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    // 중첩 표 (depth > 1): path 기반 API 사용
-    if ((pos.cellPath?.length ?? 0) > 1 && pos.parentParaIndex !== undefined) {
-      return JSON.parse((this.doc as any).getFieldInfoAtByPath(
-        pos.sectionIndex, pos.parentParaIndex, JSON.stringify(pos.cellPath), pos.charOffset,
-      ));
-    }
-    if (pos.parentParaIndex !== undefined && pos.controlIndex !== undefined) {
-      return JSON.parse((this.doc as any).getFieldInfoAtInCell(
-        pos.sectionIndex, pos.parentParaIndex, pos.controlIndex,
-        pos.cellIndex ?? 0, pos.cellParaIndex ?? 0, pos.charOffset,
-        pos.isTextBox ?? false,
-      ));
-    }
-    return JSON.parse((this.doc as any).getFieldInfoAt(
-      pos.sectionIndex, pos.paragraphIndex, pos.charOffset,
-    ));
+    return getFieldInfoAtField(this.requireDoc(), pos);
   }
 
   /** 커서 위치의 누름틀 필드를 제거한다 (텍스트 유지). */
   removeFieldAt(pos: DocumentPosition): { ok: boolean } {
-    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
-    if (pos.parentParaIndex !== undefined && pos.controlIndex !== undefined) {
-      return JSON.parse((this.doc as any).removeFieldAtInCell(
-        pos.sectionIndex, pos.parentParaIndex, pos.controlIndex,
-        pos.cellIndex ?? 0, pos.cellParaIndex ?? 0, pos.charOffset,
-        pos.isTextBox ?? false,
-      ));
-    }
-    return JSON.parse((this.doc as any).removeFieldAt(
-      pos.sectionIndex, pos.paragraphIndex, pos.charOffset,
-    ));
+    return removeFieldAtField(this.requireDoc(), pos);
   }
 
   /** 활성 필드를 설정한다 (안내문 숨김용). 변경 시 true 반환. */
   setActiveField(pos: DocumentPosition): boolean {
-    if (!this.doc) return false;
-    // 중첩 표 (depth > 1): path 기반 API 사용
-    if ((pos.cellPath?.length ?? 0) > 1 && pos.parentParaIndex !== undefined) {
-      return (this.doc as any).setActiveFieldByPath(
-        pos.sectionIndex, pos.parentParaIndex, JSON.stringify(pos.cellPath), pos.charOffset,
-      );
-    }
-    if (pos.parentParaIndex !== undefined && pos.controlIndex !== undefined) {
-      return (this.doc as any).setActiveFieldInCell(
-        pos.sectionIndex, pos.parentParaIndex, pos.controlIndex,
-        pos.cellIndex ?? 0, pos.cellParaIndex ?? 0, pos.charOffset,
-        pos.isTextBox ?? false,
-      );
-    } else {
-      return (this.doc as any).setActiveField(
-        pos.sectionIndex, pos.paragraphIndex, pos.charOffset,
-      );
-    }
+    return setActiveFieldField(this.doc, pos);
   }
 
   /** 활성 필드를 해제한다 (안내문 다시 표시). */
   clearActiveField(): void {
-    if (!this.doc) return;
-    (this.doc as any).clearActiveField();
+    clearActiveFieldField(this.withOptionalDoc.bind(this));
   }
 
   /** 누름틀 필드 속성을 조회한다. */
   getClickHereProps(fieldId: number): { ok: boolean; guide?: string; memo?: string; name?: string; editable?: boolean } {
-    if (!this.doc) return { ok: false };
-    return JSON.parse((this.doc as any).getClickHereProps(fieldId));
+    return getClickHerePropsField(this.parseOptionalDocJson.bind(this), fieldId);
   }
 
   /** 누름틀 필드 속성을 수정한다. */
   updateClickHereProps(fieldId: number, guide: string, memo: string, name: string, editable: boolean): { ok: boolean } {
-    if (!this.doc) return { ok: false };
-    return JSON.parse((this.doc as any).updateClickHereProps(fieldId, guide, memo, name, editable));
+    return updateClickHerePropsField(this.parseOptionalDocJson.bind(this), fieldId, guide, memo, name, editable);
   }
 
   // ─────────────────────────────────────────────
@@ -1302,93 +1153,67 @@ export class WasmBridge {
 
   /** 페이지 좌표에서 양식 개체를 찾는다. */
   getFormObjectAt(pageNum: number, x: number, y: number): import('./types').FormObjectHitResult {
-    if (!this.doc || typeof (this.doc as any).getFormObjectAt !== 'function') return { found: false };
-    return JSON.parse((this.doc as any).getFormObjectAt(pageNum, x, y));
+    return getFormObjectAtForm(this.parseOptionalDocMethodJson.bind(this), pageNum, x, y);
   }
 
   /** 양식 개체 값을 조회한다. */
   getFormValue(sec: number, para: number, ci: number): import('./types').FormValueResult {
-    if (!this.doc || typeof (this.doc as any).getFormValue !== 'function') return { ok: false };
-    return JSON.parse((this.doc as any).getFormValue(sec, para, ci));
+    return getFormValueForm(this.parseOptionalDocMethodJson.bind(this), sec, para, ci);
   }
 
   /** 양식 개체 값을 설정한다. */
   setFormValue(sec: number, para: number, ci: number, valueJson: string): { ok: boolean } {
-    if (!this.doc || typeof (this.doc as any).setFormValue !== 'function') return { ok: false };
-    return JSON.parse((this.doc as any).setFormValue(sec, para, ci, valueJson));
+    return setFormValueForm(this.parseOptionalDocMethodJson.bind(this), sec, para, ci, valueJson);
   }
 
   /** 셀 내부 양식 개체 값을 설정한다. */
   setFormValueInCell(sec: number, tablePara: number, tableCi: number, cellIdx: number, cellPara: number, formCi: number, valueJson: string): { ok: boolean } {
-    if (!this.doc || typeof (this.doc as any).setFormValueInCell !== 'function') return { ok: false };
-    return JSON.parse((this.doc as any).setFormValueInCell(sec, tablePara, tableCi, cellIdx, cellPara, formCi, valueJson));
+    return setFormValueInCellForm(this.parseOptionalDocMethodJson.bind(this), sec, tablePara, tableCi, cellIdx, cellPara, formCi, valueJson);
   }
 
   /** 양식 개체 상세 정보를 반환한다. */
   getFormObjectInfo(sec: number, para: number, ci: number): import('./types').FormObjectInfoResult {
-    if (!this.doc || typeof (this.doc as any).getFormObjectInfo !== 'function') return { ok: false };
-    return JSON.parse((this.doc as any).getFormObjectInfo(sec, para, ci));
+    return getFormObjectInfoForm(this.parseOptionalDocMethodJson.bind(this), sec, para, ci);
   }
 
   // ── 검색/치환 API ──
 
-  searchText(query: string, fromSec: number, fromPara: number, fromChar: number, forward: boolean, caseSensitive: boolean): import('./types').SearchResult {
-    if (!this.doc || typeof (this.doc as any).searchText !== 'function') return { found: false };
-    return JSON.parse((this.doc as any).searchText(query, fromSec, fromPara, fromChar, forward, caseSensitive));
+  searchText(query: string, fromSec: number, fromPara: number, fromChar: number, forward: boolean, caseSensitive: boolean): SearchResult {
+    return searchTextField(this.parseOptionalDocMethodJson.bind(this), query, fromSec, fromPara, fromChar, forward, caseSensitive);
   }
 
-  replaceText(sec: number, para: number, charOffset: number, length: number, newText: string): import('./types').ReplaceResult {
-    if (!this.doc || typeof (this.doc as any).replaceText !== 'function') return { ok: false };
-    return JSON.parse((this.doc as any).replaceText(sec, para, charOffset, length, newText));
+  replaceText(sec: number, para: number, charOffset: number, length: number, newText: string): ReplaceResult {
+    return replaceTextField(this.parseOptionalDocMethodJson.bind(this), sec, para, charOffset, length, newText);
   }
 
-  replaceAll(query: string, newText: string, caseSensitive: boolean): import('./types').ReplaceAllResult {
-    if (!this.doc || typeof (this.doc as any).replaceAll !== 'function') return { ok: false };
-    return JSON.parse((this.doc as any).replaceAll(query, newText, caseSensitive));
+  replaceAll(query: string, newText: string, caseSensitive: boolean): ReplaceAllResult {
+    return replaceAllField(this.parseOptionalDocMethodJson.bind(this), query, newText, caseSensitive);
   }
 
   getPositionOfPage(globalPage: number): { ok: boolean; sec?: number; para?: number; charOffset?: number } {
-    if (!this.doc || typeof (this.doc as any).getPositionOfPage !== 'function') return { ok: false };
-    return JSON.parse((this.doc as any).getPositionOfPage(globalPage));
+    return getPositionOfPageField(this.parseOptionalDocMethodJson.bind(this), globalPage);
   }
 
-  getPageOfPosition(sectionIdx: number, paraIdx: number): import('./types').PageOfPositionResult {
-    if (!this.doc || typeof (this.doc as any).getPageOfPosition !== 'function') return { ok: false };
-    return JSON.parse((this.doc as any).getPageOfPosition(sectionIdx, paraIdx));
+  getPageOfPosition(sectionIdx: number, paraIdx: number): PageOfPositionResult {
+    return getPageOfPositionField(this.parseOptionalDocMethodJson.bind(this), sectionIdx, paraIdx);
   }
 
   // ── 책갈피 API ──
 
   getBookmarks(): BookmarkInfo[] {
-    if (!this.doc) return [];
-    try {
-      const json = (this.doc as any).getBookmarks();
-      return typeof json === 'string' ? JSON.parse(json) : json;
-    } catch { return []; }
+    return getBookmarksField(this.getOptionalDocMethod.bind(this));
   }
 
   addBookmark(sec: number, para: number, charOffset: number, name: string): { ok: boolean; error?: string } {
-    if (!this.doc) return { ok: false, error: '문서가 로드되지 않았습니다' };
-    try {
-      const json = (this.doc as any).addBookmark(sec, para, charOffset, name);
-      return typeof json === 'string' ? JSON.parse(json) : json;
-    } catch (e) { return { ok: false, error: String(e) }; }
+    return addBookmarkField(this.getOptionalDocMethod.bind(this), sec, para, charOffset, name);
   }
 
   deleteBookmark(sec: number, para: number, ctrlIdx: number): { ok: boolean; error?: string } {
-    if (!this.doc) return { ok: false, error: '문서가 로드되지 않았습니다' };
-    try {
-      const json = (this.doc as any).deleteBookmark(sec, para, ctrlIdx);
-      return typeof json === 'string' ? JSON.parse(json) : json;
-    } catch (e) { return { ok: false, error: String(e) }; }
+    return deleteBookmarkField(this.getOptionalDocMethod.bind(this), sec, para, ctrlIdx);
   }
 
   renameBookmark(sec: number, para: number, ctrlIdx: number, newName: string): { ok: boolean; error?: string } {
-    if (!this.doc) return { ok: false, error: '문서가 로드되지 않았습니다' };
-    try {
-      const json = (this.doc as any).renameBookmark(sec, para, ctrlIdx, newName);
-      return typeof json === 'string' ? JSON.parse(json) : json;
-    } catch (e) { return { ok: false, error: String(e) }; }
+    return renameBookmarkField(this.getOptionalDocMethod.bind(this), sec, para, ctrlIdx, newName);
   }
 
   dispose(): void {

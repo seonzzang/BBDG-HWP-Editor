@@ -400,3 +400,140 @@ pub fn resolve_remote_hwp_url(
         detection_method: probe.detection_method,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
+
+    const TEST_HWPX_BYTES: &[u8] = b"PK\x03\x04test-hwpx";
+
+    fn spawn_test_server(
+        route: &'static str,
+        content_type: &'static str,
+        content_disposition: Option<&'static str>,
+        body: &'static [u8],
+        request_count: usize,
+    ) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        let address = listener.local_addr().expect("local addr");
+
+        thread::spawn(move || {
+            for _ in 0..request_count {
+                let (mut stream, _) = listener.accept().expect("accept request");
+                let mut buffer = [0u8; 2048];
+                let read = stream.read(&mut buffer).expect("read request");
+                let request = String::from_utf8_lossy(&buffer[..read]);
+                let method = request
+                    .lines()
+                    .next()
+                    .and_then(|line| line.split_whitespace().next())
+                    .unwrap_or("GET");
+
+                let (status, response_body) = if request.contains(route) {
+                    if method.eq_ignore_ascii_case("HEAD") {
+                        ("200 OK", Vec::new())
+                    } else {
+                        ("200 OK", body.to_vec())
+                    }
+                } else {
+                    ("404 Not Found", Vec::new())
+                };
+
+                let mut headers = vec![
+                    format!("HTTP/1.1 {status}"),
+                    format!("Content-Type: {content_type}"),
+                    format!("Content-Length: {}", response_body.len()),
+                    "Connection: close".to_string(),
+                ];
+                if let Some(value) = content_disposition {
+                    headers.push(format!("Content-Disposition: {value}"));
+                }
+                headers.push(String::new());
+                headers.push(String::new());
+
+                let mut response = headers.join("\r\n").into_bytes();
+                response.extend_from_slice(&response_body);
+                stream.write_all(&response).expect("write response");
+                stream.flush().expect("flush response");
+            }
+        });
+
+        format!("http://127.0.0.1:{}{}", address.port(), route)
+    }
+
+    #[test]
+    fn resolve_remote_hwp_url_accepts_direct_extension_download() {
+        let url = spawn_test_server(
+            "/sample.hwpx",
+            "application/octet-stream",
+            None,
+            TEST_HWPX_BYTES,
+            1,
+        );
+
+        let result = resolve_remote_hwp_url(url.clone(), None).expect("resolve direct extension");
+        assert_eq!(result.file_name, "sample.hwpx");
+        assert_eq!(result.final_url, url);
+        assert_eq!(result.detection_method, "direct-extension");
+        assert_eq!(result.bytes, TEST_HWPX_BYTES);
+        assert!(Path::new(&result.temp_path).exists());
+        cleanup_remote_hwp_temp_path(result.temp_path).expect("cleanup temp file");
+    }
+
+    #[test]
+    fn resolve_remote_hwp_url_accepts_header_detected_download() {
+        let url = spawn_test_server(
+            "/download",
+            "application/haansoft-hwpx",
+            Some("attachment; filename=\"header-detected.hwpx\""),
+            TEST_HWPX_BYTES,
+            2,
+        );
+
+        let result = resolve_remote_hwp_url(url.clone(), None).expect("resolve header detected");
+        assert_eq!(result.file_name, "header-detected.hwpx");
+        assert_eq!(result.final_url, url);
+        assert_eq!(result.detection_method, "response-headers");
+        assert_eq!(result.bytes, TEST_HWPX_BYTES);
+        assert!(Path::new(&result.temp_path).exists());
+        cleanup_remote_hwp_temp_path(result.temp_path).expect("cleanup temp file");
+    }
+
+    #[test]
+    fn resolve_remote_hwp_url_rejects_html_page_response() {
+        let url = spawn_test_server(
+            "/fake.hwpx",
+            "text/html; charset=utf-8",
+            None,
+            b"<!DOCTYPE html><html><body>not a document</body></html>",
+            1,
+        );
+
+        let error = resolve_remote_hwp_url(url, None).expect_err("html page should be rejected");
+        assert!(
+            error.contains("HTML 페이지"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn resolve_remote_hwp_url_rejects_invalid_download_signature() {
+        let url = spawn_test_server(
+            "/bad-download.hwpx",
+            "application/octet-stream",
+            None,
+            b"NOT-HWPX-DATA",
+            1,
+        );
+
+        let error =
+            resolve_remote_hwp_url(url, None).expect_err("invalid binary signature should fail");
+        assert!(
+            error.contains("지원되지 않는 다운로드 데이터"),
+            "unexpected error: {error}"
+        );
+    }
+}

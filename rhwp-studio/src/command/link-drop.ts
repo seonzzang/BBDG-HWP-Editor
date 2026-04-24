@@ -6,6 +6,14 @@ export type DroppedResourceCandidate = {
   file?: File;
 };
 
+export type DropTransferSnapshot = {
+  files?: File[];
+  downloadUrl?: string | null;
+  uriList?: string | null;
+  plainText?: string | null;
+  html?: string | null;
+};
+
 function normalizeUrl(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -23,13 +31,14 @@ function parseDownloadUrl(value: string): { name?: string; url: string } | null 
   };
 }
 
-export function extractDropCandidates(dataTransfer: DataTransfer | null): DroppedResourceCandidate[] {
-  if (!dataTransfer) return [];
-
+export function extractDropCandidatesFromSnapshot(
+  snapshot: DropTransferSnapshot | null | undefined,
+): DroppedResourceCandidate[] {
+  if (!snapshot) return [];
   const candidates: DroppedResourceCandidate[] = [];
   const seenUrls = new Set<string>();
 
-  for (const file of Array.from(dataTransfer.files ?? [])) {
+  for (const file of Array.from(snapshot.files ?? [])) {
     candidates.push({
       kind: 'file',
       source: 'file',
@@ -54,13 +63,13 @@ export function extractDropCandidates(dataTransfer: DataTransfer | null): Droppe
     });
   };
 
-  const downloadUrl = dataTransfer.getData('DownloadURL');
+  const downloadUrl = snapshot.downloadUrl ?? '';
   if (downloadUrl) {
     const parsed = parseDownloadUrl(downloadUrl);
     pushUrl('download-url', normalizeUrl(parsed?.url ?? ''), parsed?.name);
   }
 
-  const uriList = dataTransfer.getData('text/uri-list');
+  const uriList = snapshot.uriList ?? '';
   if (uriList) {
     for (const line of uriList.split(/\r?\n/)) {
       const candidate = line.trim();
@@ -69,12 +78,12 @@ export function extractDropCandidates(dataTransfer: DataTransfer | null): Droppe
     }
   }
 
-  const plainText = dataTransfer.getData('text/plain');
+  const plainText = snapshot.plainText ?? '';
   if (plainText) {
     pushUrl('plain-text', normalizeUrl(plainText));
   }
 
-  const html = dataTransfer.getData('text/html');
+  const html = snapshot.html ?? '';
   if (html) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -87,6 +96,23 @@ export function extractDropCandidates(dataTransfer: DataTransfer | null): Droppe
   }
 
   return candidates;
+}
+
+export function createDropTransferSnapshot(
+  dataTransfer: DataTransfer | null,
+): DropTransferSnapshot | null {
+  if (!dataTransfer) return null;
+  return {
+    files: Array.from(dataTransfer.files ?? []),
+    downloadUrl: dataTransfer.getData('DownloadURL'),
+    uriList: dataTransfer.getData('text/uri-list'),
+    plainText: dataTransfer.getData('text/plain'),
+    html: dataTransfer.getData('text/html'),
+  };
+}
+
+export function extractDropCandidates(dataTransfer: DataTransfer | null): DroppedResourceCandidate[] {
+  return extractDropCandidatesFromSnapshot(createDropTransferSnapshot(dataTransfer));
 }
 
 function looksLikeHwpName(value?: string): boolean {

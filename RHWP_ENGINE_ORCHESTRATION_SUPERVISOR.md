@@ -1,5 +1,9 @@
 # RHWP Engine Orchestration Supervisor
 
+Project:
+- `RHWP Integration Preservation Framework`
+- `RHWP 엔진 통합 보존 프레임워크`
+
 ## Purpose
 
 This document defines the orchestration supervisor role for RHWP engine update work.
@@ -15,6 +19,10 @@ Writes code and documentation for a specific scoped task.
 ### Guardian Agent
 
 Reviews the current diff against the approved documents and gives a `Continue`, `Continue with caution`, or `Stop` decision.
+
+### Approval Gate Agent
+
+Checks whether a completed step report has enough evidence to automatically approve the next planned step.
 
 ### Momentum Monitor
 
@@ -53,6 +61,7 @@ The supervisor must continuously use these documents:
 - `RHWP_ENGINE_API_INVENTORY.md`
 - `RHWP_ENGINE_COMPATIBILITY_CHECKLIST.md`
 - `RHWP_ENGINE_GUARDIAN_AGENT.md`
+- `RHWP_ENGINE_APPROVAL_GATE_AGENT.md`
 - `RHWP_ENGINE_MOMENTUM_MONITOR.md`
 - `RHWP_ENGINE_BASELINE_COMPARISON_AGENT.md`
 - `RHWP_ENGINE_APP_CONTROL_VERIFICATION_AGENT.md`
@@ -73,11 +82,13 @@ Every RHWP engine update should be run as a controlled loop:
 6. Run appropriate checks
 7. Request guardian review
 8. Resolve guardian risks
-9. Run momentum check if progress stalls
-10. Run app control verification where practical
-11. Run baseline comparison before accepting the update
-12. Record result
-13. Commit only when the phase is stable
+9. Request approval gate review
+10. Auto-approve next step when evidence is sufficient
+11. Run momentum check if progress stalls
+12. Run app control verification where practical
+13. Run baseline comparison before accepting the update
+14. Record result
+15. Commit only when the phase is stable
 ```
 
 The next phase is allowed only when both gates pass:
@@ -166,6 +177,19 @@ Feature preservation gate:
 - guardian review does not report feature loss
 
 If either gate fails, the phase result is `Fail` and the work must stay in the current phase.
+
+### 5A. Approval Gate Progression
+
+After a step is reported complete, the supervisor should prefer using the approval gate agent instead of waiting for a human acknowledgement.
+
+The approval gate agent may approve the next step only when:
+
+- the step result matches the development plan
+- required verification evidence exists
+- guardian has not issued `Stop`
+- no blocking feature preservation failure remains
+
+If the approval gate agent returns `Approve With Conditions`, the supervisor must record and enforce those conditions before the next phase transition.
 
 ### 6. Error And Performance Control
 
